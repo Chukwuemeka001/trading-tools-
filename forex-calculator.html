@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trade Calculator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    .container { max-width: 540px; margin: 0 auto; }
+
+    header { text-align: center; margin-bottom: 22px; }
+    header h1 { font-size: 1.55rem; font-weight: 700; color: #58a6ff; }
+    header p { color: #8b949e; font-size: 0.83rem; margin-top: 4px; }
+
+    /* Mode tabs */
+    .tabs {
+      display: flex;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 16px;
+    }
+    .tab {
+      flex: 1;
+      padding: 9px 0;
+      text-align: center;
+      font-size: 0.88rem;
+      font-weight: 600;
+      border-radius: 7px;
+      cursor: pointer;
+      color: #8b949e;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .tab.active { background: #21262d; color: #e6edf3; }
+    .tab.btc.active { color: #f7931a; }
+    .tab.forex.active { color: #58a6ff; }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+    .card h2 {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #8b949e;
+      margin-bottom: 14px;
+    }
+
+    .field { margin-bottom: 12px; }
+    label { display: block; font-size: 0.81rem; color: #8b949e; margin-bottom: 5px; }
+
+    .input-wrap { position: relative; display: flex; align-items: center; }
+
+    input[type="number"], select {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e6edf3;
+      font-size: 0.93rem;
+      padding: 9px 44px 9px 12px;
+      outline: none;
+      transition: border-color 0.2s;
+      -moz-appearance: textfield;
+    }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    input[type="number"]:focus, select:focus { border-color: #58a6ff; }
+
+    select { padding-right: 12px; cursor: pointer; appearance: none; }
+
+    .unit {
+      position: absolute; right: 10px;
+      font-size: 0.76rem; color: #8b949e; pointer-events: none;
+    }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    /* Direction toggle */
+    .dir-toggle { display: flex; gap: 8px; }
+    .dir-btn {
+      flex: 1; padding: 8px; text-align: center; border-radius: 7px;
+      font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      border: 1px solid #30363d; background: #0d1117; color: #8b949e;
+      transition: all 0.18s;
+    }
+    .dir-btn.long.active  { background: #0a1f0f; border-color: #3fb950; color: #3fb950; }
+    .dir-btn.short.active { background: #1f0a0a; border-color: #f85149; color: #f85149; }
+
+    /* Results */
+    .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .result-item {
+      background: #0d1117; border: 1px solid #30363d;
+      border-radius: 8px; padding: 11px 13px;
+    }
+    .result-item.highlight { border-color: #58a6ff; background: #0c1a2e; }
+    .result-item.highlight-btc { border-color: #f7931a; background: #1a1206; }
+    .result-item.green { border-color: #3fb950; background: #0a1f0f; }
+    .result-item.red   { border-color: #f85149; background: #1f0a0a; }
+    .result-label { font-size: 0.71rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
+    .result-value { font-size: 1.2rem; font-weight: 700; color: #e6edf3; }
+    .result-item.highlight .result-value { color: #58a6ff; }
+    .result-item.highlight-btc .result-value { color: #f7931a; }
+    .result-item.green .result-value { color: #3fb950; }
+    .result-item.red .result-value   { color: #f85149; }
+    .result-sub { font-size: 0.7rem; color: #8b949e; margin-top: 2px; }
+
+    /* Info note */
+    .info-note {
+      font-size: 0.73rem; color: #8b949e;
+      margin-top: 10px; padding: 8px 10px;
+      background: #0d1117; border-radius: 6px;
+      border-left: 3px solid #58a6ff;
+    }
+    .info-note.btc-note { border-left-color: #f7931a; }
+
+    /* RR bar */
+    .rr-bar-wrap { margin-top: 14px; }
+    .rr-bar-labels { display: flex; justify-content: space-between; font-size: 0.73rem; color: #8b949e; margin-bottom: 5px; }
+    .rr-bar { height: 8px; background: #30363d; border-radius: 4px; overflow: hidden; display: flex; }
+    .rr-risk   { background: #f85149; transition: width 0.3s; }
+    .rr-reward { background: #3fb950; transition: width 0.3s; }
+
+    button.reset-btn {
+      width: 100%; padding: 11px;
+      background: #21262d; border: 1px solid #30363d; border-radius: 8px;
+      color: #8b949e; font-size: 0.87rem; cursor: pointer;
+      transition: all 0.2s; margin-top: 2px;
+    }
+    button.reset-btn:hover { background: #30363d; color: #e6edf3; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Trade Calculator</h1>
+    <p>Position size · Risk · Reward · Capital</p>
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px;flex-wrap:wrap;">
+      <a href="trade-log.html" style="font-size:0.75rem;color:#58a6ff;text-decoration:none;border:1px solid #30363d;padding:4px 10px;border-radius:6px;">Trade Journal ↗</a>
+      <span id="syncBadge" style="font-size:0.72rem;color:#8b949e;"></span>
+    </div>
+  </header>
+
+  <!-- Mode tabs -->
+  <div class="tabs">
+    <div class="tab forex active" onclick="setMode('forex')">Forex</div>
+    <div class="tab btc"   onclick="setMode('btc')">BTC/USDT</div>
+  </div>
+
+  <!-- Account card (shared) -->
+  <div class="card">
+    <h2>Account</h2>
+    <div class="grid-2">
+      <div class="field">
+        <label>Capital</label>
+        <div class="input-wrap">
+          <input type="number" id="capital" value="10000" min="0" step="100">
+          <span class="unit">USDT</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Risk Per Trade</label>
+        <div class="input-wrap">
+          <input type="number" id="riskPct" value="1" min="0.01" max="100" step="0.1">
+          <span class="unit">%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FOREX PANEL ── -->
+  <div id="forexPanel">
+    <div class="card">
+      <h2>Forex Parameters</h2>
+      <div class="grid-2">
+        <div class="field">
+          <label>Stop Loss</label>
+          <div class="input-wrap">
+            <input type="number" id="fxSL" value="20" min="0.1" step="0.5">
+            <span class="unit">pips</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Risk : Reward</label>
+          <div class="input-wrap">
+            <input type="number" id="fxRR" value="2" min="0.1" step="0.1">
+            <span class="unit">R</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Pair Type</label>
+        <select id="pairType">
+          <option value="usd_quote">USD Quote — EUR/USD, GBP/USD, AUD/USD…</option>
+          <option value="usd_base">USD Base — USD/JPY, USD/CAD, USD/CHF…</option>
+          <option value="cross">Cross Pair — EUR/GBP, GBP/JPY, EUR/JPY…</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Exchange Rate (current price)</label>
+        <div class="input-wrap">
+          <input type="number" id="fxPrice" value="1.2500" min="0.0001" step="0.0001">
+        </div>
+      </div>
+
+      <div id="fxNote" class="info-note"></div>
+    </div>
+
+    <div class="card">
+      <h2>Results</h2>
+      <div class="results-grid">
+        <div class="result-item red">
+          <div class="result-label">Risk Amount</div>
+          <div class="result-value" id="fxRiskAmt">—</div>
+          <div class="result-sub" id="fxRiskPct">—</div>
+        </div>
+        <div class="result-item green">
+          <div class="result-label">Reward Amount</div>
+          <div class="result-value" id="fxRewardAmt">—</div>
+          <div class="result-sub" id="fxRewardPips">—</div>
+        </div>
+        <div class="result-item highlight">
+          <div class="result-label">Lot Size</div>
+          <div class="result-value" id="fxLotSize">—</div>
+          <div class="result-sub" id="fxLotType">—</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">Take Profit</div>
+          <div class="result-value" id="fxTPPips">—</div>
+          <div class="result-sub">pips</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">Pip Value</div>
+          <div class="result-value" id="fxPipVal">—</div>
+          <div class="result-sub">per std lot</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">After Win / Loss</div>
+          <div class="result-value" id="fxCapWin">—</div>
+          <div class="result-sub" id="fxCapLoss">—</div>
+        </div>
+      </div>
+      <div class="rr-bar-wrap">
+        <div class="rr-bar-labels">
+          <span id="fxBarL">Risk</span>
+          <span id="fxBarM">R:R</span>
+          <span id="fxBarR">Reward</span>
+        </div>
+        <div class="rr-bar">
+          <div class="rr-risk"   id="fxBarRisk"   style="width:33%"></div>
+          <div class="rr-reward" id="fxBarReward" style="width:67%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── BTC/USDT PANEL ── -->
+  <div id="btcPanel" class="hidden">
+    <div class="card">
+      <h2>BTC/USDT Parameters</h2>
+
+      <div class="field">
+        <label>Direction</label>
+        <div class="dir-toggle">
+          <div class="dir-btn long active" id="btnLong"  onclick="setDir('long')">Long</div>
+          <div class="dir-btn short"       id="btnShort" onclick="setDir('short')">Short</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label>Entry Price</label>
+          <div class="input-wrap">
+            <input type="number" id="btcEntry" value="84000" min="0.01" step="10">
+            <span class="unit">USDT</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Stop Loss Price</label>
+          <div class="input-wrap">
+            <input type="number" id="btcSL" value="82500" min="0.01" step="10">
+            <span class="unit">USDT</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Risk : Reward</label>
+        <div class="input-wrap" style="max-width:200px">
+          <input type="number" id="btcRR" value="2" min="0.1" step="0.1">
+          <span class="unit">R</span>
+        </div>
+      </div>
+
+      <div id="btcNote" class="info-note btc-note"></div>
+    </div>
+
+    <div class="card">
+      <h2>Results</h2>
+      <div class="results-grid">
+        <div class="result-item red">
+          <div class="result-label">Risk Amount</div>
+          <div class="result-value" id="btcRiskAmt">—</div>
+          <div class="result-sub" id="btcRiskPct">—</div>
+        </div>
+        <div class="result-item green">
+          <div class="result-label">Reward Amount</div>
+          <div class="result-value" id="btcRewardAmt">—</div>
+          <div class="result-sub" id="btcRewardSub">—</div>
+        </div>
+        <div class="result-item highlight-btc">
+          <div class="result-label">Position Size</div>
+          <div class="result-value" id="btcQty">—</div>
+          <div class="result-sub" id="btcQtySub">—</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">Position Value</div>
+          <div class="result-value" id="btcPosVal">—</div>
+          <div class="result-sub">USDT notional</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">Take Profit Price</div>
+          <div class="result-value" id="btcTP">—</div>
+          <div class="result-sub" id="btcTPDist">—</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">After Win / Loss</div>
+          <div class="result-value" id="btcCapWin">—</div>
+          <div class="result-sub" id="btcCapLoss">—</div>
+        </div>
+      </div>
+
+      <!-- SL distance breakdown -->
+      <div style="margin-top:12px; padding:10px 12px; background:#0d1117; border-radius:8px; border:1px solid #21262d;">
+        <div style="font-size:0.71rem; color:#8b949e; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px;">Price Levels</div>
+        <div style="display:flex; justify-content:space-between; font-size:0.82rem;">
+          <span style="color:#8b949e;">Entry</span>
+          <span id="lvlEntry" style="font-weight:600;">—</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:0.82rem; margin-top:5px;">
+          <span style="color:#f85149;">Stop Loss</span>
+          <span id="lvlSL" style="font-weight:600; color:#f85149;">—</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:0.82rem; margin-top:5px;">
+          <span style="color:#3fb950;">Take Profit</span>
+          <span id="lvlTP" style="font-weight:600; color:#3fb950;">—</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:0.82rem; margin-top:5px;">
+          <span style="color:#8b949e;">SL Distance</span>
+          <span id="lvlSLDist" style="font-weight:600;">—</span>
+        </div>
+      </div>
+
+      <div class="rr-bar-wrap">
+        <div class="rr-bar-labels">
+          <span id="btcBarL">Risk</span>
+          <span id="btcBarM">R:R</span>
+          <span id="btcBarR">Reward</span>
+        </div>
+        <div class="rr-bar">
+          <div class="rr-risk"   id="btcBarRisk"   style="width:33%"></div>
+          <div class="rr-reward" id="btcBarReward" style="width:67%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="reset-btn" onclick="resetAll()">Reset to Defaults</button>
+
+</div>
+
+<script>
+  let mode = 'forex';
+  let dir  = 'long';
+
+  // ── Helpers ──────────────────────────────────────────────
+  function fmt(n, dec = 2) {
+    return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  }
+  function fmtPrice(n) {
+    // Auto-decimal for BTC prices
+    if (n >= 1000) return '$' + fmt(n, 2);
+    if (n >= 1)    return '$' + fmt(n, 4);
+    return '$' + fmt(n, 6);
+  }
+
+  // ── Mode switching ────────────────────────────────────────
+  function setMode(m) {
+    mode = m;
+    document.getElementById('forexPanel').classList.toggle('hidden', m !== 'forex');
+    document.getElementById('btcPanel').classList.toggle('hidden',   m !== 'btc');
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.tab.${m}`).classList.add('active');
+    calculate();
+  }
+
+  function setDir(d) {
+    dir = d;
+    document.getElementById('btnLong').classList.toggle('active',  d === 'long');
+    document.getElementById('btnShort').classList.toggle('active', d === 'short');
+    calculate();
+  }
+
+  // ── Forex pip value ───────────────────────────────────────
+  function fxPipValue(pairType, price) {
+    // Standard lot = 100,000 units
+    if (pairType === 'usd_quote') {
+      return 10; // 0.0001 × 100,000 = $10 always
+    } else if (pairType === 'usd_base') {
+      // USD/JPY: pip = 0.01 → (0.01 / price) × 100,000
+      // USD/XXX: pip = 0.0001 → (0.0001 / price) × 100,000
+      // JPY pairs have price > 50, others < 10 — detect by price
+      const pipSize = price > 20 ? 0.01 : 0.0001;
+      return (pipSize / price) * 100000;
+    } else {
+      // Cross: pip in quote ccy; divide by price to get approximate USD
+      const pipSize = price > 20 ? 0.01 : 0.0001;
+      return (pipSize / price) * 100000;
+    }
+  }
+
+  // ── Main calculate ────────────────────────────────────────
+  function calculate() {
+    const capital = parseFloat(document.getElementById('capital').value) || 0;
+    const riskPct = parseFloat(document.getElementById('riskPct').value) || 0;
+    if (!capital || !riskPct) return;
+
+    if (mode === 'forex') calcForex(capital, riskPct);
+    else                  calcBTC(capital, riskPct);
+  }
+
+  function calcForex(capital, riskPct) {
+    const sl       = parseFloat(document.getElementById('fxSL').value)    || 0;
+    const rr       = parseFloat(document.getElementById('fxRR').value)    || 1;
+    const pairType = document.getElementById('pairType').value;
+    const price    = parseFloat(document.getElementById('fxPrice').value) || 1;
+    if (!sl) return;
+
+    const riskAmt   = capital * (riskPct / 100);
+    const rewardAmt = riskAmt * rr;
+    const tpPips    = sl * rr;
+    const pipVal    = fxPipValue(pairType, price);
+    const lotSize   = riskAmt / (sl * pipVal);
+
+    let lotLabel = '';
+    if (lotSize >= 0.09)     lotLabel = fmt(lotSize, 3) + ' std lot(s)';
+    else if (lotSize >= 0.009) lotLabel = fmt(lotSize * 10, 3) + ' mini lot(s)';
+    else                       lotLabel = fmt(lotSize * 100, 3) + ' micro lot(s)';
+
+    const notes = {
+      usd_quote: 'EUR/USD, GBP/USD etc. — pip value fixed $10/std lot (100k units)',
+      usd_base:  'USD/JPY, USD/CAD etc. — pip value = pip size ÷ price × 100,000',
+      cross:     'EUR/GBP, GBP/JPY etc. — pip value approximated via exchange rate'
+    };
+    document.getElementById('fxNote').textContent = notes[pairType];
+
+    set('fxRiskAmt',   '$' + fmt(riskAmt));
+    set('fxRiskPct',   riskPct + '% of capital');
+    set('fxRewardAmt', '$' + fmt(rewardAmt));
+    set('fxRewardPips', fmt(tpPips, 1) + ' pips TP');
+    set('fxLotSize',   fmt(lotSize, 3));
+    set('fxLotType',   lotLabel);
+    set('fxTPPips',    fmt(tpPips, 1));
+    set('fxPipVal',    '$' + fmt(pipVal, 3));
+    set('fxCapWin',    '$' + fmt(capital + rewardAmt));
+    set('fxCapLoss',   'Loss → $' + fmt(capital - riskAmt));
+
+    setBar('fxBarRisk', 'fxBarReward', 'fxBarL', 'fxBarM', 'fxBarR', riskAmt, rewardAmt, rr);
+  }
+
+  function calcBTC(capital, riskPct) {
+    const entry = parseFloat(document.getElementById('btcEntry').value) || 0;
+    const sl    = parseFloat(document.getElementById('btcSL').value)    || 0;
+    const rr    = parseFloat(document.getElementById('btcRR').value)    || 1;
+    if (!entry || !sl) return;
+
+    // SL distance — direction-aware
+    let slDist, tpPrice, validSL = true;
+    if (dir === 'long') {
+      slDist  = entry - sl;
+      tpPrice = entry + slDist * rr;
+      if (sl >= entry) validSL = false;
+    } else {
+      slDist  = sl - entry;
+      tpPrice = entry - slDist * rr;
+      if (sl <= entry) validSL = false;
+    }
+
+    if (!validSL || slDist <= 0) {
+      document.getElementById('btcNote').textContent =
+        dir === 'long'
+          ? 'Stop loss must be below entry for a Long trade.'
+          : 'Stop loss must be above entry for a Short trade.';
+      return;
+    }
+
+    // Accurate formula: qty (BTC) = Risk $ / SL distance ($)
+    const riskAmt   = capital * (riskPct / 100);
+    const qty       = riskAmt / slDist;           // BTC amount
+    const posVal    = qty * entry;                // USDT notional
+    const rewardAmt = riskAmt * rr;
+    const slPct     = (slDist / entry) * 100;
+    const tpDist    = slDist * rr;
+
+    document.getElementById('btcNote').textContent =
+      `Position Size = Risk $ ÷ SL Distance  →  $${fmt(riskAmt)} ÷ $${fmt(slDist)} = ${fmt(qty,6)} BTC`;
+
+    set('btcRiskAmt',   '$' + fmt(riskAmt));
+    set('btcRiskPct',   riskPct + '% of capital');
+    set('btcRewardAmt', '$' + fmt(rewardAmt));
+    set('btcRewardSub', fmt(tpDist, 2) + ' USDT move');
+    set('btcQty',       fmt(qty, 6) + ' BTC');
+    set('btcQtySub',    fmt(qty * 1000, 4) + ' mBTC');
+    set('btcPosVal',    '$' + fmt(posVal));
+    set('btcTP',        fmtPrice(tpPrice));
+    set('btcTPDist',    (dir === 'long' ? '+' : '-') + '$' + fmt(tpDist) + ' from entry');
+    set('btcCapWin',    '$' + fmt(capital + rewardAmt));
+    set('btcCapLoss',   'Loss → $' + fmt(capital - riskAmt));
+
+    set('lvlEntry',  fmtPrice(entry));
+    set('lvlSL',     fmtPrice(sl));
+    set('lvlTP',     fmtPrice(tpPrice));
+    set('lvlSLDist', '$' + fmt(slDist) + '  (' + fmt(slPct, 2) + '%)');
+
+    setBar('btcBarRisk', 'btcBarReward', 'btcBarL', 'btcBarM', 'btcBarR', riskAmt, rewardAmt, rr);
+  }
+
+  function set(id, val) { document.getElementById(id).textContent = val; }
+
+  function setBar(riskId, rewardId, lId, mId, rId, riskAmt, rewardAmt, rr) {
+    const riskW   = (1 / (1 + rr)) * 100;
+    const rewardW = (rr / (1 + rr)) * 100;
+    document.getElementById(riskId).style.width   = riskW + '%';
+    document.getElementById(rewardId).style.width = rewardW + '%';
+    set(lId, 'Risk $' + fmt(riskAmt));
+    set(mId, '1:' + rr);
+    set(rId, 'Reward $' + fmt(rewardAmt));
+  }
+
+  // ── Reset ─────────────────────────────────────────────────
+  function resetAll() {
+    document.getElementById('capital').value  = 10000;
+    document.getElementById('riskPct').value  = 1;
+    document.getElementById('fxSL').value     = 20;
+    document.getElementById('fxRR').value     = 2;
+    document.getElementById('pairType').value = 'usd_quote';
+    document.getElementById('fxPrice').value  = 1.2500;
+    document.getElementById('btcEntry').value = 84000;
+    document.getElementById('btcSL').value    = 82500;
+    document.getElementById('btcRR').value    = 2;
+    dir = 'long';
+    setDir('long');
+    calculate();
+  }
+
+  // ── Sync with Trade Journal ───────────────────────────────
+  const SYNC_KEY = 'tradingTools_sync';
+
+  function saveSettings() {
+    const capital = parseFloat(document.getElementById('capital').value) || 0;
+    const riskPct = parseFloat(document.getElementById('riskPct').value) || 0;
+    if (!capital) return;
+    const existing = JSON.parse(localStorage.getItem(SYNC_KEY) || '{}');
+    localStorage.setItem(SYNC_KEY, JSON.stringify({
+      ...existing, capital, riskPct,
+      lastUpdated: new Date().toISOString(), source: 'calculator'
+    }));
+    updateSyncBadge();
+  }
+
+  function loadSettings() {
+    try {
+      const s = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null');
+      if (s) {
+        // Prefer runningCapital (updated by journal after trades close)
+        const cap = s.runningCapital || s.capital;
+        if (cap) document.getElementById('capital').value = cap;
+        if (s.riskPct) document.getElementById('riskPct').value = s.riskPct;
+      }
+    } catch {}
+    updateSyncBadge();
+  }
+
+  function updateSyncBadge() {
+    const el = document.getElementById('syncBadge');
+    if (!el) return;
+    const s = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null');
+    if (s && s.lastUpdated) {
+      const t = new Date(s.lastUpdated).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      el.innerHTML = `<span style="color:#3fb950;">⬤</span> Synced · ${t}`;
+    } else {
+      el.innerHTML = `<span style="color:#6e7681;">⬤</span> Not synced`;
+    }
+  }
+
+  // ── Event listeners ───────────────────────────────────────
+  const allInputs = ['capital','riskPct','fxSL','fxRR','pairType','fxPrice','btcEntry','btcSL','btcRR'];
+  allInputs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input',  () => { calculate(); if (id==='capital'||id==='riskPct') saveSettings(); });
+      el.addEventListener('change', () => { calculate(); if (id==='capital'||id==='riskPct') saveSettings(); });
+    }
+  });
+
+  // React to journal updating capital in another tab
+  window.addEventListener('storage', e => {
+    if (e.key !== SYNC_KEY) return;
+    try {
+      const s = JSON.parse(e.newValue || 'null');
+      if (s && s.source === 'journal') {
+        const cap = s.runningCapital || s.capital;
+        if (cap) document.getElementById('capital').value = cap;
+        if (s.riskPct) document.getElementById('riskPct').value = s.riskPct;
+        calculate();
+      }
+    } catch {}
+    updateSyncBadge();
+  });
+
+  loadSettings();
+  calculate();
+  saveSettings();
+</script>
+</body>
+</html>
