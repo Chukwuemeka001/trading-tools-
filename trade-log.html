@@ -367,6 +367,35 @@
     .review-chip.active { border-color: #58a6ff; color: #58a6ff; background: #0c1a2e; }
 
     .hidden { display: none !important; }
+
+    /* Dashboard tables */
+    .dash-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .dash-table th {
+      text-align: left; font-size: 0.67rem; color: #8b949e; text-transform: uppercase;
+      letter-spacing: 0.6px; padding: 6px 8px; border-bottom: 1px solid #30363d;
+    }
+    .dash-table th.right, .dash-table td.right { text-align: right; }
+    .dash-table td { padding: 7px 8px; border-bottom: 1px solid #21262d; color: #c9d1d9; }
+    .dash-table tr.row-best td { color: #3fb950; }
+    .dash-table tr.row-worst td { color: #f85149; }
+    .dash-table tr:last-child td { border-bottom: none; }
+
+    /* Confluence bars */
+    .conf-group { margin-bottom: 14px; }
+    .conf-group-title { font-size: 0.7rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+    .conf-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 0.78rem; }
+    .conf-label { min-width: 80px; color: #c9d1d9; flex-shrink: 0; }
+    .conf-bar-bg { flex: 1; height: 8px; background: #21262d; border-radius: 4px; overflow: hidden; }
+    .conf-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .conf-stat { min-width: 90px; text-align: right; font-size: 0.72rem; color: #8b949e; flex-shrink: 0; }
+
+    /* Execution quality */
+    .exec-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    @media(max-width:500px){ .exec-grid { grid-template-columns: 1fr; } }
+    .exec-card { background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 12px 14px; text-align: center; }
+    .exec-card-label { font-size: 0.67rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.6px; }
+    .exec-card-val { font-size: 1.3rem; font-weight: 700; margin-top: 4px; }
+    .exec-card-sub { font-size: 0.7rem; color: #6e7681; margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -425,6 +454,24 @@
       <div class="card-title">By Timeframe</div>
       <div id="tfBreakdown" style="font-size:0.8rem;"></div>
     </div>
+  </div>
+
+  <!-- Setup Performance -->
+  <div class="card">
+    <div class="card-title">Setup Performance</div>
+    <div id="setupPerformance" style="overflow-x:auto;"></div>
+  </div>
+
+  <!-- Confluence Performance -->
+  <div class="card">
+    <div class="card-title">Confluence Performance — "Which rules matter most?"</div>
+    <div id="confluencePerformance"></div>
+  </div>
+
+  <!-- Execution Quality -->
+  <div class="card">
+    <div class="card-title">Execution Quality</div>
+    <div id="executionQuality"></div>
   </div>
 
   <!-- Recent trades -->
@@ -1540,6 +1587,9 @@ function renderDashboard() {
 
   renderEquity(closed);
   renderBreakdown(filtered);
+  renderSetupPerformance(filtered);
+  renderConfluencePerformance(filtered);
+  renderExecutionQuality(filtered);
   renderRecent(filtered);
 }
 
@@ -1636,6 +1686,239 @@ function renderBreakdown(list) {
 
   document.getElementById('setupBreakdown').innerHTML = renderRows(buildBreakdown('setup'));
   document.getElementById('tfBreakdown').innerHTML    = renderRows(buildBreakdown('timeframe'));
+}
+
+// ── Setup Performance Table ──────────────────────────
+function renderSetupPerformance(list) {
+  const closed = list.filter(t => t.status === 'closed');
+  const el = document.getElementById('setupPerformance');
+  if (!closed.length) { el.innerHTML = '<div style="color:#6e7681; font-size:0.78rem; padding:8px 0;">No closed trades yet.</div>'; return; }
+
+  const SETUPS = [
+    'Secondary POI + SC entry', 'Primary POI + SC entry', 'Trusted BOS entry',
+    'mbms confirmation entry', 'SC reaction only', 'HTF liquidity sweep entry'
+  ];
+
+  const map = {};
+  closed.forEach(t => {
+    let key = SETUPS.find(s => t.setup === s) || (t.setup?.startsWith('Other') ? 'Other' : t.setup || 'Unknown');
+    if (!map[key]) map[key] = { trades: 0, wins: 0, losses: 0, rrSum: 0, rrCount: 0 };
+    map[key].trades++;
+    if (t.outcome === 'win') map[key].wins++;
+    if (t.outcome === 'loss') map[key].losses++;
+    if (t.actualRR) { map[key].rrSum += t.actualRR; map[key].rrCount++; }
+  });
+
+  const rows = Object.entries(map).sort((a, b) => {
+    const wrA = a[1].trades ? a[1].wins / a[1].trades : 0;
+    const wrB = b[1].trades ? b[1].wins / b[1].trades : 0;
+    return wrB - wrA;
+  });
+
+  // Find best/worst by win rate (min 1 trade)
+  let bestKey = null, worstKey = null, bestWR = -1, worstWR = 101;
+  rows.forEach(([k, v]) => {
+    if (v.trades < 1) return;
+    const wr = v.wins / v.trades * 100;
+    if (wr > bestWR) { bestWR = wr; bestKey = k; }
+    if (wr < worstWR) { worstWR = wr; worstKey = k; }
+  });
+  if (bestKey === worstKey) worstKey = null; // don't highlight same row both colors
+
+  let html = `<table class="dash-table">
+    <thead><tr>
+      <th>Setup Type</th><th class="right">Trades</th><th class="right">Wins</th>
+      <th class="right">Losses</th><th class="right">Win%</th><th class="right">Avg R:R</th>
+    </tr></thead><tbody>`;
+
+  rows.forEach(([k, v]) => {
+    const wr = v.trades ? (v.wins / v.trades * 100).toFixed(0) : 0;
+    const avgRR = v.rrCount ? (v.rrSum / v.rrCount).toFixed(2) + 'R' : '—';
+    const cls = k === bestKey ? ' class="row-best"' : k === worstKey ? ' class="row-worst"' : '';
+    html += `<tr${cls}>
+      <td>${k}${k === bestKey ? ' ★' : ''}${k === worstKey ? ' ▼' : ''}</td>
+      <td class="right">${v.trades}</td><td class="right">${v.wins}</td>
+      <td class="right">${v.losses}</td><td class="right">${wr}%</td>
+      <td class="right">${avgRR}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// ── Confluence Performance ───────────────────────────
+function renderConfluencePerformance(list) {
+  const closed = list.filter(t => t.status === 'closed');
+  const el = document.getElementById('confluencePerformance');
+  if (!closed.length) { el.innerHTML = '<div style="color:#6e7681; font-size:0.78rem; padding:8px 0;">No closed trades yet.</div>'; return; }
+
+  function calcWR(arr) {
+    if (!arr.length) return { wr: 0, n: 0 };
+    const wins = arr.filter(t => t.outcome === 'win').length;
+    return { wr: arr.length ? (wins / arr.length * 100) : 0, n: arr.length };
+  }
+
+  function barColor(wr) {
+    if (wr >= 60) return '#3fb950';
+    if (wr >= 45) return '#f0883e';
+    return '#f85149';
+  }
+
+  function renderGroup(title, items) {
+    let html = `<div class="conf-group"><div class="conf-group-title">${title}</div>`;
+    items.forEach(({ label, wr, n }) => {
+      if (n === 0) return;
+      html += `<div class="conf-row">
+        <span class="conf-label">${label}</span>
+        <div class="conf-bar-bg"><div class="conf-bar-fill" style="width:${wr}%;background:${barColor(wr)}"></div></div>
+        <span class="conf-stat" style="color:${barColor(wr)}">${wr.toFixed(0)}% <span style="color:#6e7681">(n=${n})</span></span>
+      </div>`;
+    });
+    html += '</div>';
+    return html;
+  }
+
+  let html = '';
+
+  // POI Type
+  const poiSec = calcWR(closed.filter(t => t.poiType === 'Secondary'));
+  const poiPri = calcWR(closed.filter(t => t.poiType === 'Primary'));
+  html += renderGroup('POI Type', [
+    { label: 'Secondary', ...poiSec }, { label: 'Primary', ...poiPri }
+  ]);
+
+  // SC Visible
+  const scY = calcWR(closed.filter(t => t.scVisible === 'Yes'));
+  const scN = calcWR(closed.filter(t => t.scVisible === 'No'));
+  html += renderGroup('SC Candle Visible', [
+    { label: 'Yes', ...scY }, { label: 'No', ...scN }
+  ]);
+
+  // mbms Confirmed
+  const mbY = calcWR(closed.filter(t => t.mbmsConfirmed === 'Yes'));
+  const mbN = calcWR(closed.filter(t => t.mbmsConfirmed === 'No'));
+  html += renderGroup('mbms Confirmed', [
+    { label: 'Yes', ...mbY }, { label: 'No', ...mbN }
+  ]);
+
+  // Liquidity Taken
+  const lqY = calcWR(closed.filter(t => t.liqTaken === 'Yes'));
+  const lqN = calcWR(closed.filter(t => t.liqTaken === 'No'));
+  html += renderGroup('Liquidity Taken Before Entry', [
+    { label: 'Yes', ...lqY }, { label: 'No', ...lqN }
+  ]);
+
+  // HTF Bias Aligned (compare htfBias direction with trade direction)
+  const htfY = calcWR(closed.filter(t => t.htfAligned === 'Yes' || (t.htfBias && (
+    (t.htfBias === 'Bullish' && t.direction === 'long') ||
+    (t.htfBias === 'Bearish' && t.direction === 'short')
+  ))));
+  const htfN = calcWR(closed.filter(t => t.htfAligned === 'No' || (t.htfBias && (
+    (t.htfBias === 'Bullish' && t.direction === 'short') ||
+    (t.htfBias === 'Bearish' && t.direction === 'long')
+  ))));
+  const htfNeu = calcWR(closed.filter(t => t.htfBias === 'Neutral'));
+  const htfItems = [{ label: 'Aligned', ...htfY }, { label: 'Not aligned', ...htfN }];
+  if (htfNeu.n > 0) htfItems.push({ label: 'Neutral', ...htfNeu });
+  html += renderGroup('HTF Bias Alignment', htfItems);
+
+  // Distance & Momentum
+  const dmS = calcWR(closed.filter(t => t.distMomentum === 'Strong'));
+  const dmM = calcWR(closed.filter(t => t.distMomentum === 'Moderate'));
+  const dmW = calcWR(closed.filter(t => t.distMomentum === 'Weak'));
+  html += renderGroup('Distance & Momentum', [
+    { label: 'Strong', ...dmS }, { label: 'Moderate', ...dmM }, { label: 'Weak', ...dmW }
+  ]);
+
+  // Entry Confirmation
+  const ecHH = calcWR(closed.filter(t => t.entryConfirmation === 'HH+HL'));
+  const ecLL = calcWR(closed.filter(t => t.entryConfirmation === 'LL+LH'));
+  const ecNone = calcWR(closed.filter(t => t.entryConfirmation === 'None yet'));
+  html += renderGroup('Entry Confirmation', [
+    { label: 'HH+HL', ...ecHH }, { label: 'LL+LH', ...ecLL }, { label: 'None yet', ...ecNone }
+  ]);
+
+  // Check if all groups are empty
+  const totalDataPoints = [poiSec,poiPri,scY,scN,mbY,mbN,lqY,lqN,dmS,dmM,dmW,ecHH,ecLL,ecNone].reduce((s,x) => s + x.n, 0);
+  if (totalDataPoints === 0) {
+    el.innerHTML = '<div style="color:#6e7681; font-size:0.78rem; padding:8px 0;">No confluence data yet — log trades with the new fields to see breakdowns here.</div>';
+    return;
+  }
+
+  el.innerHTML = html;
+}
+
+// ── Execution Quality ────────────────────────────────
+function renderExecutionQuality(list) {
+  const closed = list.filter(t => t.status === 'closed');
+  const el = document.getElementById('executionQuality');
+  if (!closed.length) { el.innerHTML = '<div style="color:#6e7681; font-size:0.78rem; padding:8px 0;">No closed trades yet.</div>'; return; }
+
+  // Average execution rating
+  const withExec = closed.filter(t => t.executionRating > 0);
+  const avgExec = withExec.length ? (withExec.reduce((s, t) => s + t.executionRating, 0) / withExec.length) : 0;
+
+  // Execution vs outcome: avg exec rating for wins vs losses
+  const winsWithExec = withExec.filter(t => t.outcome === 'win');
+  const lossesWithExec = withExec.filter(t => t.outcome === 'loss');
+  const avgExecWin = winsWithExec.length ? (winsWithExec.reduce((s, t) => s + t.executionRating, 0) / winsWithExec.length) : 0;
+  const avgExecLoss = lossesWithExec.length ? (lossesWithExec.reduce((s, t) => s + t.executionRating, 0) / lossesWithExec.length) : 0;
+
+  // Confidence vs outcome
+  const wins = closed.filter(t => t.outcome === 'win');
+  const losses = closed.filter(t => t.outcome === 'loss');
+  const avgConfWin = wins.length ? (wins.reduce((s, t) => s + (t.confidence || 0), 0) / wins.length) : 0;
+  const avgConfLoss = losses.length ? (losses.reduce((s, t) => s + (t.confidence || 0), 0) / losses.length) : 0;
+
+  // High exec (>=7) vs low exec (<7) win rates
+  const highExec = withExec.filter(t => t.executionRating >= 7);
+  const lowExec = withExec.filter(t => t.executionRating < 7);
+  const highWR = highExec.length ? (highExec.filter(t => t.outcome === 'win').length / highExec.length * 100) : 0;
+  const lowWR = lowExec.length ? (lowExec.filter(t => t.outcome === 'win').length / lowExec.length * 100) : 0;
+
+  const execColor = avgExec >= 7 ? '#3fb950' : avgExec >= 5 ? '#f0883e' : '#f85149';
+
+  let html = '<div class="exec-grid">';
+
+  // Card 1: Average execution rating
+  html += `<div class="exec-card">
+    <div class="exec-card-label">Avg Execution Rating</div>
+    <div class="exec-card-val" style="color:${execColor}">${withExec.length ? avgExec.toFixed(1) : '—'}<span style="font-size:0.7rem;color:#8b949e;">/10</span></div>
+    <div class="exec-card-sub">${withExec.length} rated trade${withExec.length !== 1 ? 's' : ''}</div>
+  </div>`;
+
+  // Card 2: Execution → Win correlation
+  html += `<div class="exec-card">
+    <div class="exec-card-label">Execution → Wins?</div>
+    <div class="exec-card-val">${withExec.length >= 2 ? `<span style="color:#3fb950">${avgExecWin.toFixed(1)}</span> <span style="font-size:0.7rem;color:#6e7681">vs</span> <span style="color:#f85149">${avgExecLoss.toFixed(1)}</span>` : '—'}</div>
+    <div class="exec-card-sub">${withExec.length >= 2 ? `Avg rating: wins vs losses` : 'Need more data'}</div>
+  </div>`;
+
+  // Card 3: Confidence on wins vs losses
+  html += `<div class="exec-card">
+    <div class="exec-card-label">Confidence → Wins?</div>
+    <div class="exec-card-val">${closed.length >= 2 ? `<span style="color:#3fb950">${avgConfWin.toFixed(1)}</span> <span style="font-size:0.7rem;color:#6e7681">vs</span> <span style="color:#f85149">${avgConfLoss.toFixed(1)}</span>` : '—'}</div>
+    <div class="exec-card-sub">${closed.length >= 2 ? 'Avg confidence: wins vs losses' : 'Need more data'}</div>
+  </div>`;
+
+  html += '</div>';
+
+  // High vs Low execution win rate comparison
+  if (withExec.length >= 2) {
+    html += `<div style="margin-top:12px; padding:10px 14px; background:#0d1117; border:1px solid #21262d; border-radius:8px; font-size:0.78rem;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <span style="color:#8b949e;">High execution (7-10)</span>
+        <span style="color:${highWR >= 50 ? '#3fb950' : '#f85149'}; font-weight:600;">${highExec.length ? highWR.toFixed(0) + '% WR' : '—'} <span style="color:#6e7681;font-weight:400;">(n=${highExec.length})</span></span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:#8b949e;">Low execution (1-6)</span>
+        <span style="color:${lowWR >= 50 ? '#3fb950' : '#f85149'}; font-weight:600;">${lowExec.length ? lowWR.toFixed(0) + '% WR' : '—'} <span style="color:#6e7681;font-weight:400;">(n=${lowExec.length})</span></span>
+      </div>
+    </div>`;
+  }
+
+  el.innerHTML = html;
 }
 
 function renderRecent(list) {
