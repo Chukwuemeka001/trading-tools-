@@ -346,6 +346,27 @@
 
     /* scroll indicator */
     .scroll-note { font-size: 0.7rem; color: #6e7681; text-align: right; margin-bottom: 8px; }
+
+    /* Collapsible section */
+    .collapsible-header {
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; padding: 10px 0; user-select: none;
+    }
+    .collapsible-header .arrow { transition: transform 0.2s; color: #8b949e; font-size: 0.8rem; }
+    .collapsible-header.open .arrow { transform: rotate(90deg); }
+    .collapsible-body { display: none; }
+    .collapsible-body.open { display: block; }
+
+    /* Yes/No/Partially chips for review */
+    .review-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .review-chip {
+      padding: 5px 12px; font-size: 0.78rem; border-radius: 6px;
+      border: 1px solid #30363d; background: #0d1117; color: #8b949e;
+      cursor: pointer; transition: all 0.15s; user-select: none;
+    }
+    .review-chip.active { border-color: #58a6ff; color: #58a6ff; background: #0c1a2e; }
+
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
@@ -425,7 +446,7 @@
   </div>
 
   <form id="tradeForm" onsubmit="submitTrade(event)">
-    <!-- Instrument -->
+    <!-- Instrument & Setup -->
     <div class="card">
       <div class="card-title">Instrument & Setup</div>
       <div class="form-grid">
@@ -460,15 +481,13 @@
         </div>
         <div class="field">
           <label>Setup Type</label>
-          <select id="f_setup">
-            <option>Breakout</option>
-            <option>Pullback / Retest</option>
-            <option>Trend Continuation</option>
-            <option>Reversal</option>
-            <option>Supply & Demand</option>
-            <option>Support / Resistance</option>
-            <option>News / Fundamental</option>
-            <option>Range / Mean Reversion</option>
+          <select id="f_setup" onchange="toggleSetupOther()">
+            <option>Secondary POI + SC entry</option>
+            <option>Primary POI + SC entry</option>
+            <option>Trusted BOS entry</option>
+            <option>mbms confirmation entry</option>
+            <option>SC reaction only</option>
+            <option>HTF liquidity sweep entry</option>
             <option>Other</option>
           </select>
         </div>
@@ -476,6 +495,10 @@
           <label>Date & Time Opened</label>
           <input type="datetime-local" id="f_dateOpen" required>
         </div>
+      </div>
+      <div class="field hidden" id="setupOtherWrap">
+        <label>Setup Description (Other)</label>
+        <input type="text" id="f_setupOther" placeholder="Describe your setup type">
       </div>
 
       <div class="field">
@@ -490,6 +513,90 @@
           <div class="chip" onclick="toggleChip(this)">London Session</div>
           <div class="chip" onclick="toggleChip(this)">NY Session</div>
           <div class="chip" onclick="toggleChip(this)">Asian Session</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Analysis Fields -->
+    <div class="card">
+      <div class="card-title">Structure & Confluence Analysis</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>HTF Bias *</label>
+          <select id="f_htfBias" required>
+            <option value="">— Select —</option>
+            <option>Bullish</option>
+            <option>Bearish</option>
+            <option>Neutral</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>POI Type *</label>
+          <select id="f_poiType" required>
+            <option value="">— Select —</option>
+            <option>Secondary</option>
+            <option>Primary</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>BOS Timeframe</label>
+          <select id="f_bosTF">
+            <option value="">— Select —</option>
+            <option>M1</option><option>M5</option><option>M15</option>
+            <option>H1</option><option>H4</option>
+            <option>D1</option><option>W1</option><option>Monthly</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Liquidity Taken Before Entry *</label>
+          <select id="f_liqTaken" required>
+            <option value="">— Select —</option>
+            <option>Yes</option>
+            <option>No</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>mbms Confirmed *</label>
+          <select id="f_mbmsConfirmed" required>
+            <option value="">— Select —</option>
+            <option>Yes</option>
+            <option>No</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>SC Candle Visible *</label>
+          <select id="f_scVisible" required>
+            <option value="">— Select —</option>
+            <option>Yes</option>
+            <option>No</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Entry Confirmation</label>
+          <select id="f_entryConf">
+            <option value="">— Select —</option>
+            <option>HH+HL</option>
+            <option>LL+LH</option>
+            <option>None yet</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Distance & Momentum</label>
+          <select id="f_distMomentum">
+            <option value="">— Select —</option>
+            <option>Strong</option>
+            <option>Moderate</option>
+            <option>Weak</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>POI Level Reached</label>
+          <select id="f_poiLevel">
+            <option value="">— Select —</option>
+            <option>Secondary only</option>
+            <option>Primary only</option>
+            <option>Both</option>
+          </select>
         </div>
       </div>
     </div>
@@ -599,14 +706,12 @@
     </select>
     <select class="filter-select" id="fltSetup" onchange="renderJournal()">
       <option value="">All Setups</option>
-      <option>Breakout</option>
-      <option>Pullback / Retest</option>
-      <option>Trend Continuation</option>
-      <option>Reversal</option>
-      <option>Supply & Demand</option>
-      <option>Support / Resistance</option>
-      <option>News / Fundamental</option>
-      <option>Range / Mean Reversion</option>
+      <option>Secondary POI + SC entry</option>
+      <option>Primary POI + SC entry</option>
+      <option>Trusted BOS entry</option>
+      <option>mbms confirmation entry</option>
+      <option>SC reaction only</option>
+      <option>HTF liquidity sweep entry</option>
       <option>Other</option>
     </select>
   </div>
@@ -760,6 +865,7 @@ function initForm() {
   }
   updateRR();
   readSync();
+  toggleSetupOther();
 }
 
 function setFDir(d) {
@@ -770,6 +876,11 @@ function setFDir(d) {
 }
 
 function toggleChip(el) { el.classList.toggle('active'); }
+
+function toggleSetupOther() {
+  const val = document.getElementById('f_setup').value;
+  document.getElementById('setupOtherWrap').classList.toggle('hidden', val !== 'Other');
+}
 
 function updateRR() {
   const entry = parseFloat(document.getElementById('f_entry').value);
@@ -797,8 +908,10 @@ function handleImg(e, type) {
         document.getElementById('prePreviewImg').src = b64;
       } else {
         postImgData = b64;
-        document.getElementById('postPreview').style.display = 'block';
-        document.getElementById('postPreviewImg').src = b64;
+        const el = document.getElementById('postPreview');
+        if (el) el.style.display = 'block';
+        const img = document.getElementById('postPreviewImg');
+        if (img) img.src = b64;
       }
     });
   };
@@ -826,8 +939,8 @@ function removeImg(type, e) {
     document.getElementById('prePreviewImg').src = '';
   } else {
     postImgData = '';
-    if (document.getElementById('postPreview'))
-      document.getElementById('postPreview').style.display = 'none';
+    const el = document.getElementById('postPreview');
+    if (el) el.style.display = 'none';
   }
 }
 
@@ -840,6 +953,7 @@ function submitTrade(e) {
   const slDist = Math.abs(entry - sl);
   const tpDist = Math.abs(tp - entry);
   const conditions = [...document.querySelectorAll('#condChips .chip.active')].map(c => c.textContent);
+  const setupVal = document.getElementById('f_setup').value;
 
   const t = {
     id:         editId || uid(),
@@ -847,7 +961,7 @@ function submitTrade(e) {
     pair:       document.getElementById('f_pair').value.toUpperCase(),
     direction:  formDir,
     timeframe:  document.getElementById('f_tf').value,
-    setup:      document.getElementById('f_setup').value,
+    setup:      setupVal === 'Other' ? 'Other: ' + (document.getElementById('f_setupOther').value || 'unspecified') : setupVal,
     dateOpen:   document.getElementById('f_dateOpen').value,
     entry:      entry,
     sl:         sl,
@@ -859,22 +973,32 @@ function submitTrade(e) {
     conditions: conditions,
     rationale:  document.getElementById('f_rationale').value,
     preChart:   preImgData,
+    // System analysis fields
+    htfBias:          document.getElementById('f_htfBias').value,
+    poiType:          document.getElementById('f_poiType').value,
+    bosTF:            document.getElementById('f_bosTF').value,
+    liqTaken:         document.getElementById('f_liqTaken').value,
+    mbmsConfirmed:    document.getElementById('f_mbmsConfirmed').value,
+    scVisible:        document.getElementById('f_scVisible').value,
+    entryConfirmation:document.getElementById('f_entryConf').value,
+    distMomentum:     document.getElementById('f_distMomentum').value,
+    poiLevel:         document.getElementById('f_poiLevel').value,
+    // Status
     status:     'open',
-    // result fields
-    dateClose:  null,
-    exitPrice:  null,
-    actualPnL:  null,
-    outcome:    null,
-    actualRR:   null,
-    review:     '',
-    postChart:  '',
-    rating:     0,
+    // Result fields (preserved on edit)
+    dateClose:  null, exitPrice: null, actualPnL: null,
+    outcome:    null, actualRR: null,
+    review:     '', postChart: '', rating: 0,
+    // Post-trade review fields
+    scRespected: null, mbmsPlayedOut: null, htfAligned: null,
+    liqProperlyTaken: null, expectedVsActual: '', whatDifferently: '',
+    lessonLearned: '', executionRating: 0,
+    // Meta
     createdAt:  editId ? (trades.find(t=>t.id===editId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
     updatedAt:  new Date().toISOString(),
   };
 
   if (editId) {
-    // preserve result data on edit
     const old = trades.find(x => x.id === editId);
     if (old) {
       t.status = old.status; t.dateClose = old.dateClose;
@@ -882,6 +1006,10 @@ function submitTrade(e) {
       t.outcome = old.outcome; t.actualRR = old.actualRR;
       t.review = old.review; t.postChart = old.postChart || postImgData;
       t.rating = old.rating;
+      t.scRespected = old.scRespected; t.mbmsPlayedOut = old.mbmsPlayedOut;
+      t.htfAligned = old.htfAligned; t.liqProperlyTaken = old.liqProperlyTaken;
+      t.expectedVsActual = old.expectedVsActual; t.whatDifferently = old.whatDifferently;
+      t.lessonLearned = old.lessonLearned; t.executionRating = old.executionRating;
     }
     trades = trades.map(x => x.id === editId ? t : x);
   } else {
@@ -902,6 +1030,7 @@ function resetForm() {
   document.getElementById('prePreview').style.display = 'none';
   document.getElementById('confVal').textContent = '6';
   document.querySelectorAll('#condChips .chip').forEach(c => c.classList.remove('active'));
+  document.getElementById('setupOtherWrap').classList.add('hidden');
   updateRR();
 }
 
@@ -918,7 +1047,7 @@ function renderJournal() {
   if (status)  list = list.filter(t => t.status === status);
   if (outcome) list = list.filter(t => t.outcome === outcome);
   if (market)  list = list.filter(t => t.market === market);
-  if (setup)   list = list.filter(t => t.setup === setup);
+  if (setup)   list = list.filter(t => setup === 'Other' ? t.setup?.startsWith('Other') : t.setup === setup);
 
   const el = document.getElementById('tradeList');
   if (!list.length) {
@@ -958,11 +1087,13 @@ function renderJournal() {
 // MODAL
 // ═══════════════════════════════════════════════════════
 let modalRating = 0;
+let modalExecRating = 5;
 
 function openModal(id) {
   const t = trades.find(x => x.id === id);
   if (!t) return;
   modalRating = t.rating || 0;
+  modalExecRating = t.executionRating || 5;
   postImgData = '';
 
   const overlay = document.getElementById('modalOverlay');
@@ -980,18 +1111,46 @@ function openModal(id) {
   const slDist = Math.abs(t.entry - t.sl);
   const tpDist = Math.abs(t.tp - t.entry);
 
-  // Build close form HTML if open
+  // System analysis fields display
+  const sysFields = [
+    { label: 'HTF Bias', val: t.htfBias, color: t.htfBias === 'Bullish' ? '#3fb950' : t.htfBias === 'Bearish' ? '#f85149' : '#8b949e' },
+    { label: 'POI Type', val: t.poiType },
+    { label: 'BOS Timeframe', val: t.bosTF },
+    { label: 'Liquidity Taken', val: t.liqTaken, color: t.liqTaken === 'Yes' ? '#3fb950' : '#f85149' },
+    { label: 'mbms Confirmed', val: t.mbmsConfirmed, color: t.mbmsConfirmed === 'Yes' ? '#3fb950' : '#f85149' },
+    { label: 'SC Candle Visible', val: t.scVisible, color: t.scVisible === 'Yes' ? '#3fb950' : '#f85149' },
+    { label: 'Entry Confirmation', val: t.entryConfirmation },
+    { label: 'Distance & Momentum', val: t.distMomentum },
+    { label: 'POI Level Reached', val: t.poiLevel },
+  ].filter(f => f.val);
+
+  const sysHtml = sysFields.length ? `
+    <div style="background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:12px 14px; margin-bottom:14px;">
+      <div style="font-size:0.68rem; color:#8b949e; text-transform:uppercase; letter-spacing:0.7px; margin-bottom:8px;">Structure & Confluence</div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
+        ${sysFields.map(f => `<div>
+          <div class="info-cell-label">${f.label}</div>
+          <div class="info-cell-val" style="font-size:0.82rem;${f.color ? 'color:'+f.color : ''}">${f.val}</div>
+        </div>`).join('')}
+      </div>
+    </div>` : '';
+
+  // Close section for open trades
   const closeSection = t.status === 'open' ? `
     <hr class="section-divider">
     <div class="card-title" style="margin-bottom:12px;">Close This Trade</div>
     <div class="form-grid">
       <div class="field">
         <label>Exit Price</label>
-        <input type="number" id="closeExit" placeholder="0.00" step="any">
+        <input type="number" id="closeExit" placeholder="0.00" step="any" oninput="updateModalRR('${t.id}')">
       </div>
       <div class="field">
         <label>Actual P&L ($)</label>
         <input type="number" id="closePnL" placeholder="e.g. 150 or -75" step="any">
+      </div>
+      <div class="field">
+        <label>Actual R:R (auto)</label>
+        <input type="number" id="closeActualRR" readonly style="color:#58a6ff;cursor:default;" placeholder="—">
       </div>
       <div class="field">
         <label>Date Closed</label>
@@ -1006,29 +1165,77 @@ function openModal(id) {
         </select>
       </div>
     </div>
-    <div class="field">
-      <label>Post-Trade Review</label>
-      <textarea id="closeReview" rows="4"
-        placeholder="What went right? What went wrong? Did you follow your plan? What would you do differently?"></textarea>
+
+    <hr class="section-divider">
+    <div class="collapsible-header open" onclick="toggleCollapsible(this)">
+      <div class="card-title" style="margin:0;">Post-Trade Review</div>
+      <span class="arrow">▶</span>
     </div>
-    <div class="field">
-      <label>Execution Rating</label>
-      <div class="rating-stars" id="modalStars">
-        ${[1,2,3,4,5].map(i=>`<span class="star ${i<=modalRating?'active':''}" onclick="setRating(${i})">★</span>`).join('')}
+    <div class="collapsible-body open">
+      <div class="field">
+        <label>Post-Trade Chart (optional)</label>
+        <div class="upload-zone">
+          <input type="file" accept="image/*" onchange="handleImg(event,'post')">
+          <div class="upload-zone-text">Drop chart or <span>click to upload</span></div>
+          <div class="img-preview" id="postPreview" style="display:none;">
+            <img id="postPreviewImg" src="" onclick="lightbox(this.src)">
+            <div class="rm-img" onclick="removeImg('post',event)">×</div>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="field">
-      <label>Post-Trade Chart (optional)</label>
-      <div class="upload-zone">
-        <input type="file" accept="image/*" onchange="handleImg(event,'post')">
-        <div class="upload-zone-text">Drop chart or <span>click to upload</span></div>
-        <div class="img-preview" id="postPreview" style="display:none;">
-          <img id="postPreviewImg" src="" onclick="lightbox(this.src)">
-          <div class="rm-img" onclick="removeImg('post',event)">×</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Did price respect the SC zone?</label>
+          <select id="closeScRespected">
+            <option value="">—</option>
+            <option>Yes</option><option>No</option><option>Partially</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Did the mbms play out as expected?</label>
+          <select id="closeMbmsPlayed">
+            <option value="">—</option>
+            <option>Yes</option><option>No</option><option>Partially</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Did HTF bias align with the trade?</label>
+          <select id="closeHtfAligned">
+            <option value="">—</option>
+            <option>Yes</option><option>No</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Was liquidity properly taken before entry?</label>
+          <select id="closeLiqProper">
+            <option value="">—</option>
+            <option>Yes</option><option>No</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>What I expected vs what happened</label>
+        <textarea id="closeExpected" rows="3" placeholder="Describe what you expected the market to do and what actually happened..."></textarea>
+      </div>
+      <div class="field">
+        <label>What would I do differently?</label>
+        <textarea id="closeDifferently" rows="3" placeholder="If you could take this trade again, what would you change?"></textarea>
+      </div>
+      <div class="field">
+        <label>Lesson learned</label>
+        <textarea id="closeLesson" rows="3" placeholder="Key takeaway from this trade..."></textarea>
+      </div>
+      <div class="field">
+        <label>Trade Execution Rating — how well did you follow the rules?</label>
+        <div class="slider-wrap">
+          <input type="range" id="closeExecRating" min="1" max="10" value="${modalExecRating}"
+            oninput="document.getElementById('execRatingVal').textContent=this.value">
+          <span class="slider-val" id="execRatingVal">${modalExecRating}</span>
+          <span style="font-size:0.72rem; color:#8b949e;">/10</span>
         </div>
       </div>
     </div>
-    <div class="btn-row">
+    <div class="btn-row" style="margin-top:12px;">
       <button class="btn btn-success" onclick="closeTrade('${t.id}')">Close Trade</button>
       <button class="btn btn-ghost" onclick="editTrade('${t.id}')">Edit</button>
       <button class="btn btn-danger" onclick="deleteTrade('${t.id}')">Delete</button>
@@ -1048,20 +1255,58 @@ function openModal(id) {
        <img src="${t.preChart}" style="max-width:100%; border-radius:8px; border:1px solid #30363d; cursor:zoom-in;" onclick="lightbox(this.src)"></div>`
     : '';
 
-  const postChartHtml = t.postChart
-    ? `<div class="field"><div class="card-title" style="margin-bottom:6px;">Post-Trade Chart</div>
-       <img src="${t.postChart}" style="max-width:100%; border-radius:8px; border:1px solid #30363d; cursor:zoom-in;" onclick="lightbox(this.src)"></div>`
-    : '';
+  // Post-trade review display (for closed trades)
+  let reviewDisplay = '';
+  if (t.status === 'closed') {
+    const postChartHtml = t.postChart
+      ? `<div class="field"><div class="card-title" style="margin-bottom:6px;">Post-Trade Chart</div>
+         <img src="${t.postChart}" style="max-width:100%; border-radius:8px; border:1px solid #30363d; cursor:zoom-in;" onclick="lightbox(this.src)"></div>`
+      : '';
 
-  const reviewHtml = t.review
-    ? `<div class="field"><div class="card-title" style="margin-bottom:6px;">Review Notes</div>
-       <div class="rationale-box">${escHtml(t.review)}</div></div>`
-    : '';
+    const reviewFields = [];
+    if (t.scRespected) reviewFields.push({ l: 'SC zone respected?', v: t.scRespected });
+    if (t.mbmsPlayedOut) reviewFields.push({ l: 'mbms played out?', v: t.mbmsPlayedOut });
+    if (t.htfAligned) reviewFields.push({ l: 'HTF bias aligned?', v: t.htfAligned });
+    if (t.liqProperlyTaken) reviewFields.push({ l: 'Liquidity properly taken?', v: t.liqProperlyTaken });
 
-  const ratingHtml = t.rating
-    ? `<div style="margin:8px 0; font-size:0.8rem; color:#8b949e;">Execution rating:
-       <span style="color:#f7931a;">${'★'.repeat(t.rating)}${'☆'.repeat(5-t.rating)}</span></div>`
-    : '';
+    const reviewGrid = reviewFields.length ? `
+      <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:10px;">
+        ${reviewFields.map(f => {
+          const col = f.v === 'Yes' ? '#3fb950' : f.v === 'No' ? '#f85149' : '#f0883e';
+          return `<div><div class="info-cell-label">${f.l}</div><div class="info-cell-val" style="font-size:0.82rem;color:${col}">${f.v}</div></div>`;
+        }).join('')}
+      </div>` : '';
+
+    const textReviews = [];
+    if (t.expectedVsActual?.trim()) textReviews.push({ l: 'Expected vs Actual', v: t.expectedVsActual });
+    if (t.whatDifferently?.trim()) textReviews.push({ l: 'What I\'d Do Differently', v: t.whatDifferently });
+    if (t.lessonLearned?.trim()) textReviews.push({ l: 'Lesson Learned', v: t.lessonLearned });
+    if (t.review?.trim()) textReviews.push({ l: 'General Review Notes', v: t.review });
+
+    const textReviewsHtml = textReviews.map(r =>
+      `<div class="field"><div class="card-title" style="margin-bottom:4px;">${r.l}</div><div class="rationale-box">${escHtml(r.v)}</div></div>`
+    ).join('');
+
+    const execRatingHtml = t.executionRating
+      ? `<div style="margin:8px 0; font-size:0.8rem; color:#8b949e;">Execution Rating: <span style="color:#58a6ff; font-weight:700;">${t.executionRating}/10</span> — how well rules were followed</div>`
+      : '';
+
+    const hasReview = postChartHtml || reviewGrid || textReviewsHtml || execRatingHtml;
+    if (hasReview) {
+      reviewDisplay = `
+        <hr class="section-divider">
+        <div class="collapsible-header open" onclick="toggleCollapsible(this)">
+          <div class="card-title" style="margin:0;">Post-Trade Review</div>
+          <span class="arrow">▶</span>
+        </div>
+        <div class="collapsible-body open">
+          ${postChartHtml}
+          ${reviewGrid}
+          ${textReviewsHtml}
+          ${execRatingHtml}
+        </div>`;
+    }
+  }
 
   const actualRR = t.actualRR != null ? fmt(t.actualRR,2)+'R' : '—';
   const dateClose = t.dateClose ? new Date(t.dateClose).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
@@ -1078,6 +1323,8 @@ function openModal(id) {
       <div class="info-cell"><div class="info-cell-label">Risk ($)</div><div class="info-cell-val" style="color:#f85149">$${fmt(t.risk)}</div></div>
       <div class="info-cell"><div class="info-cell-label">Confidence</div><div class="info-cell-val">${t.confidence}/10</div></div>
     </div>
+
+    ${sysHtml}
 
     ${t.status === 'closed' ? `
     <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:12px 14px; margin-bottom:14px; display:grid; grid-template-columns:repeat(4,1fr); gap:10px;">
@@ -1098,9 +1345,7 @@ function openModal(id) {
     </div>
 
     ${preChartHtml}
-    ${reviewHtml}
-    ${ratingHtml}
-    ${postChartHtml}
+    ${reviewDisplay}
     ${closeSection}
   `;
 
@@ -1115,6 +1360,24 @@ function openModal(id) {
   overlay.classList.add('open');
 }
 
+function toggleCollapsible(header) {
+  header.classList.toggle('open');
+  const body = header.nextElementSibling;
+  if (body) body.classList.toggle('open');
+}
+
+function updateModalRR(tradeId) {
+  const t = trades.find(x => x.id === tradeId);
+  if (!t) return;
+  const exit = parseFloat(document.getElementById('closeExit')?.value);
+  if (!exit) return;
+  const slDist = Math.abs(t.entry - t.sl);
+  if (slDist <= 0) return;
+  const actualRR = Math.abs(exit - t.entry) / slDist;
+  const el = document.getElementById('closeActualRR');
+  if (el) el.value = fmt(actualRR, 2);
+}
+
 function setRating(n) {
   modalRating = n;
   document.querySelectorAll('#modalStars .star').forEach((s,i) => s.classList.toggle('active', i < n));
@@ -1124,9 +1387,18 @@ function closeTrade(id) {
   const exit    = parseFloat(document.getElementById('closeExit').value);
   const pnl     = parseFloat(document.getElementById('closePnL').value);
   const outcome = document.getElementById('closeOutcome').value;
-  const review  = document.getElementById('closeReview').value;
   const dateClose = document.getElementById('closeDate').value;
   if (!exit || isNaN(pnl)) { alert('Please enter exit price and actual P&L.'); return; }
+
+  // Post-trade review fields
+  const scRespected = document.getElementById('closeScRespected')?.value || null;
+  const mbmsPlayedOut = document.getElementById('closeMbmsPlayed')?.value || null;
+  const htfAligned = document.getElementById('closeHtfAligned')?.value || null;
+  const liqProperlyTaken = document.getElementById('closeLiqProper')?.value || null;
+  const expectedVsActual = document.getElementById('closeExpected')?.value || '';
+  const whatDifferently = document.getElementById('closeDifferently')?.value || '';
+  const lessonLearned = document.getElementById('closeLesson')?.value || '';
+  const executionRating = parseInt(document.getElementById('closeExecRating')?.value) || 0;
 
   trades = trades.map(t => {
     if (t.id !== id) return t;
@@ -1136,8 +1408,11 @@ function closeTrade(id) {
       ...t,
       status: 'closed', dateClose, exitPrice: exit,
       actualPnL: pnl, outcome, actualRR,
-      review, postChart: postImgData || t.postChart,
-      rating: modalRating, updatedAt: new Date().toISOString()
+      review: '', postChart: postImgData || t.postChart,
+      rating: modalRating,
+      scRespected, mbmsPlayedOut, htfAligned, liqProperlyTaken,
+      expectedVsActual, whatDifferently, lessonLearned, executionRating,
+      updatedAt: new Date().toISOString()
     };
   });
   save();
@@ -1158,7 +1433,14 @@ function editTrade(id) {
     document.getElementById('f_market').value   = t.market;
     document.getElementById('f_pair').value     = t.pair;
     document.getElementById('f_tf').value       = t.timeframe;
-    document.getElementById('f_setup').value    = t.setup;
+    // Handle setup: if it starts with "Other:" restore the Other option + text
+    if (t.setup?.startsWith('Other:')) {
+      document.getElementById('f_setup').value = 'Other';
+      document.getElementById('f_setupOther').value = t.setup.replace('Other: ', '');
+    } else {
+      document.getElementById('f_setup').value = t.setup;
+    }
+    toggleSetupOther();
     document.getElementById('f_dateOpen').value = t.dateOpen;
     document.getElementById('f_entry').value    = t.entry;
     document.getElementById('f_sl').value       = t.sl;
@@ -1168,6 +1450,17 @@ function editTrade(id) {
     document.getElementById('f_conf').value     = t.confidence;
     document.getElementById('confVal').textContent = t.confidence;
     document.getElementById('f_rationale').value = t.rationale;
+    // System fields
+    if (t.htfBias) document.getElementById('f_htfBias').value = t.htfBias;
+    if (t.poiType) document.getElementById('f_poiType').value = t.poiType;
+    if (t.bosTF) document.getElementById('f_bosTF').value = t.bosTF;
+    if (t.liqTaken) document.getElementById('f_liqTaken').value = t.liqTaken;
+    if (t.mbmsConfirmed) document.getElementById('f_mbmsConfirmed').value = t.mbmsConfirmed;
+    if (t.scVisible) document.getElementById('f_scVisible').value = t.scVisible;
+    if (t.entryConfirmation) document.getElementById('f_entryConf').value = t.entryConfirmation;
+    if (t.distMomentum) document.getElementById('f_distMomentum').value = t.distMomentum;
+    if (t.poiLevel) document.getElementById('f_poiLevel').value = t.poiLevel;
+
     setFDir(t.direction);
     updateRR();
     if (t.conditions) {
@@ -1283,15 +1576,12 @@ function renderEquity(closed) {
   const px = p => p.x * (W - 2*pad) + pad;
   const py = p => H - pad - ((p.y - minY) / range) * (H - 2*pad);
 
-  // Zero line
-  const zeroY = py({y:0});
   ctx.strokeStyle = '#30363d';
   ctx.lineWidth = devicePixelRatio;
   ctx.setLineDash([4*devicePixelRatio, 4*devicePixelRatio]);
-  ctx.beginPath(); ctx.moveTo(0, zeroY); ctx.lineTo(W, zeroY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, py({y:0})); ctx.lineTo(W, py({y:0})); ctx.stroke();
   ctx.setLineDash([]);
 
-  // Fill
   ctx.beginPath();
   ctx.moveTo(px(points[0]), py(points[0]));
   points.forEach(p => ctx.lineTo(px(p), py(p)));
@@ -1305,7 +1595,6 @@ function renderEquity(closed) {
   ctx.fillStyle = grad;
   ctx.fill();
 
-  // Line
   ctx.beginPath();
   ctx.moveTo(px(points[0]), py(points[0]));
   points.forEach(p => ctx.lineTo(px(p), py(p)));
@@ -1434,7 +1723,6 @@ function updateSyncDot() {
   }
 }
 
-// React to calculator updating settings in another tab
 window.addEventListener('storage', e => {
   if (e.key !== SYNC_KEY) return;
   readSync();
@@ -1451,7 +1739,6 @@ const DEFAULT_GIST = 'bc004e07ada6586fc4492590f80b182b';
 const GIST_OWNER   = 'Chukwuemeka001';
 let   gistPushTimer = null;
 
-// ── Cookie helpers: survive browser clears better than localStorage ──
 function setCookie(name, val, days) {
   const exp = new Date(Date.now() + days * 864e5).toUTCString();
   document.cookie = `${name}=${encodeURIComponent(val)}; expires=${exp}; path=/; SameSite=Lax`;
@@ -1463,7 +1750,6 @@ function getCookie(name) {
   }, '');
 }
 
-// Token stored in cookie (GitHub Pages) + localStorage (file://) for maximum persistence
 function getToken() {
   return getCookie('gist_token') || JSON.parse(localStorage.getItem(GIST_STORE) || '{}').token || '';
 }
@@ -1479,7 +1765,6 @@ function getGistCfg() {
 }
 function saveGistCfg(c) {
   if (c.token) saveToken(c.token);
-  // Store everything except token (token lives in cookie + its own localStorage key)
   const { token, ...rest } = c;
   localStorage.setItem(GIST_STORE, JSON.stringify(rest));
 }
@@ -1558,7 +1843,6 @@ async function gistPush(token, gistId) {
   return (await resp.json()).id;
 }
 
-// Pull via raw URL — works without a token (secret gists are readable by URL)
 async function gistPullRaw() {
   const url  = `https://gist.githubusercontent.com/${GIST_OWNER}/${DEFAULT_GIST}/raw/${GIST_FILE}?t=${Date.now()}`;
   const resp = await fetch(url);
@@ -1594,7 +1878,6 @@ function gistDisconnect() {
   refreshCloudStatus();
 }
 
-// Auto-push after saves (debounced 3s)
 function scheduleGistPush() {
   const token = getToken();
   const cfg   = getGistCfg();
@@ -1635,14 +1918,11 @@ function importTrades(e) {
   reader.onload = ev => {
     try {
       const data = JSON.parse(ev.target.result);
-      // Support both raw array and wrapped export format
       const incoming = Array.isArray(data) ? data : (data.trades || []);
       if (!incoming.length) { alert('No trades found in file.'); return; }
-      // Merge by id — incoming wins on conflict
       const existingIds = new Set(trades.map(t => t.id));
       const newTrades   = incoming.filter(t => !existingIds.has(t.id));
       const merged      = [...trades, ...newTrades];
-      // Confirm if overwriting
       if (newTrades.length < incoming.length) {
         const dupes = incoming.length - newTrades.length;
         if (!confirm(`Import ${newTrades.length} new trades? (${dupes} duplicate IDs skipped)`)) return;
@@ -1707,7 +1987,6 @@ function generateAnalysisExport(period) {
   const sorted   = [...filtered].sort((a, b) => new Date(a.dateOpen) - new Date(b.dateOpen));
   const periodLabel = {all:'All Time', week:'Last 7 Days', month:'This Month', year:'This Year'}[period];
 
-  // Setup / TF / condition breakdowns
   const setupMap = {}, tfMap = {}, condMap = {};
   closed.forEach(t => {
     const s = t.setup || 'Unknown';
@@ -1755,6 +2034,18 @@ function generateAnalysisExport(period) {
     out += `Confidence: ${t.confidence}/10`;
     if (t.conditions?.length) out += ` | Conditions: ${t.conditions.join(', ')}`;
     out += `\n`;
+    // System analysis fields
+    const sysLine = [];
+    if (t.htfBias) sysLine.push(`HTF Bias: ${t.htfBias}`);
+    if (t.poiType) sysLine.push(`POI: ${t.poiType}`);
+    if (t.bosTF) sysLine.push(`BOS TF: ${t.bosTF}`);
+    if (t.liqTaken) sysLine.push(`Liq Taken: ${t.liqTaken}`);
+    if (t.mbmsConfirmed) sysLine.push(`mbms: ${t.mbmsConfirmed}`);
+    if (t.scVisible) sysLine.push(`SC Visible: ${t.scVisible}`);
+    if (t.entryConfirmation) sysLine.push(`Entry Conf: ${t.entryConfirmation}`);
+    if (t.distMomentum) sysLine.push(`Dist/Mom: ${t.distMomentum}`);
+    if (t.poiLevel) sysLine.push(`POI Level: ${t.poiLevel}`);
+    if (sysLine.length) out += `Structure: ${sysLine.join(' | ')}\n`;
     out += `Entry: ${t.entry} | SL: ${t.sl} | TP: ${t.tp}\n`;
     out += `Planned R:R: 1:${t.plannedRR ? d(t.plannedRR) : '?'} | Risk: $${t.risk ? d(t.risk) : '?'}`;
     if (t.size) out += ` | Size: ${t.size}`;
@@ -1765,12 +2056,22 @@ function generateAnalysisExport(period) {
       out += `\n`;
       if (t.dateClose) out += `Closed: ${dateStr(t.dateClose)}\n`;
       if (startCap)    out += `Equity After: $${d(equity)}\n`;
+      // Post-trade review
+      const reviewLine = [];
+      if (t.scRespected) reviewLine.push(`SC Respected: ${t.scRespected}`);
+      if (t.mbmsPlayedOut) reviewLine.push(`mbms Played Out: ${t.mbmsPlayedOut}`);
+      if (t.htfAligned) reviewLine.push(`HTF Aligned: ${t.htfAligned}`);
+      if (t.liqProperlyTaken) reviewLine.push(`Liq Proper: ${t.liqProperlyTaken}`);
+      if (t.executionRating) reviewLine.push(`Execution: ${t.executionRating}/10`);
+      if (reviewLine.length) out += `Review: ${reviewLine.join(' | ')}\n`;
+      if (t.expectedVsActual?.trim()) out += `Expected vs Actual: ${t.expectedVsActual.trim()}\n`;
+      if (t.whatDifferently?.trim()) out += `Would Do Differently: ${t.whatDifferently.trim()}\n`;
+      if (t.lessonLearned?.trim()) out += `Lesson Learned: ${t.lessonLearned.trim()}\n`;
     } else {
       out += `Status: OPEN\n`;
     }
     if (t.rationale?.trim()) out += `Pre-Trade Notes: ${t.rationale.trim()}\n`;
-    if (t.review?.trim())    out += `Post-Trade Review: ${t.review.trim()}\n`;
-    if (t.rating)            out += `Execution Rating: ${t.rating}/5\n`;
+    if (t.review?.trim())    out += `Post-Trade Notes: ${t.review.trim()}\n`;
     out += `\n`;
   });
 
@@ -1842,7 +2143,6 @@ load();
 updateSyncDot();
 refreshCloudStatus();
 renderDashboard();
-// Auto-pull on load via raw URL — no token required
 (async () => {
   try {
     const added = await gistPullRaw();
