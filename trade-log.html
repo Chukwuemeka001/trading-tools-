@@ -621,14 +621,15 @@
         <label>GitHub Personal Access Token</label>
         <input type="password" id="gistToken" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
         <div class="token-hint">
-          Needs <code>gist</code> scope only — nothing else.<br>
-          Create at <a href="https://github.com/settings/tokens/new?scopes=gist&description=TradeJournal" target="_blank">github.com/settings/tokens</a> → <em>Generate new token (classic)</em> → tick <code>gist</code>.
+          Needs <code>gist</code> scope only.<br>
+          Create at <a href="https://github.com/settings/tokens/new?scopes=gist&description=TradeJournal" target="_blank">github.com/settings/tokens</a> → <em>Generate new token (classic)</em> → tick <code>gist</code> → Generate.<br>
+          <strong style="color:#e6edf3;">You only enter this once</strong> — it's saved in a 1-year cookie.
         </div>
       </div>
 
       <div class="field">
-        <label>Gist ID <span style="color:#6e7681;font-weight:400;">(auto-filled on first push)</span></label>
-        <input type="text" id="gistId" placeholder="Leave empty to create a new private Gist">
+        <label>Gist ID <span style="color:#3fb950; font-size:0.68rem;">(hardcoded — never changes)</span></label>
+        <input type="text" id="gistId" readonly style="color:#6e7681; cursor:default;">
       </div>
 
       <div class="btn-row" style="margin-top:14px;">
@@ -638,7 +639,7 @@
       </div>
 
       <div style="font-size:0.7rem; color:#6e7681; margin-top:12px; line-height:1.6;">
-        Your data is saved in a <strong style="color:#8b949e;">secret (private) Gist</strong> — not publicly listed, only accessible with your token. The token is stored in your browser's localStorage only.
+        Data is in a <strong style="color:#8b949e;">secret Gist</strong> — not public. Trades load automatically on every page open, even without a token.
       </div>
     </div>
   </div>
@@ -1394,16 +1395,46 @@ window.addEventListener('storage', e => {
 // ═══════════════════════════════════════════════════════
 const GIST_STORE   = 'tradingTools_gist';
 const GIST_FILE    = 'trade-journal.json';
+const DEFAULT_GIST = 'bc004e07ada6586fc4492590f80b182b';
+const GIST_OWNER   = 'Chukwuemeka001';
 let   gistPushTimer = null;
 
-function getGistCfg()    { return JSON.parse(localStorage.getItem(GIST_STORE) || '{}'); }
-function saveGistCfg(c)  { localStorage.setItem(GIST_STORE, JSON.stringify(c)); }
+// ── Cookie helpers: survive browser clears better than localStorage ──
+function setCookie(name, val, days) {
+  const exp = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(val)}; expires=${exp}; path=/; SameSite=Lax`;
+}
+function getCookie(name) {
+  return document.cookie.split('; ').reduce((r, v) => {
+    const parts = v.split('=');
+    return parts[0] === name ? decodeURIComponent(parts.slice(1).join('=')) : r;
+  }, '');
+}
+
+// Token stored in cookie (GitHub Pages) + localStorage (file://) for maximum persistence
+function getToken() {
+  return getCookie('gist_token') || JSON.parse(localStorage.getItem(GIST_STORE) || '{}').token || '';
+}
+function saveToken(token) {
+  setCookie('gist_token', token, 365);
+  const cfg = JSON.parse(localStorage.getItem(GIST_STORE) || '{}');
+  localStorage.setItem(GIST_STORE, JSON.stringify({ ...cfg, token }));
+}
+
+function getGistCfg() {
+  const cfg = JSON.parse(localStorage.getItem(GIST_STORE) || '{}');
+  return { ...cfg, token: getToken(), gistId: cfg.gistId || DEFAULT_GIST };
+}
+function saveGistCfg(c) {
+  if (c.token) saveToken(c.token);
+  // Store everything except token (token lives in cookie + its own localStorage key)
+  const { token, ...rest } = c;
+  localStorage.setItem(GIST_STORE, JSON.stringify(rest));
+}
 
 function openCloudModal() {
-  const cfg = getGistCfg();
-  document.getElementById('gistToken').value = cfg.token  || '';
-  // Only pre-fill gistId if we have a confirmed lastSync (meaning it worked before)
-  document.getElementById('gistId').value    = cfg.lastSync ? (cfg.gistId || '') : '';
+  document.getElementById('gistToken').value = getToken();
+  document.getElementById('gistId').value    = getGistCfg().gistId || DEFAULT_GIST;
   refreshCloudStatus();
   document.getElementById('cloudModalOverlay').classList.add('open');
 }
@@ -1416,33 +1447,32 @@ function refreshCloudStatus() {
   const btn = document.getElementById('cloudBtn');
   if (!cfg.token) {
     bar.style.borderColor = '#30363d';
-    bar.innerHTML = '<span style="color:#8b949e;">⬤ Not connected.</span> Enter your token and click Connect &amp; Push.';
+    bar.innerHTML = '<span style="color:#8b949e;">⬤ Token missing.</span> Paste your token below and click Connect — you only do this once per device.';
     if (btn) { btn.className = 'cloud-btn'; btn.textContent = '☁ Cloud'; }
     return;
   }
   if (cfg.lastSync) {
     const t = new Date(cfg.lastSync).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
     bar.style.borderColor = '#3fb950';
-    bar.innerHTML = `<span style="color:#3fb950;">⬤ Connected</span>${cfg.gistId ? ' · Gist <code style="font-size:0.67rem;background:#21262d;padding:1px 4px;border-radius:3px;">' + cfg.gistId.slice(0,8) + '…</code>' : ''} · Last sync ${t}`;
+    bar.innerHTML = `<span style="color:#3fb950;">⬤ Connected</span> · Last sync ${t}`;
     if (btn) { btn.className = 'cloud-btn connected'; btn.textContent = '☁ Synced'; }
   } else {
     bar.style.borderColor = '#58a6ff';
-    bar.innerHTML = '<span style="color:#58a6ff;">⬤ Token saved</span> — click Connect &amp; Push to create your Gist.';
+    bar.innerHTML = '<span style="color:#58a6ff;">⬤ Token saved</span> — click Connect &amp; Push to activate.';
     if (btn) { btn.className = 'cloud-btn syncing'; btn.textContent = '☁ Cloud'; }
   }
 }
 
 async function gistConnect() {
   const token  = document.getElementById('gistToken').value.trim();
-  const gistId = document.getElementById('gistId').value.trim();
+  const gistId = document.getElementById('gistId').value.trim() || DEFAULT_GIST;
   if (!token) { alert('Please enter your GitHub Personal Access Token.'); return; }
-
   const bar = document.getElementById('cloudStatusBar');
-  bar.innerHTML = '<span style="color:#58a6ff;">⬤ Pushing…</span>';
-
+  bar.innerHTML = '<span style="color:#58a6ff;">⬤ Connecting…</span>';
   try {
     const newId = await gistPush(token, gistId);
-    saveGistCfg({ token, gistId: newId, lastSync: new Date().toISOString() });
+    saveToken(token);
+    saveGistCfg({ gistId: newId, lastSync: new Date().toISOString() });
     document.getElementById('gistId').value = newId;
     refreshCloudStatus();
   } catch(err) {
@@ -1457,11 +1487,7 @@ async function gistPush(token, gistId) {
   const payload = {
     description: 'Trade Journal — auto-synced',
     public: false,
-    files: {
-      [GIST_FILE]: {
-        content: JSON.stringify({ version: 2, lastUpdated: new Date().toISOString(), trades }, null, 2)
-      }
-    }
+    files: { [GIST_FILE]: { content: JSON.stringify({ version: 2, lastUpdated: new Date().toISOString(), trades }, null, 2) } }
   };
   const url    = gistId ? `https://api.github.com/gists/${gistId}` : 'https://api.github.com/gists';
   const method = gistId ? 'PATCH' : 'POST';
@@ -1471,68 +1497,63 @@ async function gistPush(token, gistId) {
     body: JSON.stringify(payload)
   });
   if (!resp.ok) {
-    // Gist was deleted or ID is stale — create a fresh one automatically
     if (resp.status === 404 && method === 'PATCH') return await gistPush(token, '');
-    const msg = resp.status === 401
-      ? 'Invalid token (401) — regenerate your PAT and make sure to tick the "gist" checkbox.'
-      : resp.status === 403
-      ? 'Permission denied (403) — your token is missing the "gist" scope. Go to github.com/settings/tokens, delete this token and create a new classic token with only "gist" ticked.'
-      : `GitHub API error ${resp.status}`;
+    const msg = resp.status === 401 ? 'Invalid token — make sure it has "gist" scope.'
+              : resp.status === 403 ? 'Permission denied — create a new classic PAT with only "gist" ticked.'
+              : `GitHub API error ${resp.status}`;
     throw new Error(msg);
   }
-  const data = await resp.json();
-  return data.id;
+  return (await resp.json()).id;
 }
 
-async function gistPullUI() {
-  const cfg = getGistCfg();
-  if (!cfg.token || !cfg.gistId) { alert('Connect first — enter your token and click Connect & Push.'); return; }
-  const bar = document.getElementById('cloudStatusBar');
-  bar.innerHTML = '<span style="color:#58a6ff;">⬤ Pulling…</span>';
-  try {
-    const added = await gistPull(cfg.token, cfg.gistId);
-    saveGistCfg({ ...cfg, lastSync: new Date().toISOString() });
-    refreshCloudStatus();
-    renderDashboard();
-    alert(`Pull complete. ${added} new trade(s) added.`);
-  } catch(err) {
-    bar.innerHTML = `<span style="color:#f85149;">⬤ Error:</span> ${err.message}`;
-  }
-}
-
-async function gistPull(token, gistId) {
-  const resp = await fetch(`https://api.github.com/gists/${gistId}`, {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-  if (!resp.ok) throw new Error(`GitHub API error ${resp.status}`);
-  const data    = await resp.json();
-  const content = JSON.parse(data.files[GIST_FILE]?.content || '{"trades":[]}');
-  const incoming    = content.trades || [];
+// Pull via raw URL — works without a token (secret gists are readable by URL)
+async function gistPullRaw() {
+  const url  = `https://gist.githubusercontent.com/${GIST_OWNER}/${DEFAULT_GIST}/raw/${GIST_FILE}?t=${Date.now()}`;
+  const resp = await fetch(url);
+  if (!resp.ok) return 0;
+  const incoming    = (await resp.json()).trades || [];
   const existingIds = new Set(trades.map(t => t.id));
   const newTrades   = incoming.filter(t => !existingIds.has(t.id));
-  if (newTrades.length) { trades = [...trades, ...newTrades]; save(); }
+  if (newTrades.length) { trades = [...trades, ...newTrades]; localStorage.setItem(STORE, JSON.stringify(trades)); }
   return newTrades.length;
 }
 
+async function gistPullUI() {
+  const bar = document.getElementById('cloudStatusBar');
+  bar.innerHTML = '<span style="color:#58a6ff;">⬤ Pulling…</span>';
+  try {
+    const added = await gistPullRaw();
+    const cfg   = getGistCfg();
+    saveGistCfg({ ...cfg, lastSync: new Date().toISOString() });
+    refreshCloudStatus();
+    if (added) renderDashboard();
+    bar.innerHTML = `<span style="color:#3fb950;">⬤ Done — ${added} new trade(s) added.</span>`;
+  } catch(err) {
+    bar.innerHTML = `<span style="color:#f85149;">⬤ Pull failed:</span> ${err.message}`;
+  }
+}
+
 function gistDisconnect() {
-  if (!confirm('Disconnect from Gist? Your local data stays intact.')) return;
+  if (!confirm('Disconnect? Your local data stays intact.')) return;
+  setCookie('gist_token', '', -1);
   localStorage.removeItem(GIST_STORE);
   document.getElementById('gistToken').value = '';
-  document.getElementById('gistId').value    = '';
+  document.getElementById('gistId').value    = DEFAULT_GIST;
   refreshCloudStatus();
 }
 
 // Auto-push after saves (debounced 3s)
 function scheduleGistPush() {
-  const cfg = getGistCfg();
-  if (!cfg.token || !cfg.gistId) return;
+  const token = getToken();
+  const cfg   = getGistCfg();
+  if (!token || !cfg.gistId) return;
   clearTimeout(gistPushTimer);
   gistPushTimer = setTimeout(async () => {
     try {
-      await gistPush(cfg.token, cfg.gistId);
-      saveGistCfg({ ...cfg, lastSync: new Date().toISOString() });
+      const newId = await gistPush(token, cfg.gistId);
+      saveGistCfg({ ...cfg, gistId: newId, lastSync: new Date().toISOString() });
       refreshCloudStatus();
-    } catch { /* silent — user can retry manually */ }
+    } catch { /* silent */ }
   }, 3000);
 }
 
@@ -1606,17 +1627,17 @@ load();
 updateSyncDot();
 refreshCloudStatus();
 renderDashboard();
-// Auto-pull on load if connected
+// Auto-pull on load via raw URL — no token required
 (async () => {
-  const cfg = getGistCfg();
-  if (cfg.token && cfg.gistId) {
-    try {
-      const added = await gistPull(cfg.token, cfg.gistId);
+  try {
+    const added = await gistPullRaw();
+    if (added) {
+      const cfg = getGistCfg();
       saveGistCfg({ ...cfg, lastSync: new Date().toISOString() });
       refreshCloudStatus();
-      if (added) renderDashboard();
-    } catch { /* silent */ }
-  }
+      renderDashboard();
+    }
+  } catch { /* silent */ }
 })();
 window.addEventListener('resize', () => {
   if (document.getElementById('page-dashboard').classList.contains('active')) renderEquity(trades.filter(t=>t.status==='closed'));
