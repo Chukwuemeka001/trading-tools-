@@ -322,6 +322,22 @@
 
     /* ── Condition chips ── */
     .cond-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+
+    /* ── Analysis Export modal ── */
+    .analysis-textarea {
+      width: 100%; height: 420px;
+      background: #0d1117; border: 1px solid #30363d; border-radius: 7px;
+      color: #c9d1d9; font-family: 'SF Mono', 'Monaco', monospace;
+      font-size: 0.72rem; line-height: 1.65; padding: 12px;
+      resize: vertical; outline: none; white-space: pre;
+    }
+    .export-btn-row {
+      display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap;
+    }
+    .copy-ok { font-size: 0.78rem; color: #3fb950; display: none; }
+    .export-hint {
+      font-size: 0.71rem; color: #6e7681; margin-top: 8px; line-height: 1.5;
+    }
     .cond-chip {
       padding: 3px 9px; font-size: 0.7rem; border-radius: 20px;
       border: 1px solid #30363d; color: #8b949e;
@@ -361,6 +377,12 @@
       <div class="period-tab" onclick="setPeriod('month')">Month</div>
       <div class="period-tab" onclick="setPeriod('year')">Year</div>
     </div>
+  </div>
+
+  <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+    <button class="btn btn-primary" onclick="openAnalysisModal()" style="font-size:0.82rem; padding:7px 16px;">
+      &#128202; Export for Claude AI
+    </button>
   </div>
 
   <div class="stats-row" id="statsRow"></div>
@@ -640,6 +662,36 @@
 
       <div style="font-size:0.7rem; color:#6e7681; margin-top:12px; line-height:1.6;">
         Data is in a <strong style="color:#8b949e;">secret Gist</strong> — not public. Trades load automatically on every page open, even without a token.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     ANALYSIS EXPORT MODAL
+════════════════════════════════════════════════════════ -->
+<div class="cloud-modal-overlay" id="analysisOverlay" onclick="maybeCloseAnalysis(event)">
+  <div class="cloud-modal" style="max-width:700px;">
+    <div class="cloud-modal-header">
+      <h2>&#128202; Claude AI Analysis Export</h2>
+      <button class="modal-close" onclick="closeAnalysisModal()">✕</button>
+    </div>
+    <div class="cloud-modal-body">
+      <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+        <span style="font-size:0.78rem; color:#8b949e;">Period:</span>
+        <button class="period-tab active" id="aPeriodAll"   onclick="setAnalysisPeriod('all')"   style="font-size:0.75rem; padding:4px 10px;">All Time</button>
+        <button class="period-tab"        id="aPeriodWeek"  onclick="setAnalysisPeriod('week')"  style="font-size:0.75rem; padding:4px 10px;">Week</button>
+        <button class="period-tab"        id="aPeriodMonth" onclick="setAnalysisPeriod('month')" style="font-size:0.75rem; padding:4px 10px;">Month</button>
+        <button class="period-tab"        id="aPeriodYear"  onclick="setAnalysisPeriod('year')"  style="font-size:0.75rem; padding:4px 10px;">Year</button>
+      </div>
+      <textarea class="analysis-textarea" id="analysisText" readonly onclick="this.select()"></textarea>
+      <div class="export-btn-row">
+        <button class="btn btn-primary" onclick="copyAnalysis()">Copy to Clipboard</button>
+        <button class="btn btn-ghost"   onclick="downloadAnalysis()">Download .txt</button>
+        <span class="copy-ok" id="copyOk">&#10003; Copied!</span>
+      </div>
+      <div class="export-hint">
+        Paste directly into a Claude chat window and ask: <em>"Analyse my trading data, identify patterns, and tell me what to improve."</em>
       </div>
     </div>
   </div>
@@ -1607,6 +1659,169 @@ function importTrades(e) {
     e.target.value = '';
   };
   reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════════════
+// ANALYSIS EXPORT
+// ═══════════════════════════════════════════════════════
+let analysisPeriod = 'all';
+
+function openAnalysisModal() {
+  analysisPeriod = activePeriod;
+  syncAnalysisPeriodTabs();
+  document.getElementById('analysisText').value = generateAnalysisExport(analysisPeriod);
+  document.getElementById('analysisOverlay').classList.add('open');
+}
+function closeAnalysisModal() { document.getElementById('analysisOverlay').classList.remove('open'); }
+function maybeCloseAnalysis(e) { if (e.target === document.getElementById('analysisOverlay')) closeAnalysisModal(); }
+
+function setAnalysisPeriod(p) {
+  analysisPeriod = p;
+  syncAnalysisPeriodTabs();
+  document.getElementById('analysisText').value = generateAnalysisExport(p);
+}
+function syncAnalysisPeriodTabs() {
+  ['all','week','month','year'].forEach(p => {
+    const el = document.getElementById('aPeriod' + p.charAt(0).toUpperCase() + p.slice(1));
+    if (el) el.classList.toggle('active', p === analysisPeriod);
+  });
+}
+
+function generateAnalysisExport(period) {
+  const filtered = filterByPeriod(trades, period);
+  const closed   = filtered.filter(t => t.status === 'closed');
+  const open     = filtered.filter(t => t.status === 'open');
+  const wins     = closed.filter(t => t.outcome === 'win');
+  const losses   = closed.filter(t => t.outcome === 'loss');
+  const totalPnL = closed.reduce((s, t) => s + (t.actualPnL || 0), 0);
+  const winRate  = closed.length ? (wins.length / closed.length * 100) : 0;
+  const avgPRR   = closed.filter(t => t.plannedRR).length
+    ? closed.filter(t => t.plannedRR).reduce((s, t, _, a) => s + t.plannedRR / a.length, 0) : 0;
+  const avgARR   = closed.filter(t => t.actualRR).length
+    ? closed.filter(t => t.actualRR).reduce((s, t, _, a) => s + t.actualRR / a.length, 0) : 0;
+  const grossW   = wins.reduce((s, t) => s + (t.actualPnL || 0), 0);
+  const grossL   = Math.abs(losses.reduce((s, t) => s + (t.actualPnL || 0), 0));
+  const pf       = grossL > 0 ? grossW / grossL : 0;
+  const sync     = JSON.parse(localStorage.getItem(SYNC_KEY) || '{}');
+  const startCap = sync.capital || 0;
+  const sorted   = [...filtered].sort((a, b) => new Date(a.dateOpen) - new Date(b.dateOpen));
+  const periodLabel = {all:'All Time', week:'Last 7 Days', month:'This Month', year:'This Year'}[period];
+
+  // Setup / TF / condition breakdowns
+  const setupMap = {}, tfMap = {}, condMap = {};
+  closed.forEach(t => {
+    const s = t.setup || 'Unknown';
+    if (!setupMap[s]) setupMap[s] = {w:0, l:0, pnl:0};
+    setupMap[s].pnl += t.actualPnL || 0;
+    if (t.outcome === 'win') setupMap[s].w++; else if (t.outcome === 'loss') setupMap[s].l++;
+
+    const tf = t.timeframe || '?';
+    if (!tfMap[tf]) tfMap[tf] = {w:0, l:0};
+    if (t.outcome === 'win') tfMap[tf].w++; else if (t.outcome === 'loss') tfMap[tf].l++;
+
+    (t.conditions || []).forEach(c => {
+      if (!condMap[c]) condMap[c] = {w:0, l:0};
+      if (t.outcome === 'win') condMap[c].w++; else if (t.outcome === 'loss') condMap[c].l++;
+    });
+  });
+
+  const d = (n, dec=2) => n == null ? '—' : Number(n).toFixed(dec);
+  const money = n => n == null ? '—' : (n >= 0 ? '+$' : '-$') + Math.abs(n).toFixed(2);
+  const dateStr = t => new Date(t).toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  let out = '';
+  out += `=== CLAUDE ANALYSIS EXPORT ===\n`;
+  out += `Generated: ${new Date().toLocaleString()}\n`;
+  out += `Period: ${periodLabel}\n\n`;
+
+  out += `PERFORMANCE SUMMARY:\n`;
+  out += `Total Trades: ${filtered.length}  |  Closed: ${closed.length}  |  Open: ${open.length}\n`;
+  out += `Win: ${wins.length}  |  Loss: ${losses.length}  |  Win Rate: ${closed.length ? winRate.toFixed(1) + '%' : '—'}\n`;
+  out += `Total P&L: ${money(totalPnL)}\n`;
+  out += `Profit Factor: ${pf ? d(pf) : '—'}\n`;
+  out += `Avg Planned R:R: ${avgPRR ? d(avgPRR) + 'R' : '—'}  |  Avg Actual R:R: ${avgARR ? d(avgARR) + 'R' : '—'}\n`;
+  if (startCap) {
+    out += `Starting Capital: $${d(startCap)}  |  Current Equity: $${d(startCap + totalPnL)}\n`;
+  }
+  out += `\n`;
+
+  out += `TRADE LOG:\n`;
+  let equity = startCap;
+  sorted.forEach((t, i) => {
+    if (t.status === 'closed' && t.actualPnL) equity += t.actualPnL;
+    out += `---\n`;
+    out += `ID: ${String(i+1).padStart(3,'0')} | Date: ${dateStr(t.dateOpen)} | Symbol: ${t.pair}\n`;
+    out += `Direction: ${t.direction.toUpperCase()} | Market: ${t.market} | TF: ${t.timeframe} | Setup: ${t.setup}\n`;
+    out += `Confidence: ${t.confidence}/10`;
+    if (t.conditions?.length) out += ` | Conditions: ${t.conditions.join(', ')}`;
+    out += `\n`;
+    out += `Entry: ${t.entry} | SL: ${t.sl} | TP: ${t.tp}\n`;
+    out += `Planned R:R: 1:${t.plannedRR ? d(t.plannedRR) : '?'} | Risk: $${t.risk ? d(t.risk) : '?'}`;
+    if (t.size) out += ` | Size: ${t.size}`;
+    out += `\n`;
+    if (t.status === 'closed') {
+      out += `Result: ${(t.outcome || '?').toUpperCase()} | Exit: ${t.exitPrice} | P&L: ${money(t.actualPnL)}`;
+      if (t.actualRR) out += ` | Actual R: ${d(t.actualRR)}R`;
+      out += `\n`;
+      if (t.dateClose) out += `Closed: ${dateStr(t.dateClose)}\n`;
+      if (startCap)    out += `Equity After: $${d(equity)}\n`;
+    } else {
+      out += `Status: OPEN\n`;
+    }
+    if (t.rationale?.trim()) out += `Pre-Trade Notes: ${t.rationale.trim()}\n`;
+    if (t.review?.trim())    out += `Post-Trade Review: ${t.review.trim()}\n`;
+    if (t.rating)            out += `Execution Rating: ${t.rating}/5\n`;
+    out += `\n`;
+  });
+
+  out += `PATTERN BREAKDOWN:\n\n`;
+
+  out += `By Setup:\n`;
+  Object.entries(setupMap).sort((a,b) => b[1].pnl - a[1].pnl).forEach(([k,v]) => {
+    const tot = v.w + v.l;
+    out += `  ${k}: ${v.w}W / ${v.l}L (${tot ? ((v.w/tot)*100).toFixed(0) : 0}% WR) | P&L: ${money(v.pnl)}\n`;
+  });
+  out += `\n`;
+
+  out += `By Timeframe:\n`;
+  Object.entries(tfMap).sort((a,b) => (b[1].w - b[1].l) - (a[1].w - a[1].l)).forEach(([k,v]) => {
+    const tot = v.w + v.l;
+    out += `  ${k}: ${v.w}W / ${v.l}L (${tot ? ((v.w/tot)*100).toFixed(0) : 0}% WR)\n`;
+  });
+  out += `\n`;
+
+  if (Object.keys(condMap).length) {
+    out += `By Market Condition:\n`;
+    Object.entries(condMap).sort((a,b) => b[1].w - a[1].w).forEach(([k,v]) => {
+      out += `  ${k}: ${v.w} wins, ${v.l} losses\n`;
+    });
+    out += `\n`;
+  }
+
+  out += `=== END OF EXPORT ===\n`;
+  out += `\nInstructions: Paste into Claude chat and ask —\n`;
+  out += `"Analyse my trade data, identify patterns in my wins/losses, and give me specific improvements."\n`;
+  return out;
+}
+
+function copyAnalysis() {
+  const ta = document.getElementById('analysisText');
+  ta.select();
+  navigator.clipboard.writeText(ta.value).then(() => {
+    const ok = document.getElementById('copyOk');
+    ok.style.display = 'inline';
+    setTimeout(() => { ok.style.display = 'none'; }, 2500);
+  });
+}
+
+function downloadAnalysis() {
+  const text = document.getElementById('analysisText').value;
+  const date = new Date().toISOString().slice(0,10);
+  const blob = new Blob([text], {type:'text/plain'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `claude-analysis-${date}.txt`; a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ═══════════════════════════════════════════════════════
