@@ -396,6 +396,35 @@
     .exec-card-label { font-size: 0.67rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.6px; }
     .exec-card-val { font-size: 1.3rem; font-weight: 700; margin-top: 4px; }
     .exec-card-sub { font-size: 0.7rem; color: #6e7681; margin-top: 2px; }
+
+    /* Broker / Roadmap */
+    .broker-status { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; padding: 5px 10px; border-radius: 6px; border: 1px solid #30363d; }
+    .broker-status.saved { color: #3fb950; border-color: #3fb950; }
+    .broker-status.none  { color: #8b949e; }
+    .roadmap-item {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 9px 0; border-bottom: 1px solid #21262d; font-size: 0.82rem;
+    }
+    .roadmap-item:last-child { border: none; }
+    .roadmap-label { color: #c9d1d9; flex: 1; }
+    .roadmap-badge { font-size: 0.67rem; color: #8b949e; background: #21262d; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+    .notify-toggle { width: 34px; height: 18px; background: #30363d; border-radius: 9px; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+    .notify-toggle.on { background: #58a6ff; }
+    .notify-toggle::after { content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; background:#e6edf3; border-radius:50%; transition:left 0.2s; }
+    .notify-toggle.on::after { left:18px; }
+
+    /* Checklist modal */
+    .cl-section { margin-bottom: 16px; }
+    .cl-section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #58a6ff; margin-bottom: 10px; padding-bottom: 4px; border-bottom: 1px solid #21262d; }
+    .cl-q { margin-bottom: 10px; }
+    .cl-q label { font-size: 0.8rem; color: #c9d1d9; margin-bottom: 4px; display: block; }
+    .cl-q select, .cl-q input, .cl-q textarea {
+      width: 100%; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+      color: #e6edf3; font-size: 0.82rem; padding: 7px 10px; outline: none; font-family: inherit;
+    }
+    .cl-q textarea { resize: vertical; min-height: 50px; }
+    .cl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media(max-width:500px){ .cl-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -408,6 +437,7 @@
   <div class="nav-link" onclick="nav('journal')">Journal</div>
   <div class="nav-spacer"></div>
   <span id="syncDot" style="font-size:0.71rem;color:#8b949e;white-space:nowrap;padding:0 4px;"></span>
+  <button class="cloud-btn" onclick="openBrokerModal()" style="font-size:0.75rem;">&#9881; Broker</button>
   <button id="cloudBtn" class="cloud-btn" onclick="openCloudModal()">☁ Cloud</button>
   <button onclick="exportTrades()" class="nav-ext" style="cursor:pointer;background:none;">Export</button>
   <label class="nav-ext" style="cursor:pointer;" for="importFile">Import</label>
@@ -716,6 +746,7 @@
     <input type="hidden" id="f_editId" value="">
 
     <div class="btn-row">
+      <button type="button" class="btn btn-ghost" onclick="openChecklist()" style="border-color:#58a6ff; color:#58a6ff;">&#9745; Pre-Trade Checklist</button>
       <button type="submit" class="btn btn-primary" id="formSubmitBtn">Save Trade</button>
       <button type="button" class="btn btn-ghost" onclick="resetForm()">Clear</button>
     </div>
@@ -845,6 +876,222 @@
       <div class="export-hint">
         Paste directly into a Claude chat window and ask: <em>"Analyse my trading data, identify patterns, and tell me what to improve."</em>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     BROKER SETTINGS & AUTOMATION ROADMAP MODAL
+════════════════════════════════════════════════════════ -->
+<div class="cloud-modal-overlay" id="brokerOverlay" onclick="maybeCloseBroker(event)">
+  <div class="cloud-modal" style="max-width:520px;">
+    <div class="cloud-modal-header">
+      <h2>&#9881; Broker Settings & Roadmap</h2>
+      <button class="modal-close" onclick="closeBrokerModal()">✕</button>
+    </div>
+    <div class="cloud-modal-body">
+
+      <!-- Broker credentials -->
+      <div class="card-title" style="margin-bottom:10px;">Broker / Exchange Credentials</div>
+      <div id="brokerStatus" class="broker-status none" style="margin-bottom:12px;">No credentials saved</div>
+
+      <div class="form-grid" style="gap:10px; margin-bottom:10px;">
+        <div>
+          <label class="form-label">Broker / Exchange</label>
+          <select id="bk_exchange" class="form-input">
+            <option value="">Select…</option>
+            <option value="Binance">Binance</option>
+            <option value="ByBit">ByBit</option>
+            <option value="MetaTrader 4">MetaTrader 4</option>
+            <option value="MetaTrader 5">MetaTrader 5</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">API Key</label>
+          <input type="password" id="bk_apiKey" class="form-input" placeholder="Paste API key…" autocomplete="off">
+        </div>
+        <div>
+          <label class="form-label">API Secret</label>
+          <input type="password" id="bk_apiSecret" class="form-input" placeholder="Paste API secret…" autocomplete="off">
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+        <button class="btn btn-primary" onclick="saveBrokerCreds()">Save to Cookie</button>
+        <button class="btn btn-danger" onclick="clearBrokerCreds()">Clear Credentials</button>
+      </div>
+
+      <div style="font-size:0.7rem; color:#6e7681; line-height:1.5; margin-bottom:20px; padding:8px 10px; border:1px solid #21262d; border-radius:6px; background:#0d1117;">
+        &#128274; Credentials are stored in a <strong style="color:#8b949e;">browser cookie only</strong> (1-year expiry).<br>
+        They are <strong style="color:#f85149;">NEVER</strong> saved to GitHub Gist and <strong style="color:#f85149;">NEVER</strong> included in any export.
+      </div>
+
+      <!-- Automation Roadmap -->
+      <div class="card-title" style="margin-bottom:10px;">Automation Roadmap</div>
+      <div style="font-size:0.72rem; color:#6e7681; margin-bottom:12px;">These features are coming soon. Toggle notify to be reminded when they launch.</div>
+
+      <div id="roadmapList">
+        <div class="roadmap-item">
+          <span class="roadmap-label">Auto-execute trades via broker API</span>
+          <span class="roadmap-badge">Coming Soon</span>
+          <div class="notify-toggle" data-road="0" onclick="toggleNotify(0)"></div>
+        </div>
+        <div class="roadmap-item">
+          <span class="roadmap-label">Copy trade from calculator → broker</span>
+          <span class="roadmap-badge">Coming Soon</span>
+          <div class="notify-toggle" data-road="1" onclick="toggleNotify(1)"></div>
+        </div>
+        <div class="roadmap-item">
+          <span class="roadmap-label">Auto stop-loss & take-profit sync</span>
+          <span class="roadmap-badge">Coming Soon</span>
+          <div class="notify-toggle" data-road="2" onclick="toggleNotify(2)"></div>
+        </div>
+        <div class="roadmap-item">
+          <span class="roadmap-label">Break-even auto-move at 1:5 R:R</span>
+          <span class="roadmap-badge">Coming Soon</span>
+          <div class="notify-toggle" data-road="3" onclick="toggleNotify(3)"></div>
+        </div>
+        <div class="roadmap-item">
+          <span class="roadmap-label">Real-time P&L dashboard from broker</span>
+          <span class="roadmap-badge">Coming Soon</span>
+          <div class="notify-toggle" data-road="4" onclick="toggleNotify(4)"></div>
+        </div>
+        <div class="roadmap-item">
+          <span class="roadmap-label">AI trade suggestions from Claude</span>
+          <span class="roadmap-badge">Coming Soon</span>
+          <div class="notify-toggle" data-road="5" onclick="toggleNotify(5)"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PRE-TRADE CHECKLIST MODAL
+════════════════════════════════════════════════════════ -->
+<div class="cloud-modal-overlay" id="checklistOverlay" onclick="maybeCloseChecklist(event)">
+  <div class="cloud-modal" style="max-width:600px; max-height:90vh; overflow-y:auto;">
+    <div class="cloud-modal-header">
+      <h2>&#9745; Pre-Trade Checklist</h2>
+      <button class="modal-close" onclick="closeChecklist()">✕</button>
+    </div>
+    <div class="cloud-modal-body">
+
+      <!-- Section 1: HTF Bias -->
+      <div class="cl-section">
+        <div class="cl-section-title">1. HTF Bias</div>
+        <div class="cl-grid">
+          <div class="cl-q">
+            <label>Monthly bias</label>
+            <select id="cl_monthlyBias"><option value="">Select…</option><option>Bullish</option><option>Bearish</option><option>Ranging</option></select>
+          </div>
+          <div class="cl-q">
+            <label>Weekly bias</label>
+            <select id="cl_weeklyBias"><option value="">Select…</option><option>Bullish</option><option>Bearish</option><option>Ranging</option></select>
+          </div>
+          <div class="cl-q">
+            <label>Daily bias</label>
+            <select id="cl_dailyBias"><option value="">Select…</option><option>Bullish</option><option>Bearish</option><option>Ranging</option></select>
+          </div>
+          <div class="cl-q">
+            <label>4H bias</label>
+            <select id="cl_4hBias"><option value="">Select…</option><option>Bullish</option><option>Bearish</option><option>Ranging</option></select>
+          </div>
+        </div>
+        <div class="cl-q">
+          <label>Do all HTF biases align with your trade direction?</label>
+          <select id="cl_htfAlign"><option value="">Select…</option><option>Yes — all aligned</option><option>Mostly — minor conflict on one TF</option><option>No — conflicting signals</option></select>
+        </div>
+      </div>
+
+      <!-- Section 2: Setup Validation -->
+      <div class="cl-section">
+        <div class="cl-section-title">2. Setup Validation</div>
+        <div class="cl-q">
+          <label>Has the relevant liquidity ($$) been taken?</label>
+          <select id="cl_liqTaken"><option value="">Select…</option><option>Yes — clearly swept</option><option>Partially</option><option>No — not yet</option></select>
+        </div>
+        <div class="cl-q">
+          <label>Is there an SC (Sponsored Candle) visible at the POI?</label>
+          <select id="cl_scVisible"><option value="">Select…</option><option>Yes — clear SC zone</option><option>Forming</option><option>No</option></select>
+        </div>
+        <div class="cl-q">
+          <label>Is mbms confirmed on the LTF?</label>
+          <select id="cl_mbmsConf"><option value="">Select…</option><option>Yes — confirmed</option><option>Forming</option><option>No</option></select>
+        </div>
+        <div class="cl-q">
+          <label>Entry confirmation (HH+HL for long / LL+LH for short)?</label>
+          <select id="cl_entryConf"><option value="">Select…</option><option>Yes — confirmed</option><option>Partial — one leg only</option><option>No</option></select>
+        </div>
+        <div class="cl-grid">
+          <div class="cl-q">
+            <label>POI type being traded</label>
+            <select id="cl_poiType"><option value="">Select…</option><option>Primary POI (mbms area)</option><option>Secondary POI</option></select>
+          </div>
+          <div class="cl-q">
+            <label>Distance & momentum after BOS</label>
+            <select id="cl_distMom"><option value="">Select…</option><option>Strong</option><option>Weak</option><option>Mixed</option></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: Levels -->
+      <div class="cl-section">
+        <div class="cl-section-title">3. Key Levels</div>
+        <div class="cl-grid">
+          <div class="cl-q">
+            <label>Entry price</label>
+            <input type="text" id="cl_entry" placeholder="e.g. 65800">
+          </div>
+          <div class="cl-q">
+            <label>Stop loss</label>
+            <input type="text" id="cl_sl" placeholder="e.g. 65200">
+          </div>
+          <div class="cl-q">
+            <label>Take profit target</label>
+            <input type="text" id="cl_tp" placeholder="e.g. 69400">
+          </div>
+          <div class="cl-q">
+            <label>R:R ratio</label>
+            <input type="text" id="cl_rr" readonly placeholder="Auto-calculated" style="color:#8b949e;">
+          </div>
+        </div>
+        <div class="cl-q">
+          <label>What $$ level are you targeting?</label>
+          <input type="text" id="cl_target" placeholder="e.g. $69.4k secondary liquidity above">
+        </div>
+      </div>
+
+      <!-- Section 4: Psychology Check -->
+      <div class="cl-section">
+        <div class="cl-section-title">4. Psychology Check</div>
+        <div class="cl-q">
+          <label>Are you chasing this trade or is it coming to you?</label>
+          <select id="cl_chasing"><option value="">Select…</option><option>Price came to my level — patient entry</option><option>I'm entering late — partial chase</option><option>Full chase — FOMO entry</option></select>
+        </div>
+        <div class="cl-q">
+          <label>Confidence level (1–10)</label>
+          <input type="number" id="cl_confidence" min="1" max="10" placeholder="1–10">
+        </div>
+        <div class="cl-q">
+          <label>Anything that could invalidate this trade?</label>
+          <textarea id="cl_invalidation" placeholder="e.g. If price breaks below $63k primary POI, structure changes on 4H…"></textarea>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+        <button class="btn btn-primary" onclick="copyChecklist()">&#128203; Copy for Claude Analysis</button>
+        <button class="btn btn-ghost" onclick="saveChecklistToForm()">&#128190; Save to Trade Log</button>
+        <span class="copy-ok" id="clCopyOk" style="display:none;">&#10003; Copied!</span>
+      </div>
+      <div style="font-size:0.7rem; color:#6e7681; margin-top:8px; line-height:1.5;">
+        <strong>Copy for Claude Analysis</strong> — paste into Claude and ask: <em>"Review my pre-trade checklist and tell me if this setup is valid."</em><br>
+        <strong>Save to Trade Log</strong> — pre-fills the Log Trade form fields from your answers.
+      </div>
+
     </div>
   </div>
 </div>
@@ -2406,6 +2653,227 @@ function downloadAnalysis() {
   const a    = document.createElement('a');
   a.href = url; a.download = `claude-analysis-${date}.txt`; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════
+// BROKER SETTINGS (cookie-based — NEVER Gist/export)
+// ═══════════════════════════════════════════════════════
+function setCookie(name, val, days) {
+  const d = new Date(); d.setTime(d.getTime() + days * 86400000);
+  document.cookie = name + '=' + encodeURIComponent(val) + ';expires=' + d.toUTCString() + ';path=/;SameSite=Strict';
+}
+function getCookie(name) {
+  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : '';
+}
+function delCookie(name) { document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'; }
+
+function openBrokerModal() {
+  loadBrokerCreds();
+  loadNotifyPrefs();
+  document.getElementById('brokerOverlay').classList.add('open');
+}
+function closeBrokerModal() { document.getElementById('brokerOverlay').classList.remove('open'); }
+function maybeCloseBroker(e) { if (e.target === e.currentTarget) closeBrokerModal(); }
+
+function saveBrokerCreds() {
+  const ex = document.getElementById('bk_exchange').value;
+  const key = document.getElementById('bk_apiKey').value.trim();
+  const secret = document.getElementById('bk_apiSecret').value.trim();
+  if (!ex) { alert('Please select a broker/exchange.'); return; }
+  if (!key || !secret) { alert('Please enter both API Key and API Secret.'); return; }
+  setCookie('tl_broker_exchange', ex, 365);
+  setCookie('tl_broker_apiKey', key, 365);
+  setCookie('tl_broker_apiSecret', secret, 365);
+  refreshBrokerStatus();
+  alert('Credentials saved to cookie (1-year expiry).');
+}
+
+function clearBrokerCreds() {
+  if (!confirm('Clear all saved broker credentials?')) return;
+  delCookie('tl_broker_exchange');
+  delCookie('tl_broker_apiKey');
+  delCookie('tl_broker_apiSecret');
+  document.getElementById('bk_exchange').value = '';
+  document.getElementById('bk_apiKey').value = '';
+  document.getElementById('bk_apiSecret').value = '';
+  refreshBrokerStatus();
+}
+
+function loadBrokerCreds() {
+  const ex = getCookie('tl_broker_exchange');
+  const key = getCookie('tl_broker_apiKey');
+  const secret = getCookie('tl_broker_apiSecret');
+  document.getElementById('bk_exchange').value = ex || '';
+  document.getElementById('bk_apiKey').value = key || '';
+  document.getElementById('bk_apiSecret').value = secret || '';
+  refreshBrokerStatus();
+}
+
+function refreshBrokerStatus() {
+  const el = document.getElementById('brokerStatus');
+  const ex = getCookie('tl_broker_exchange');
+  if (ex) {
+    el.className = 'broker-status saved';
+    el.innerHTML = '&#10003; Connected: <strong>' + escHtml(ex) + '</strong>';
+  } else {
+    el.className = 'broker-status none';
+    el.textContent = 'No credentials saved';
+  }
+}
+
+// ── Roadmap notify toggles (cookie-based) ──
+function toggleNotify(idx) {
+  const el = document.querySelector(`.notify-toggle[data-road="${idx}"]`);
+  el.classList.toggle('on');
+  saveNotifyPrefs();
+}
+function saveNotifyPrefs() {
+  const prefs = [];
+  document.querySelectorAll('.notify-toggle').forEach((el, i) => {
+    if (el.classList.contains('on')) prefs.push(i);
+  });
+  setCookie('tl_roadmap_notify', JSON.stringify(prefs), 365);
+}
+function loadNotifyPrefs() {
+  let prefs = [];
+  try { prefs = JSON.parse(getCookie('tl_roadmap_notify') || '[]'); } catch {}
+  document.querySelectorAll('.notify-toggle').forEach(el => el.classList.remove('on'));
+  prefs.forEach(idx => {
+    const el = document.querySelector(`.notify-toggle[data-road="${idx}"]`);
+    if (el) el.classList.add('on');
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// PRE-TRADE CHECKLIST
+// ═══════════════════════════════════════════════════════
+function openChecklist() {
+  document.getElementById('checklistOverlay').classList.add('open');
+  // Auto-calc R:R on input
+  ['cl_entry','cl_sl','cl_tp'].forEach(id => {
+    document.getElementById(id).oninput = calcChecklistRR;
+  });
+}
+function closeChecklist() { document.getElementById('checklistOverlay').classList.remove('open'); }
+function maybeCloseChecklist(e) { if (e.target === e.currentTarget) closeChecklist(); }
+
+function calcChecklistRR() {
+  const entry = parseFloat(document.getElementById('cl_entry').value);
+  const sl = parseFloat(document.getElementById('cl_sl').value);
+  const tp = parseFloat(document.getElementById('cl_tp').value);
+  const rrEl = document.getElementById('cl_rr');
+  if (!entry || !sl || !tp || entry === sl) { rrEl.value = ''; return; }
+  const risk = Math.abs(entry - sl);
+  const reward = Math.abs(tp - entry);
+  rrEl.value = '1 : ' + (reward / risk).toFixed(2);
+}
+
+function copyChecklist() {
+  const g = id => { const el = document.getElementById(id); return el.value || '—'; };
+  let txt = '=== PRE-TRADE CHECKLIST ===\n';
+  txt += 'Generated: ' + new Date().toLocaleString() + '\n\n';
+
+  txt += 'HTF BIAS:\n';
+  txt += '  Monthly: ' + g('cl_monthlyBias') + '\n';
+  txt += '  Weekly: ' + g('cl_weeklyBias') + '\n';
+  txt += '  Daily: ' + g('cl_dailyBias') + '\n';
+  txt += '  4H: ' + g('cl_4hBias') + '\n';
+  txt += '  All aligned? ' + g('cl_htfAlign') + '\n\n';
+
+  txt += 'SETUP VALIDATION:\n';
+  txt += '  Liquidity taken? ' + g('cl_liqTaken') + '\n';
+  txt += '  SC visible at POI? ' + g('cl_scVisible') + '\n';
+  txt += '  mbms confirmed (LTF)? ' + g('cl_mbmsConf') + '\n';
+  txt += '  Entry confirmation (HH+HL / LL+LH)? ' + g('cl_entryConf') + '\n';
+  txt += '  POI type: ' + g('cl_poiType') + '\n';
+  txt += '  Distance & momentum: ' + g('cl_distMom') + '\n\n';
+
+  txt += 'KEY LEVELS:\n';
+  txt += '  Entry: ' + g('cl_entry') + '\n';
+  txt += '  Stop loss: ' + g('cl_sl') + '\n';
+  txt += '  Take profit: ' + g('cl_tp') + '\n';
+  txt += '  R:R: ' + g('cl_rr') + '\n';
+  txt += '  Targeting: ' + g('cl_target') + '\n\n';
+
+  txt += 'PSYCHOLOGY:\n';
+  txt += '  Chasing? ' + g('cl_chasing') + '\n';
+  txt += '  Confidence: ' + g('cl_confidence') + '/10\n';
+  txt += '  Invalidation: ' + g('cl_invalidation') + '\n\n';
+
+  txt += '=== END CHECKLIST ===\n';
+  txt += '\nInstructions: Paste into Claude and ask —\n';
+  txt += '"Review my pre-trade checklist and tell me if this setup is valid based on my trading system."\n';
+
+  navigator.clipboard.writeText(txt).then(() => {
+    const ok = document.getElementById('clCopyOk');
+    ok.style.display = 'inline';
+    setTimeout(() => { ok.style.display = 'none'; }, 2500);
+  });
+}
+
+function saveChecklistToForm() {
+  // Map checklist answers to Log Trade form fields
+  const g = id => document.getElementById(id).value;
+
+  // HTF Bias → form field
+  const biases = [g('cl_monthlyBias'), g('cl_weeklyBias'), g('cl_dailyBias'), g('cl_4hBias')].filter(Boolean);
+  const bullish = biases.filter(b => b === 'Bullish').length;
+  const bearish = biases.filter(b => b === 'Bearish').length;
+  const htfBias = bullish > bearish ? 'Bullish' : bearish > bullish ? 'Bearish' : 'Ranging';
+  const htfEl = document.getElementById('f_htfBias');
+  if (htfEl) htfEl.value = htfBias;
+
+  // POI type
+  const poiMap = {'Primary POI (mbms area)': 'Primary', 'Secondary POI': 'Secondary'};
+  const poiEl = document.getElementById('f_poiType');
+  if (poiEl) poiEl.value = poiMap[g('cl_poiType')] || '';
+
+  // Liquidity taken
+  const liqMap = {'Yes — clearly swept': 'Yes', 'Partially': 'Partial', 'No — not yet': 'No'};
+  const liqEl = document.getElementById('f_liqTaken');
+  if (liqEl) liqEl.value = liqMap[g('cl_liqTaken')] || '';
+
+  // mbms confirmed
+  const mbmsMap = {'Yes — confirmed': 'Yes', 'Forming': 'Forming', 'No': 'No'};
+  const mbmsEl = document.getElementById('f_mbmsConfirmed');
+  if (mbmsEl) mbmsEl.value = mbmsMap[g('cl_mbmsConf')] || '';
+
+  // SC visible
+  const scMap = {'Yes — clear SC zone': 'Yes', 'Forming': 'Forming', 'No': 'No'};
+  const scEl = document.getElementById('f_scVisible');
+  if (scEl) scEl.value = scMap[g('cl_scVisible')] || '';
+
+  // Entry confirmation
+  const confMap = {'Yes — confirmed': 'HH+HL (bullish)', 'Partial — one leg only': 'Partial', 'No': ''};
+  const confEl = document.getElementById('f_entryConf');
+  if (confEl) {
+    const dir = document.getElementById('f_direction').value;
+    if (g('cl_entryConf') === 'Yes — confirmed') {
+      confEl.value = dir === 'long' ? 'HH+HL (bullish)' : 'LL+LH (bearish)';
+    } else {
+      confEl.value = confMap[g('cl_entryConf')] || '';
+    }
+  }
+
+  // Distance & momentum
+  const dmEl = document.getElementById('f_distMomentum');
+  if (dmEl) dmEl.value = g('cl_distMom') || '';
+
+  // Entry / SL / TP prices
+  const entry = g('cl_entry'), sl = g('cl_sl'), tp = g('cl_tp');
+  if (entry) { const el = document.getElementById('f_entry'); if (el) el.value = entry; }
+  if (sl) { const el = document.getElementById('f_sl'); if (el) el.value = sl; }
+  if (tp) { const el = document.getElementById('f_tp'); if (el) el.value = tp; }
+
+  // Confidence
+  const conf = g('cl_confidence');
+  if (conf) { const el = document.getElementById('f_confidence'); if (el) el.value = conf; }
+
+  // Switch to Log Trade tab
+  nav('log');
+  closeChecklist();
+  alert('Checklist saved to trade form! Review and complete the remaining fields.');
 }
 
 // ═══════════════════════════════════════════════════════
