@@ -699,6 +699,7 @@
           <select id="f_liqTaken" required>
             <option value="">— Select —</option>
             <option>Yes</option>
+            <option>Partial</option>
             <option>No</option>
           </select>
         </div>
@@ -707,6 +708,7 @@
           <select id="f_mbmsConfirmed" required>
             <option value="">— Select —</option>
             <option>Yes</option>
+            <option>Forming</option>
             <option>No</option>
           </select>
         </div>
@@ -715,6 +717,7 @@
           <select id="f_scVisible" required>
             <option value="">— Select —</option>
             <option>Yes</option>
+            <option>Forming</option>
             <option>No</option>
           </select>
         </div>
@@ -722,8 +725,9 @@
           <label>Entry Confirmation</label>
           <select id="f_entryConf">
             <option value="">— Select —</option>
-            <option>HH+HL</option>
-            <option>LL+LH</option>
+            <option>HH+HL (bullish)</option>
+            <option>LL+LH (bearish)</option>
+            <option>Partial</option>
             <option>None yet</option>
           </select>
         </div>
@@ -2251,23 +2255,26 @@ function renderConfluencePerformance(list) {
 
   // SC Visible
   const scY = calcWR(closed.filter(t => t.scVisible === 'Yes'));
+  const scF = calcWR(closed.filter(t => t.scVisible === 'Forming'));
   const scN = calcWR(closed.filter(t => t.scVisible === 'No'));
   html += renderGroup('SC Candle Visible', [
-    { label: 'Yes', ...scY }, { label: 'No', ...scN }
+    { label: 'Yes', ...scY }, { label: 'Forming', ...scF }, { label: 'No', ...scN }
   ]);
 
   // mbms Confirmed
   const mbY = calcWR(closed.filter(t => t.mbmsConfirmed === 'Yes'));
+  const mbF = calcWR(closed.filter(t => t.mbmsConfirmed === 'Forming'));
   const mbN = calcWR(closed.filter(t => t.mbmsConfirmed === 'No'));
   html += renderGroup('mbms Confirmed', [
-    { label: 'Yes', ...mbY }, { label: 'No', ...mbN }
+    { label: 'Yes', ...mbY }, { label: 'Forming', ...mbF }, { label: 'No', ...mbN }
   ]);
 
   // Liquidity Taken
   const lqY = calcWR(closed.filter(t => t.liqTaken === 'Yes'));
+  const lqP = calcWR(closed.filter(t => t.liqTaken === 'Partial'));
   const lqN = calcWR(closed.filter(t => t.liqTaken === 'No'));
-  html += renderGroup('Liquidity Taken Before Entry', [
-    { label: 'Yes', ...lqY }, { label: 'No', ...lqN }
+  html += renderGroup('Liquidity ($$$) Taken Before Entry', [
+    { label: 'Yes', ...lqY }, { label: 'Partial', ...lqP }, { label: 'No', ...lqN }
   ]);
 
   // HTF Bias Aligned (compare htfBias direction with trade direction)
@@ -2293,15 +2300,17 @@ function renderConfluencePerformance(list) {
   ]);
 
   // Entry Confirmation
-  const ecHH = calcWR(closed.filter(t => t.entryConfirmation === 'HH+HL'));
-  const ecLL = calcWR(closed.filter(t => t.entryConfirmation === 'LL+LH'));
+  const ecHH = calcWR(closed.filter(t => t.entryConfirmation && t.entryConfirmation.startsWith('HH+HL')));
+  const ecLL = calcWR(closed.filter(t => t.entryConfirmation && t.entryConfirmation.startsWith('LL+LH')));
+  const ecPart = calcWR(closed.filter(t => t.entryConfirmation === 'Partial'));
   const ecNone = calcWR(closed.filter(t => t.entryConfirmation === 'None yet'));
   html += renderGroup('Entry Confirmation', [
-    { label: 'HH+HL', ...ecHH }, { label: 'LL+LH', ...ecLL }, { label: 'None yet', ...ecNone }
+    { label: 'HH+HL (bullish)', ...ecHH }, { label: 'LL+LH (bearish)', ...ecLL },
+    { label: 'Partial', ...ecPart }, { label: 'None yet', ...ecNone }
   ]);
 
   // Check if all groups are empty
-  const totalDataPoints = [poiSec,poiPri,scY,scN,mbY,mbN,lqY,lqN,dmS,dmM,dmW,ecHH,ecLL,ecNone].reduce((s,x) => s + x.n, 0);
+  const totalDataPoints = [poiSec,poiPri,scY,scF,scN,mbY,mbF,mbN,lqY,lqP,lqN,dmS,dmM,dmW,ecHH,ecLL,ecPart,ecNone].reduce((s,x) => s + x.n, 0);
   if (totalDataPoints === 0) {
     el.innerHTML = '<div style="color:#6e7681; font-size:0.78rem; padding:8px 0;">No confluence data yet — log trades with the new fields to see breakdowns here.</div>';
     return;
