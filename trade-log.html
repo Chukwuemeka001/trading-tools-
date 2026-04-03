@@ -425,6 +425,53 @@
     .cl-q textarea { resize: vertical; min-height: 50px; }
     .cl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     @media(max-width:500px){ .cl-grid { grid-template-columns: 1fr; } }
+
+    /* ── Price Alerts page ── */
+    .alert-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media(max-width:500px){ .alert-form-grid { grid-template-columns: 1fr; } }
+    .alert-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .alert-table th { text-align: left; font-size: 0.67rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.6px; padding: 8px 6px; border-bottom: 1px solid #30363d; }
+    .alert-table td { padding: 8px 6px; border-bottom: 1px solid #21262d; vertical-align: middle; }
+    .alert-table tr:hover { background: rgba(88,166,255,0.04); }
+    .alert-status { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 600; }
+    .alert-status.active { color: #3fb950; }
+    .alert-status.triggered { color: #f85149; }
+    .alert-status.disabled { color: #6e7681; }
+    .alert-dist { font-size: 0.7rem; color: #6e7681; }
+    .alert-actions { display: flex; gap: 4px; }
+    .alert-actions button { padding: 3px 8px; font-size: 0.7rem; border-radius: 4px; border: 1px solid #30363d; background: none; color: #8b949e; cursor: pointer; }
+    .alert-actions button:hover { color: #e6edf3; border-color: #8b949e; }
+    .alert-actions button.rearm { color: #58a6ff; border-color: #58a6ff; }
+    .alert-actions button.del { color: #f85149; border-color: #f85149; }
+
+    /* AI Second Opinion */
+    .ai-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
+    @media(max-width:600px){ .ai-compare { grid-template-columns: 1fr; } }
+    .ai-col-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; padding-bottom: 4px; border-bottom: 1px solid #21262d; }
+    .ai-col-title.user { color: #58a6ff; }
+    .ai-col-title.ai { color: #d2a8ff; }
+    .ai-level { padding: 10px; border: 1px solid #30363d; border-radius: 8px; margin-bottom: 8px; font-size: 0.8rem; }
+    .ai-level.agree { border-color: #3fb950; background: rgba(63,185,80,0.06); }
+    .ai-level.ai-only { border-color: #d29922; background: rgba(210,153,34,0.06); }
+    .ai-level.user-only { border-color: #58a6ff; background: rgba(88,166,255,0.06); }
+    .ai-badge { display: inline-block; font-size: 0.65rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 4px; }
+    .ai-badge.high { background: #f85149; color: #fff; }
+    .ai-badge.medium { background: #d29922; color: #fff; }
+    .ai-badge.low { background: #30363d; color: #8b949e; }
+    .ai-badge.agree { background: #238636; color: #fff; }
+    .ai-badge.ai-only-b { background: #9e6a03; color: #fff; }
+    .ai-badge.user-only-b { background: #1f6feb; color: #fff; }
+    .ai-reasoning { font-size: 0.72rem; color: #8b949e; margin-top: 4px; line-height: 1.4; }
+    .ai-level-actions { margin-top: 6px; display: flex; gap: 6px; }
+    .ai-level-actions button { padding: 2px 8px; font-size: 0.68rem; border-radius: 4px; border: 1px solid #30363d; background: none; cursor: pointer; }
+    .ai-level-actions .add-btn { color: #3fb950; border-color: #3fb950; }
+    .ai-level-actions .ignore-btn { color: #8b949e; }
+    .ai-spinner { text-align: center; padding: 40px; color: #8b949e; }
+    .ai-spinner .spin { display: inline-block; width: 24px; height: 24px; border: 3px solid #30363d; border-top-color: #d2a8ff; border-radius: 50%; animation: aispin 0.8s linear infinite; }
+    @keyframes aispin { to { transform: rotate(360deg); } }
+    .backend-cfg { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .backend-cfg input { flex: 1; min-width: 200px; }
+    .backend-cfg button { white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -435,6 +482,7 @@
   <div class="nav-link active" onclick="nav('dashboard')">Dashboard</div>
   <div class="nav-link" onclick="nav('log')">Log Trade</div>
   <div class="nav-link" onclick="nav('journal')">Journal</div>
+  <div class="nav-link" onclick="nav('alerts')">Alerts</div>
   <div class="nav-spacer"></div>
   <span id="syncDot" style="font-size:0.71rem;color:#8b949e;white-space:nowrap;padding:0 4px;"></span>
   <button class="cloud-btn" onclick="openBrokerModal()" style="font-size:0.75rem;">&#9881; Broker</button>
@@ -798,6 +846,121 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
+     PRICE ALERTS
+════════════════════════════════════════════════════════ -->
+<div id="page-alerts" class="page">
+
+  <!-- Backend URL config -->
+  <div class="card">
+    <div class="card-title">Backend Connection</div>
+    <div class="backend-cfg">
+      <input type="text" class="form-input" id="backendUrl" placeholder="https://your-app.onrender.com" style="font-size:0.8rem;">
+      <button class="btn btn-primary" onclick="saveBackendUrl()" style="padding:7px 12px; font-size:0.78rem;">Save</button>
+      <span id="backendStatus" style="font-size:0.72rem; color:#8b949e;"></span>
+    </div>
+  </div>
+
+  <!-- Add Alert Form -->
+  <div class="card">
+    <div class="card-title">Add Price Alert</div>
+    <div class="alert-form-grid">
+      <div>
+        <label class="form-label">Symbol</label>
+        <input type="text" class="form-input" id="al_symbol" value="BTCUSDT" placeholder="BTCUSDT">
+      </div>
+      <div>
+        <label class="form-label">Price Level</label>
+        <input type="number" class="form-input" id="al_price" placeholder="e.g. 65800" step="any">
+      </div>
+      <div>
+        <label class="form-label">Label / Zone Type</label>
+        <select class="form-input" id="al_label">
+          <option value="SC Zone">SC Zone</option>
+          <option value="$$ Secondary liquidity">$$ Secondary liquidity</option>
+          <option value="$$ Primary liquidity">$$ Primary liquidity</option>
+          <option value="mbms area">mbms area</option>
+          <option value="BOS level">BOS level</option>
+          <option value="MBOS level">MBOS level</option>
+          <option value="Structural low">Structural low</option>
+          <option value="Structural high">Structural high</option>
+          <option value="Custom">Custom</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Direction</label>
+        <select class="form-input" id="al_direction">
+          <option value="crosses_below">Price crosses below (looking for buys)</option>
+          <option value="crosses_above">Price crosses above (looking for sells)</option>
+        </select>
+      </div>
+    </div>
+    <div id="al_customWrap" style="display:none; margin-top:10px;">
+      <label class="form-label">Custom Label</label>
+      <input type="text" class="form-input" id="al_customLabel" placeholder="Your label…">
+    </div>
+    <div style="margin-top:12px;">
+      <button class="btn btn-primary" onclick="addAlert()">Save Alert</button>
+    </div>
+  </div>
+
+  <!-- Current Price -->
+  <div class="card" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+    <div>
+      <span style="font-size:0.72rem; color:#8b949e; text-transform:uppercase; letter-spacing:0.6px;">BTCUSDT Live Price</span>
+      <div id="livePrice" style="font-size:1.3rem; font-weight:700; margin-top:2px;">—</div>
+    </div>
+    <button class="btn btn-ghost" onclick="refreshAlertPrice()" style="padding:5px 10px; font-size:0.75rem;">Refresh</button>
+  </div>
+
+  <!-- Alert List -->
+  <div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+      <div class="card-title" style="margin:0;">Your Alerts</div>
+      <button class="btn btn-ghost" onclick="loadAlerts()" style="padding:4px 10px; font-size:0.72rem;">Reload</button>
+    </div>
+    <div id="alertListWrap">
+      <div style="color:#6e7681; font-size:0.82rem;">Connect backend to see alerts.</div>
+    </div>
+  </div>
+
+  <!-- AI Second Opinion -->
+  <div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+      <div class="card-title" style="margin:0;">&#129302; AI Second Opinion</div>
+    </div>
+    <div style="font-size:0.72rem; color:#6e7681; margin-bottom:12px; line-height:1.5; padding:8px 10px; border:1px solid #21262d; border-radius:6px; background:#0d1117;">
+      This is a <strong style="color:#d2a8ff;">second opinion</strong> based on your trading system rules. <strong style="color:#e6edf3;">Your analysis and judgment always takes priority.</strong>
+    </div>
+
+    <div class="alert-form-grid" style="margin-bottom:12px;">
+      <div>
+        <label class="form-label">Symbol</label>
+        <input type="text" class="form-input" id="ai_symbol" value="BTCUSDT">
+      </div>
+      <div>
+        <label class="form-label">Timeframe</label>
+        <select class="form-input" id="ai_tf">
+          <option value="1M">Monthly</option>
+          <option value="1W">Weekly</option>
+          <option value="1D" selected>Daily</option>
+          <option value="4H">4H</option>
+          <option value="1H">1H</option>
+          <option value="30min">30min</option>
+          <option value="15min">15min</option>
+          <option value="5min">5min</option>
+          <option value="3min">3min</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="requestAILevels()" id="aiBtn" style="margin-bottom:14px;">
+      &#129302; Analyze with Your Framework
+    </button>
+
+    <div id="aiResults"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
      MODAL: Trade Detail
 ════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="modalOverlay" onclick="maybeCloseModal(event)">
@@ -1140,10 +1303,12 @@ function nav(view) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   document.getElementById('page-' + view).classList.add('active');
-  document.querySelectorAll('.nav-link')[['dashboard','log','journal'].indexOf(view)].classList.add('active');
+  const idx = ['dashboard','log','journal','alerts'].indexOf(view);
+  if (idx >= 0) document.querySelectorAll('.nav-link')[idx].classList.add('active');
   if (view === 'dashboard') renderDashboard();
   if (view === 'journal')   renderJournal();
   if (view === 'log')       initForm();
+  if (view === 'alerts')    initAlerts();
   window.scrollTo(0, 0);
 }
 
@@ -2653,6 +2818,246 @@ function downloadAnalysis() {
   const a    = document.createElement('a');
   a.href = url; a.download = `claude-analysis-${date}.txt`; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════
+// PRICE ALERTS & AI SECOND OPINION
+// ═══════════════════════════════════════════════════════
+let alertsCache = [];
+let alertPrice = null;
+
+function getBackendUrl() { return localStorage.getItem('tl_backend_url') || ''; }
+
+function saveBackendUrl() {
+  const url = document.getElementById('backendUrl').value.trim().replace(/\/+$/, '');
+  localStorage.setItem('tl_backend_url', url);
+  const st = document.getElementById('backendStatus');
+  if (!url) { st.textContent = 'Cleared'; st.style.color = '#8b949e'; return; }
+  st.textContent = 'Testing…'; st.style.color = '#58a6ff';
+  fetch(url + '/health').then(r => r.json()).then(d => {
+    st.textContent = '\u2713 Connected'; st.style.color = '#3fb950';
+    loadAlerts();
+    refreshAlertPrice();
+  }).catch(() => { st.textContent = '\u2717 Failed'; st.style.color = '#f85149'; });
+}
+
+function initAlerts() {
+  const url = getBackendUrl();
+  document.getElementById('backendUrl').value = url;
+  // Toggle custom label
+  document.getElementById('al_label').onchange = function() {
+    document.getElementById('al_customWrap').style.display = this.value === 'Custom' ? 'block' : 'none';
+  };
+  if (url) { loadAlerts(); refreshAlertPrice(); }
+}
+
+async function apiCall(method, path, body) {
+  const url = getBackendUrl();
+  if (!url) { alert('Set your backend URL first.'); return null; }
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url + path, opts);
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || r.statusText); }
+  return r.json();
+}
+
+async function loadAlerts() {
+  const wrap = document.getElementById('alertListWrap');
+  try {
+    alertsCache = await apiCall('GET', '/alerts') || [];
+    renderAlertList();
+  } catch (e) {
+    wrap.innerHTML = '<div style="color:#f85149; font-size:0.8rem;">Failed to load: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+async function refreshAlertPrice() {
+  try {
+    const d = await apiCall('GET', '/price/BTCUSDT');
+    if (d) {
+      alertPrice = d.price;
+      document.getElementById('livePrice').textContent = '$' + Number(d.price).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+      renderAlertList(); // update distances
+    }
+  } catch { /* silent */ }
+}
+
+function renderAlertList() {
+  const wrap = document.getElementById('alertListWrap');
+  if (!alertsCache.length) {
+    wrap.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">No alerts yet. Add one above.</div>';
+    return;
+  }
+  let html = '<table class="alert-table"><thead><tr><th>Symbol</th><th>Price</th><th>Label</th><th>Direction</th><th>Status</th><th>Distance</th><th></th></tr></thead><tbody>';
+  alertsCache.forEach(a => {
+    const statusCls = a.triggered ? 'triggered' : (a.active ? 'active' : 'disabled');
+    const statusIcon = a.triggered ? '\uD83D\uDD34' : (a.active ? '\uD83D\uDFE2' : '\u26AB');
+    const statusText = a.triggered ? 'Triggered' : (a.active ? 'Active' : 'Disabled');
+    let dist = '—';
+    if (alertPrice && a.active && !a.triggered) {
+      const d = ((alertPrice - a.price) / a.price * 100);
+      dist = (d >= 0 ? '+' : '') + d.toFixed(2) + '%';
+    }
+    const dirText = a.direction === 'crosses_below' ? '\u2193 Below' : '\u2191 Above';
+    let actions = '<button class="del" onclick="deleteAlert(\'' + a.id + '\')">\u2717</button>';
+    if (a.triggered) actions = '<button class="rearm" onclick="rearmAlert(\'' + a.id + '\')">Re-arm</button>' + actions;
+    html += '<tr>';
+    html += '<td>' + escHtml(a.symbol) + '</td>';
+    html += '<td style="font-weight:600;">$' + Number(a.price).toLocaleString() + '</td>';
+    html += '<td>' + escHtml(a.label) + '</td>';
+    html += '<td>' + dirText + '</td>';
+    html += '<td><span class="alert-status ' + statusCls + '">' + statusIcon + ' ' + statusText + '</span></td>';
+    html += '<td class="alert-dist">' + dist + '</td>';
+    html += '<td><div class="alert-actions">' + actions + '</div></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+async function addAlert() {
+  const symbol = document.getElementById('al_symbol').value.trim().toUpperCase();
+  const price = parseFloat(document.getElementById('al_price').value);
+  let label = document.getElementById('al_label').value;
+  const direction = document.getElementById('al_direction').value;
+  if (label === 'Custom') label = document.getElementById('al_customLabel').value.trim() || 'Custom';
+  if (!symbol || !price) { alert('Enter symbol and price.'); return; }
+  try {
+    const a = await apiCall('POST', '/alerts', { symbol, price, label, direction });
+    if (a) {
+      alertsCache.push(a);
+      renderAlertList();
+      document.getElementById('al_price').value = '';
+    }
+  } catch (e) { alert('Failed: ' + e.message); }
+}
+
+async function deleteAlert(id) {
+  if (!confirm('Delete this alert?')) return;
+  try {
+    await apiCall('DELETE', '/alerts/' + id);
+    alertsCache = alertsCache.filter(a => a.id !== id);
+    renderAlertList();
+  } catch (e) { alert('Failed: ' + e.message); }
+}
+
+async function rearmAlert(id) {
+  try {
+    const updated = await apiCall('PUT', '/alerts/' + id, { rearm: true });
+    if (updated) {
+      const idx = alertsCache.findIndex(a => a.id === id);
+      if (idx >= 0) alertsCache[idx] = updated;
+      renderAlertList();
+    }
+  } catch (e) { alert('Failed: ' + e.message); }
+}
+
+// ── AI Second Opinion ──
+async function requestAILevels() {
+  const btn = document.getElementById('aiBtn');
+  const wrap = document.getElementById('aiResults');
+  const symbol = document.getElementById('ai_symbol').value.trim().toUpperCase();
+  const timeframe = document.getElementById('ai_tf').value;
+
+  btn.disabled = true;
+  btn.textContent = 'Analyzing…';
+  wrap.innerHTML = '<div class="ai-spinner"><div class="spin"></div><div style="margin-top:10px;">Analyzing ' + escHtml(symbol) + ' ' + escHtml(timeframe) + ' with your framework…</div></div>';
+
+  try {
+    const data = await apiCall('POST', '/ai-levels', { symbol, timeframe, candle_limit: 200 });
+    if (!data || !data.levels) throw new Error('No levels returned');
+    renderAIComparison(data.levels);
+  } catch (e) {
+    wrap.innerHTML = '<div style="color:#f85149; font-size:0.82rem;">AI analysis failed: ' + escHtml(e.message) + '</div>';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '\uD83E\uDD16 Analyze with Your Framework';
+  }
+}
+
+function renderAIComparison(aiLevels) {
+  const wrap = document.getElementById('aiResults');
+  const userAlerts = alertsCache.filter(a => a.active);
+
+  // Compare: within 0.5% = agreement
+  const THRESHOLD = 0.005;
+  const aiMatched = new Set();
+  const userMatched = new Set();
+
+  aiLevels.forEach((ai, i) => {
+    userAlerts.forEach((ua, j) => {
+      if (Math.abs(ai.price - ua.price) / ua.price <= THRESHOLD) {
+        aiMatched.add(i);
+        userMatched.add(j);
+      }
+    });
+  });
+
+  let html = '<div class="ai-compare">';
+
+  // Left: User levels
+  html += '<div>';
+  html += '<div class="ai-col-title user">Your Levels</div>';
+  if (!userAlerts.length) {
+    html += '<div style="color:#6e7681; font-size:0.8rem;">No active alerts saved yet.</div>';
+  }
+  userAlerts.forEach((ua, j) => {
+    const cls = userMatched.has(j) ? 'agree' : 'user-only';
+    const badge = userMatched.has(j) ? '<span class="ai-badge agree">Agreement \u2705</span>' : '<span class="ai-badge user-only-b">Your level</span>';
+    html += '<div class="ai-level ' + cls + '">';
+    html += '<strong>' + escHtml(ua.label) + '</strong> ' + badge + '<br>';
+    html += '<span style="font-size:1rem; font-weight:700;">$' + Number(ua.price).toLocaleString() + '</span>';
+    if (userMatched.has(j)) html += '<div class="ai-reasoning">Matches AI level \u2014 highest conviction zone</div>';
+    else html += '<div class="ai-reasoning">Not detected by AI \u2014 trust your own analysis</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Right: AI levels
+  html += '<div>';
+  html += '<div class="ai-col-title ai">AI Suggestion</div>';
+  aiLevels.forEach((ai, i) => {
+    const cls = aiMatched.has(i) ? 'agree' : 'ai-only';
+    const matchBadge = aiMatched.has(i) ? '<span class="ai-badge agree">Agreement \u2705</span>' : '<span class="ai-badge ai-only-b">AI only \u2014 worth checking?</span>';
+    const sigBadge = '<span class="ai-badge ' + (ai.significance || 'medium').toLowerCase() + '">' + escHtml(ai.significance || 'Medium') + '</span>';
+    html += '<div class="ai-level ' + cls + '">';
+    html += '<strong>' + escHtml(ai.type || 'Level') + '</strong> ' + sigBadge + ' ' + matchBadge + '<br>';
+    html += '<span style="font-size:1rem; font-weight:700;">$' + Number(ai.price).toLocaleString() + '</span>';
+    html += '<div class="ai-reasoning">' + escHtml(ai.reasoning || '') + '</div>';
+    if (!aiMatched.has(i)) {
+      html += '<div class="ai-level-actions">';
+      html += '<button class="add-btn" onclick="addAILevel(' + JSON.stringify(ai).replace(/"/g, '&quot;') + ')">+ Add to my alerts</button>';
+      html += '<button class="ignore-btn" onclick="this.closest(\'.ai-level\').style.opacity=\'0.3\'">Ignore</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+  html += '</div>';
+
+  // Summary
+  const agreements = aiMatched.size;
+  const aiOnly = aiLevels.length - agreements;
+  const userOnly = userAlerts.length - userMatched.size;
+  let summary = '<div style="margin-top:14px; padding:10px; border:1px solid #21262d; border-radius:8px; background:#0d1117; font-size:0.78rem; line-height:1.6;">';
+  summary += '<strong style="color:#e6edf3;">Comparison Summary</strong><br>';
+  if (agreements) summary += '\uD83D\uDFE2 <strong>' + agreements + '</strong> level(s) in agreement \u2014 highest conviction zones<br>';
+  if (aiOnly) summary += '\uD83D\uDFE1 <strong>' + aiOnly + '</strong> AI-only level(s) \u2014 worth investigating<br>';
+  if (userOnly) summary += '\uD83D\uDD35 <strong>' + userOnly + '</strong> user-only level(s) \u2014 not detected by AI, trust your analysis<br>';
+  summary += '</div>';
+
+  wrap.innerHTML = summary + wrap.innerHTML.replace('<div class="ai-compare">', '<div class="ai-compare">');
+  // Re-build: put summary on top
+  wrap.innerHTML = summary + html;
+}
+
+function addAILevel(ai) {
+  const symbol = document.getElementById('ai_symbol').value.trim().toUpperCase() || 'BTCUSDT';
+  const label = ai.type || 'AI Level';
+  const price = ai.price;
+  apiCall('POST', '/alerts', { symbol, price, label, direction: 'crosses_below' }).then(a => {
+    if (a) { alertsCache.push(a); renderAlertList(); alert('Added: ' + label + ' at $' + Number(price).toLocaleString()); }
+  }).catch(e => alert('Failed: ' + e.message));
 }
 
 // ═══════════════════════════════════════════════════════
