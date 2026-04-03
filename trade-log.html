@@ -472,6 +472,26 @@
     .backend-cfg { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
     .backend-cfg input { flex: 1; min-width: 200px; }
     .backend-cfg button { white-space: nowrap; }
+
+    /* ── MT4 connection indicator ── */
+    .mt4-dot { display: inline-flex; align-items: center; gap: 4px; font-size: 0.68rem; padding: 3px 8px; border-radius: 10px; border: 1px solid #30363d; white-space: nowrap; cursor: default; }
+    .mt4-dot.on { color: #3fb950; border-color: #3fb950; }
+    .mt4-dot.off { color: #f85149; border-color: #f85149; }
+
+    /* ── Live trades panel ── */
+    .live-trade { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+    .live-trade-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .live-trade-pair { font-weight: 700; font-size: 0.95rem; }
+    .live-trade-dir { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+    .live-trade-dir.long { background: #0f5323; color: #3fb950; }
+    .live-trade-dir.short { background: #5c1616; color: #f85149; }
+    .live-trade-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 0.78rem; }
+    @media(max-width:500px){ .live-trade-grid { grid-template-columns: 1fr 1fr; } }
+    .live-trade-item { }
+    .live-trade-label { font-size: 0.65rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+    .live-trade-val { font-weight: 600; margin-top: 1px; }
+    .live-trade-be { margin-top: 8px; font-size: 0.75rem; padding: 5px 10px; border-radius: 6px; border: 1px solid #21262d; background: #0d1117; }
+    .mt4-badge { display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: #1f6feb; color: #fff; margin-left: 6px; vertical-align: middle; }
   </style>
 </head>
 <body>
@@ -483,7 +503,9 @@
   <div class="nav-link" onclick="nav('log')">Log Trade</div>
   <div class="nav-link" onclick="nav('journal')">Journal</div>
   <div class="nav-link" onclick="nav('alerts')">Alerts</div>
+  <div class="nav-link" onclick="nav('live')">Live</div>
   <div class="nav-spacer"></div>
+  <span id="mt4Dot" class="mt4-dot off" title="MT4 Connection">&#9899; MT4</span>
   <span id="syncDot" style="font-size:0.71rem;color:#8b949e;white-space:nowrap;padding:0 4px;"></span>
   <button class="cloud-btn" onclick="openBrokerModal()" style="font-size:0.75rem;">&#9881; Broker</button>
   <button id="cloudBtn" class="cloud-btn" onclick="openCloudModal()">☁ Cloud</button>
@@ -961,6 +983,32 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
+     LIVE TRADES (MT4)
+════════════════════════════════════════════════════════ -->
+<div id="page-live" class="page">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+    <h1 style="font-size:1.1rem; font-weight:700;">Live MT4 Trades</h1>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <span id="mt4ConnStatus" style="font-size:0.75rem; color:#8b949e;"></span>
+      <button class="btn btn-ghost" onclick="refreshLiveTrades()" style="padding:5px 10px; font-size:0.72rem;">Refresh</button>
+    </div>
+  </div>
+
+  <div id="mt4LivePanel">
+    <div style="color:#6e7681; font-size:0.82rem;">Connect your backend and attach the POIWatcher EA to MT4 to see live trades here.</div>
+  </div>
+
+  <!-- Auto-logged trades needing analysis -->
+  <div style="margin-top:20px;">
+    <div class="card-title">MT4 Auto-Logged Trades — Needs Your Analysis</div>
+    <div style="font-size:0.72rem; color:#6e7681; margin-bottom:12px;">These trades were logged automatically from MT4. Click to add your HTF bias, setup type, confidence, and rationale.</div>
+    <div id="mt4NeedsAnalysis">
+      <div style="color:#6e7681; font-size:0.82rem;">No MT4 trades needing analysis.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
      MODAL: Trade Detail
 ════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="modalOverlay" onclick="maybeCloseModal(event)">
@@ -1303,12 +1351,13 @@ function nav(view) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   document.getElementById('page-' + view).classList.add('active');
-  const idx = ['dashboard','log','journal','alerts'].indexOf(view);
+  const idx = ['dashboard','log','journal','alerts','live'].indexOf(view);
   if (idx >= 0) document.querySelectorAll('.nav-link')[idx].classList.add('active');
   if (view === 'dashboard') renderDashboard();
   if (view === 'journal')   renderJournal();
   if (view === 'log')       initForm();
   if (view === 'alerts')    initAlerts();
+  if (view === 'live')      refreshLiveTrades();
   window.scrollTo(0, 0);
 }
 
@@ -1531,7 +1580,7 @@ function renderJournal() {
         <div class="trade-dir ${t.direction}">${t.direction}</div>
       </div>
       <div class="trade-main">
-        <div class="trade-pair">${t.pair} ${badge}</div>
+        <div class="trade-pair">${t.pair} ${badge}${t.source === 'mt4' ? '<span class="mt4-badge">MT4</span>' : ''}</div>
         <div class="trade-meta">${dateStr} · ${t.timeframe} · ${t.setup} · ${t.market}</div>
       </div>
       <div class="trade-right">
@@ -2724,7 +2773,7 @@ function generateAnalysisExport(period) {
   sorted.forEach((t, i) => {
     if (t.status === 'closed' && t.actualPnL) equity += t.actualPnL;
     out += `---\n`;
-    out += `ID: ${String(i+1).padStart(3,'0')} | Date: ${dateStr(t.dateOpen)} | Symbol: ${t.pair}\n`;
+    out += `ID: ${String(i+1).padStart(3,'0')} | Date: ${dateStr(t.dateOpen)} | Symbol: ${t.pair}${t.source === 'mt4' ? ' [MT4 Auto-logged]' : ''}\n`;
     out += `Direction: ${t.direction.toUpperCase()} | Market: ${t.market} | TF: ${t.timeframe} | Setup: ${t.setup}\n`;
     out += `Confidence: ${t.confidence}/10`;
     if (t.conditions?.length) out += ` | Conditions: ${t.conditions.join(', ')}`;
@@ -2818,6 +2867,166 @@ function downloadAnalysis() {
   const a    = document.createElement('a');
   a.href = url; a.download = `claude-analysis-${date}.txt`; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════
+// MT4 LIVE TRADES & CONNECTION
+// ═══════════════════════════════════════════════════════
+let _mt4Interval = null;
+
+function updateMT4Dot() {
+  const url = getBackendUrl();
+  if (!url) return;
+  fetch(url + '/mt4/connection').then(r => r.json()).then(d => {
+    const dot = document.getElementById('mt4Dot');
+    if (d.connected) {
+      dot.className = 'mt4-dot on';
+      const ago = d.seconds_ago < 60 ? d.seconds_ago + 's' : Math.floor(d.seconds_ago / 60) + 'm';
+      dot.innerHTML = '\uD83D\uDFE2 MT4 <span style="font-size:0.6rem;opacity:0.7;">' + ago + '</span>';
+      dot.title = 'MT4 Connected — last ping ' + ago + ' ago';
+    } else {
+      dot.className = 'mt4-dot off';
+      dot.innerHTML = '\uD83D\uDD34 MT4';
+      dot.title = 'MT4 Disconnected';
+    }
+  }).catch(() => {});
+}
+
+function startMT4Polling() {
+  if (_mt4Interval) return;
+  updateMT4Dot();
+  _mt4Interval = setInterval(updateMT4Dot, 30000);
+}
+
+async function refreshLiveTrades() {
+  const url = getBackendUrl();
+  const panel = document.getElementById('mt4LivePanel');
+  const needs = document.getElementById('mt4NeedsAnalysis');
+  const conn  = document.getElementById('mt4ConnStatus');
+
+  if (!url) {
+    panel.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">Set your backend URL in the Alerts tab first.</div>';
+    return;
+  }
+
+  // Connection status
+  try {
+    const status = await (await fetch(url + '/mt4/connection')).json();
+    if (status.connected) {
+      const ago = status.seconds_ago < 60 ? status.seconds_ago + 's' : Math.floor(status.seconds_ago / 60) + 'm';
+      conn.innerHTML = '\uD83D\uDFE2 Connected \u00b7 ' + ago + ' ago \u00b7 Balance: $' + Number(status.account_balance || 0).toLocaleString(undefined, {minimumFractionDigits:2});
+      conn.style.color = '#3fb950';
+    } else {
+      conn.innerHTML = '\uD83D\uDD34 Disconnected';
+      conn.style.color = '#f85149';
+    }
+  } catch { conn.innerHTML = '\u26AB Backend offline'; conn.style.color = '#8b949e'; }
+
+  // Open trades
+  try {
+    const openTrades = await (await fetch(url + '/mt4/open-trades')).json();
+    if (!openTrades.length) {
+      panel.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">No open MT4 trades right now.</div>';
+    } else {
+      let html = '';
+      for (const t of openTrades) {
+        const dir = (t.direction || '').toLowerCase();
+        const entry = t.entry || 0;
+        const sl = t.sl || 0;
+        const tp = t.tp || 0;
+        const slDist = Math.abs(entry - sl);
+        const tpDist = Math.abs(tp - entry);
+        const plannedRR = slDist > 0 ? (tpDist / slDist).toFixed(1) : '—';
+
+        // Try to get current price
+        let currentPrice = null;
+        try {
+          const pd = await (await fetch(url + '/price/' + (t.pair || 'BTCUSDT').replace('/', ''))).json();
+          currentPrice = pd.price;
+        } catch {}
+
+        let currentPnL = '—', currentRR = '—', slPips = '—', tpPips = '—';
+        if (currentPrice && entry && sl) {
+          const profit = dir === 'long' ? currentPrice - entry : entry - currentPrice;
+          currentPnL = (profit >= 0 ? '+' : '') + profit.toFixed(2);
+          currentRR = slDist > 0 ? (Math.abs(profit) / slDist).toFixed(1) : '—';
+          if (profit < 0) currentRR = '-' + currentRR;
+          slPips = Math.abs(currentPrice - sl).toFixed(2);
+          tpPips = tp ? Math.abs(tp - currentPrice).toFixed(2) : '—';
+        }
+
+        // Time open
+        let duration = '—';
+        if (t.dateOpen) {
+          const mins = Math.floor((Date.now() - new Date(t.dateOpen).getTime()) / 60000);
+          duration = mins < 60 ? mins + 'm' : Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+        }
+
+        // BE status
+        const beRR = 1.5;
+        let beStatus = '';
+        if (sl && Math.abs(sl - entry) < 0.01) {
+          beStatus = '\uD83D\uDD12 Break even set \u2014 risk free!';
+        } else if (currentPrice && slDist > 0) {
+          const profit = dir === 'long' ? currentPrice - entry : entry - currentPrice;
+          const rr = profit / slDist;
+          beStatus = '\u23F3 BE at 1:' + beRR.toFixed(1) + ' RR \u2014 currently at 1:' + rr.toFixed(1);
+        }
+
+        html += '<div class="live-trade">';
+        html += '<div class="live-trade-header">';
+        html += '<div><span class="live-trade-pair">' + escHtml(t.pair || '') + '</span><span class="live-trade-dir ' + dir + '">' + (dir === 'long' ? 'LONG' : 'SHORT') + '</span></div>';
+        html += '<div style="font-size:0.72rem;color:#8b949e;">' + duration + ' open</div>';
+        html += '</div>';
+        html += '<div class="live-trade-grid">';
+        html += '<div class="live-trade-item"><div class="live-trade-label">Entry</div><div class="live-trade-val">$' + Number(entry).toLocaleString() + '</div></div>';
+        html += '<div class="live-trade-item"><div class="live-trade-label">Current</div><div class="live-trade-val" style="color:' + (currentPnL.startsWith('+') ? '#3fb950' : currentPnL.startsWith('-') ? '#f85149' : '#e6edf3') + '">$' + (currentPrice ? Number(currentPrice).toLocaleString() : '—') + '</div></div>';
+        html += '<div class="live-trade-item"><div class="live-trade-label">P&L</div><div class="live-trade-val" style="color:' + (currentPnL.startsWith('+') ? '#3fb950' : currentPnL.startsWith('-') ? '#f85149' : '#e6edf3') + '">' + currentPnL + '</div></div>';
+        html += '<div class="live-trade-item"><div class="live-trade-label">Current RR</div><div class="live-trade-val">' + currentRR + '</div></div>';
+        html += '<div class="live-trade-item"><div class="live-trade-label">Dist to SL</div><div class="live-trade-val">' + slPips + '</div></div>';
+        html += '<div class="live-trade-item"><div class="live-trade-label">Dist to TP</div><div class="live-trade-val">' + tpPips + '</div></div>';
+        html += '</div>';
+        if (beStatus) html += '<div class="live-trade-be">' + beStatus + '</div>';
+        html += '</div>';
+      }
+      panel.innerHTML = html;
+    }
+  } catch (e) {
+    panel.innerHTML = '<div style="color:#f85149; font-size:0.82rem;">Failed to load: ' + escHtml(e.message) + '</div>';
+  }
+
+  // MT4 trades needing analysis
+  try {
+    const allTrades = trades; // from localStorage
+    const mt4Trades = allTrades.filter(t => t.source === 'mt4' && !t.htfBias && !t.setup);
+    if (!mt4Trades.length) {
+      needs.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">All MT4 trades have been analysed.</div>';
+    } else {
+      let html = '';
+      mt4Trades.forEach(t => {
+        const outcome = t.status === 'closed' ? (t.outcome === 'win' ? ' \u2705 Win' : t.outcome === 'loss' ? ' \uD83D\uDD34 Loss' : ' \u2796 BE') : ' \uD83D\uDFE2 Open';
+        html += '<div class="live-trade" style="cursor:pointer;" onclick="editMT4Trade(\'' + t.id + '\')">';
+        html += '<div class="live-trade-header">';
+        html += '<div><span class="live-trade-pair">' + escHtml(t.pair || '') + '</span><span class="mt4-badge">MT4 Auto-logged</span>' + outcome + '</div>';
+        html += '<div style="font-size:0.72rem;color:#58a6ff;">Click to add analysis \u2192</div>';
+        html += '</div>';
+        html += '<div style="font-size:0.78rem; color:#8b949e; margin-top:4px;">';
+        html += (t.direction || '') + ' \u00b7 Entry: $' + Number(t.entry || 0).toLocaleString() + ' \u00b7 SL: $' + Number(t.sl || 0).toLocaleString() + ' \u00b7 TP: $' + Number(t.tp || 0).toLocaleString();
+        html += '</div>';
+        html += '</div>';
+      });
+      needs.innerHTML = html;
+    }
+  } catch {}
+}
+
+function editMT4Trade(id) {
+  // Switch to Log Trade tab in edit mode for this trade
+  const t = trades.find(x => x.id === id);
+  if (t) {
+    editTrade(id);
+    nav('log');
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3299,6 +3508,7 @@ load();
 updateSyncDot();
 refreshCloudStatus();
 renderDashboard();
+startMT4Polling();
 (async () => {
   try {
     const added = await gistPullRaw();
