@@ -169,11 +169,19 @@
           </div>
         </div>
       </div>
-      <div class="field">
-        <label>Risk : Reward</label>
-        <div class="input-wrap" style="max-width:200px">
-          <input type="number" id="fxRR" value="2" min="0.1" step="0.1">
-          <span class="unit">R</span>
+      <div class="grid-2">
+        <div class="field">
+          <label>Take Profit Price</label>
+          <div class="input-wrap">
+            <input type="number" id="fxTP" placeholder="Auto or enter" step="any">
+          </div>
+        </div>
+        <div class="field">
+          <label>Risk : Reward</label>
+          <div class="input-wrap">
+            <input type="number" id="fxRR" value="2" min="0.1" step="0.1">
+            <span class="unit">R</span>
+          </div>
         </div>
       </div>
       <div class="field">
@@ -251,19 +259,29 @@
           <div class="result-sub" id="fxLotType">—</div>
         </div>
         <div class="result-item">
-          <div class="result-label">Take Profit</div>
-          <div class="result-value" id="fxTPPips">—</div>
-          <div class="result-sub">pips</div>
+          <div class="result-label">Take Profit Price</div>
+          <div class="result-value" id="fxTPPrice">—</div>
+          <div class="result-sub" id="fxTPPipsSub">—</div>
         </div>
         <div class="result-item">
-          <div class="result-label">Pip Value</div>
-          <div class="result-value" id="fxPipVal">—</div>
-          <div class="result-sub">per std lot</div>
+          <div class="result-label">R:R Ratio</div>
+          <div class="result-value" id="fxRRDisplay">—</div>
+          <div class="result-sub" id="fxPipVal">—</div>
         </div>
-        <div class="result-item">
-          <div class="result-label">After Win / Loss</div>
+        <div class="result-item green">
+          <div class="result-label">After Win</div>
           <div class="result-value" id="fxCapWin">—</div>
-          <div class="result-sub" id="fxCapLoss">—</div>
+          <div class="result-sub" id="fxCapWinPct">—</div>
+        </div>
+        <div class="result-item red">
+          <div class="result-label">After Loss</div>
+          <div class="result-value" id="fxCapLoss">—</div>
+          <div class="result-sub" id="fxCapLossPct">—</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">BE Price (1:5 R:R)</div>
+          <div class="result-value" id="fxBEResult">—</div>
+          <div class="result-sub">move SL to entry</div>
         </div>
       </div>
 
@@ -330,11 +348,20 @@
           </div>
         </div>
       </div>
-      <div class="field">
-        <label>Risk : Reward</label>
-        <div class="input-wrap" style="max-width:200px">
-          <input type="number" id="btcRR" value="2" min="0.1" step="0.1">
-          <span class="unit">R</span>
+      <div class="grid-2">
+        <div class="field">
+          <label>Take Profit Price</label>
+          <div class="input-wrap">
+            <input type="number" id="btcTP_input" placeholder="Auto or enter" step="any">
+            <span class="unit">USDT</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Risk : Reward</label>
+          <div class="input-wrap">
+            <input type="number" id="btcRR" value="2" min="0.1" step="0.1">
+            <span class="unit">R</span>
+          </div>
         </div>
       </div>
       <div id="btcNote" class="info-note btc-note"></div>
@@ -404,19 +431,29 @@
           <div class="result-sub" id="btcQtySub">—</div>
         </div>
         <div class="result-item">
-          <div class="result-label">Position Value</div>
-          <div class="result-value" id="btcPosVal">—</div>
-          <div class="result-sub">USDT notional</div>
-        </div>
-        <div class="result-item">
           <div class="result-label">Take Profit Price</div>
           <div class="result-value" id="btcTP">—</div>
           <div class="result-sub" id="btcTPDist">—</div>
         </div>
         <div class="result-item">
-          <div class="result-label">After Win / Loss</div>
+          <div class="result-label">R:R Ratio</div>
+          <div class="result-value" id="btcRRDisplay">—</div>
+          <div class="result-sub" id="btcPosVal">—</div>
+        </div>
+        <div class="result-item green">
+          <div class="result-label">After Win</div>
           <div class="result-value" id="btcCapWin">—</div>
-          <div class="result-sub" id="btcCapLoss">—</div>
+          <div class="result-sub" id="btcCapWinPct">—</div>
+        </div>
+        <div class="result-item red">
+          <div class="result-label">After Loss</div>
+          <div class="result-value" id="btcCapLoss">—</div>
+          <div class="result-sub" id="btcCapLossPct">—</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">BE Price (1:5 R:R)</div>
+          <div class="result-value" id="btcBEResult">—</div>
+          <div class="result-sub">move SL to entry</div>
         </div>
       </div>
 
@@ -466,6 +503,8 @@
   let fxDir = 'long';
   let splitOn = false;
   let fxSplitOn = false;
+  let fxLastEdited = 'rr';   // 'rr' or 'tp' — which was last typed
+  let btcLastEdited = 'rr';  // 'rr' or 'tp'
 
   function fmt(n, dec = 2) { return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
   function fmtPrice(n) {
@@ -561,28 +600,49 @@
 
   function calcForex(capital, riskPct) {
     const entry    = parseFloat(document.getElementById('fxEntry').value) || 0;
-    const sl       = parseFloat(document.getElementById('fxSL').value) || 0;
-    const rr       = parseFloat(document.getElementById('fxRR').value) || 1;
+    const slPips   = parseFloat(document.getElementById('fxSL').value) || 0;
     const pairType = document.getElementById('pairType').value;
-    if (!sl || !entry) return;
+    if (!slPips || !entry) return;
 
-    const pipSz     = fxPipSize(entry);
+    const pipSz  = fxPipSize(entry);
+    const pipVal = fxPipValue(pairType, entry);
+    const slDist = slPips * pipSz;
+
+    // SL price
+    let slPrice;
+    if (fxDir === 'long') slPrice = entry - slDist;
+    else slPrice = entry + slDist;
+
+    // ── Smart bidirectional TP / RR ───────────────────────
+    let rr, tpPrice, tpPips;
+    const tpInput = parseFloat(document.getElementById('fxTP').value);
+    const rrInput = parseFloat(document.getElementById('fxRR').value);
+
+    if (fxLastEdited === 'tp' && tpInput) {
+      // Mode 1: TP entered → calculate RR
+      tpPrice = tpInput;
+      if (fxDir === 'long') {
+        rr = slDist > 0 ? (tpPrice - entry) / slDist : 1;
+      } else {
+        rr = slDist > 0 ? (entry - tpPrice) / slDist : 1;
+      }
+      if (rr < 0) rr = 0;
+      tpPips = Math.abs(tpPrice - entry) / pipSz;
+      // Update RR field silently
+      document.getElementById('fxRR').value = rr > 0 ? rr.toFixed(2) : '';
+    } else {
+      // Mode 2: RR entered → calculate TP
+      rr = rrInput || 1;
+      tpPips = slPips * rr;
+      if (fxDir === 'long') tpPrice = entry + slDist * rr;
+      else tpPrice = entry - slDist * rr;
+      // Update TP field silently
+      document.getElementById('fxTP').value = tpPrice > 0 ? (entry > 20 ? tpPrice.toFixed(3) : tpPrice.toFixed(5)) : '';
+    }
+
     const riskAmt   = capital * (riskPct / 100);
     const rewardAmt = riskAmt * rr;
-    const tpPips    = sl * rr;
-    const pipVal    = fxPipValue(pairType, entry);
-    const lotSize   = riskAmt / (sl * pipVal);
-
-    // SL and TP prices
-    const slDist = sl * pipSz;
-    let slPrice, tpPrice;
-    if (fxDir === 'long') {
-      slPrice = entry - slDist;
-      tpPrice = entry + slDist * rr;
-    } else {
-      slPrice = entry + slDist;
-      tpPrice = entry - slDist * rr;
-    }
+    const lotSize   = riskAmt / (slPips * pipVal);
 
     let lotLabel = '';
     if (lotSize >= 0.09) lotLabel = fmt(lotSize, 3) + ' std lot(s)';
@@ -601,14 +661,17 @@
     const riskBadge = exceeded ? `<div class="risk-exceeded-badge">⚠ Exceeds 2% risk cap</div>` : '';
 
     set('fxRiskAmt',   '$' + fmt(riskAmt));
-    set('fxRiskPct',   fmt(riskPct, 1) + '% of capital');
     set('fxRewardAmt', '$' + fmt(rewardAmt));
     set('fxRewardPips', fmt(tpPips, 1) + ' pips TP');
     set('fxLotSize',   fmt(lotSize, 3));
-    set('fxTPPips',    fmt(tpPips, 1));
-    set('fxPipVal',    '$' + fmt(pipVal, 3));
+    set('fxTPPrice',   fmtFxPrice(tpPrice));
+    set('fxTPPipsSub', fmt(tpPips, 1) + ' pips');
+    set('fxRRDisplay', '1 : ' + fmt(rr, 2));
+    set('fxPipVal',    'Pip val $' + fmt(pipVal, 3));
     set('fxCapWin',    '$' + fmt(capital + rewardAmt));
-    set('fxCapLoss',   'Loss → $' + fmt(capital - riskAmt));
+    set('fxCapWinPct', '+' + fmt((rewardAmt / capital) * 100, 1) + '%');
+    set('fxCapLoss',   '$' + fmt(capital - riskAmt));
+    set('fxCapLossPct', '-' + fmt((riskAmt / capital) * 100, 1) + '%');
 
     // Lot type sub with risk badge if exceeded
     const lotSubEl = document.getElementById('fxLotType');
@@ -622,18 +685,19 @@
     set('fxLvlEntry', fmtFxPrice(entry));
     set('fxLvlSL', fmtFxPrice(slPrice));
     set('fxLvlTP', fmtFxPrice(tpPrice));
-    set('fxLvlSLDist', sl + ' pips (' + fmt(slDist, entry > 20 ? 3 : 5) + ')');
+    set('fxLvlSLDist', slPips + ' pips (' + fmt(slDist, entry > 20 ? 3 : 5) + ')');
 
     setBar('fxBarRisk', 'fxBarReward', 'fxBarL', 'fxBarM', 'fxBarR', riskAmt, rewardAmt, rr);
 
     // ── Break Even at 1:5 R:R ─────────────────────────────
     const beRR = 5;
-    const bePipDist = sl * beRR;
+    const bePipDist = slPips * beRR;
     const bePriceDist = bePipDist * pipSz;
     let beTrigger;
     if (fxDir === 'long') beTrigger = entry + bePriceDist;
     else beTrigger = entry - bePriceDist;
 
+    set('fxBEResult', fmtFxPrice(beTrigger));
     set('fxBePrice', fmtFxPrice(beTrigger));
     set('fxBeDist', bePipDist + ' pips (' + fmt(bePriceDist, entry > 20 ? 3 : 5) + ')');
     set('fxBeProtected', '100% — risk-free trade ($' + fmt(riskAmt) + ' no longer at risk)');
@@ -699,12 +763,11 @@
   function calcBTC(capital, riskPct) {
     const entry = parseFloat(document.getElementById('btcEntry').value) || 0;
     const sl    = parseFloat(document.getElementById('btcSL').value) || 0;
-    const rr    = parseFloat(document.getElementById('btcRR').value) || 1;
     if (!entry || !sl) return;
 
-    let slDist, tpPrice, validSL = true;
-    if (dir === 'long') { slDist = entry - sl; tpPrice = entry + slDist * rr; if (sl >= entry) validSL = false; }
-    else { slDist = sl - entry; tpPrice = entry - slDist * rr; if (sl <= entry) validSL = false; }
+    let slDist, validSL = true;
+    if (dir === 'long') { slDist = entry - sl; if (sl >= entry) validSL = false; }
+    else { slDist = sl - entry; if (sl <= entry) validSL = false; }
 
     if (!validSL || slDist <= 0) {
       document.getElementById('btcNote').textContent = dir === 'long'
@@ -713,12 +776,36 @@
       return;
     }
 
+    // ── Smart bidirectional TP / RR ───────────────────────
+    let rr, tpPrice, tpDist;
+    const tpInput = parseFloat(document.getElementById('btcTP_input').value);
+    const rrInput = parseFloat(document.getElementById('btcRR').value);
+
+    if (btcLastEdited === 'tp' && tpInput) {
+      // Mode 1: TP entered → calculate RR
+      tpPrice = tpInput;
+      if (dir === 'long') {
+        rr = slDist > 0 ? (tpPrice - entry) / slDist : 1;
+      } else {
+        rr = slDist > 0 ? (entry - tpPrice) / slDist : 1;
+      }
+      if (rr < 0) rr = 0;
+      tpDist = Math.abs(tpPrice - entry);
+      document.getElementById('btcRR').value = rr > 0 ? rr.toFixed(2) : '';
+    } else {
+      // Mode 2: RR entered → calculate TP
+      rr = rrInput || 1;
+      tpDist = slDist * rr;
+      if (dir === 'long') tpPrice = entry + tpDist;
+      else tpPrice = entry - tpDist;
+      document.getElementById('btcTP_input').value = tpPrice > 0 ? tpPrice.toFixed(2) : '';
+    }
+
     const riskAmt   = capital * (riskPct / 100);
     const qty       = riskAmt / slDist;
     const posVal    = qty * entry;
     const rewardAmt = riskAmt * rr;
     const slPct     = (slDist / entry) * 100;
-    const tpDist    = slDist * rr;
 
     document.getElementById('btcNote').textContent =
       `Position Size = Risk $ ÷ SL Distance → $${fmt(riskAmt)} ÷ $${fmt(slDist)} = ${fmt(qty,6)} BTC`;
@@ -731,11 +818,14 @@
     set('btcRewardAmt', '$' + fmt(rewardAmt));
     set('btcRewardSub', fmt(tpDist, 2) + ' USDT move');
     set('btcQty',       fmt(qty, 6) + ' BTC');
-    set('btcPosVal',    '$' + fmt(posVal));
+    set('btcRRDisplay', '1 : ' + fmt(rr, 2));
+    set('btcPosVal',    '$' + fmt(posVal) + ' notional');
     set('btcTP',        fmtPrice(tpPrice));
     set('btcTPDist',    (dir === 'long' ? '+' : '-') + '$' + fmt(tpDist) + ' from entry');
     set('btcCapWin',    '$' + fmt(capital + rewardAmt));
-    set('btcCapLoss',   'Loss → $' + fmt(capital - riskAmt));
+    set('btcCapWinPct', '+' + fmt((rewardAmt / capital) * 100, 1) + '%');
+    set('btcCapLoss',   '$' + fmt(capital - riskAmt));
+    set('btcCapLossPct', '-' + fmt((riskAmt / capital) * 100, 1) + '%');
 
     // Risk sub with badge
     const riskSubEl = document.getElementById('btcRiskPct');
@@ -759,6 +849,7 @@
     if (dir === 'long') beTrigger = entry + beTriggerDist;
     else beTrigger = entry - beTriggerDist;
 
+    set('btcBEResult', fmtPrice(beTrigger));
     set('bePrice', fmtPrice(beTrigger));
     set('beDist', '$' + fmt(beTriggerDist) + ' (' + fmt((beTriggerDist / entry) * 100, 2) + '%)');
     set('beProtected', '100% — risk-free trade ($' + fmt(riskAmt) + ' no longer at risk)');
@@ -835,11 +926,14 @@
     document.getElementById('riskPct').value = 2;
     document.getElementById('fxEntry').value = 1.2500;
     document.getElementById('fxSL').value = 20;
+    document.getElementById('fxTP').value = '';
     document.getElementById('fxRR').value = 2;
     document.getElementById('pairType').value = 'usd_quote';
     document.getElementById('btcEntry').value = 84000;
     document.getElementById('btcSL').value = 82500;
+    document.getElementById('btcTP_input').value = '';
     document.getElementById('btcRR').value = 2;
+    fxLastEdited = 'rr'; btcLastEdited = 'rr';
     fxDir = 'long'; setFxDir('long');
     dir = 'long'; setDir('long');
     splitOn = false; fxSplitOn = false;
@@ -890,11 +984,17 @@
   }
 
   // ── Event listeners ──────────────────────────────────────
+  // Track which TP/RR field was last edited for smart calculation
+  document.getElementById('fxTP').addEventListener('input', () => { fxLastEdited = 'tp'; calculate(); });
+  document.getElementById('fxRR').addEventListener('input', () => { fxLastEdited = 'rr'; calculate(); });
+  document.getElementById('btcTP_input').addEventListener('input', () => { btcLastEdited = 'tp'; calculate(); });
+  document.getElementById('btcRR').addEventListener('input', () => { btcLastEdited = 'rr'; calculate(); });
+
   const allInputs = [
     'capital','riskPct',
-    'fxEntry','fxSL','fxRR','pairType',
+    'fxEntry','fxSL','pairType',
     'fxSplitCount','fxSp1Price','fxSp1Pct','fxSp2Price','fxSp2Pct','fxSp3Price','fxSp3Pct',
-    'btcEntry','btcSL','btcRR',
+    'btcEntry','btcSL',
     'splitCount','sp1Price','sp1Pct','sp2Price','sp2Pct','sp3Price','sp3Pct'
   ];
   allInputs.forEach(id => {
