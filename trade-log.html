@@ -569,6 +569,34 @@
       .session-pills { gap: 4px; }
       .session-pill { padding: 2px 7px; font-size: 0.62rem; }
     }
+
+    /* ── Exchange / Kraken UI ── */
+    .exchange-dot {
+      font-size: 0.71rem; white-space: nowrap; padding: 0 4px;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .exchange-dot .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+    .exchange-dot .dot.green { background: #3fb950; box-shadow: 0 0 4px #3fb950; }
+    .exchange-dot .dot.red { background: #f85149; }
+    .exchange-dot .dot.grey { background: #484f58; }
+    .exchange-badge {
+      display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 1px 6px;
+      border-radius: 4px; background: #d29922; color: #0d1117; margin-left: 6px; vertical-align: middle;
+    }
+    .exchange-badge.kraken { background: #7b61ff; color: #fff; }
+    .exchange-badge.binance { background: #f0b90b; color: #0d1117; }
+    .kraken-panel {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px;
+    }
+    .kraken-panel-item {
+      padding: 10px 12px; border-radius: 8px; border: 1px solid #30363d; background: #0d1117;
+    }
+    .kraken-panel-label { font-size: 0.65rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+    .kraken-panel-value { font-size: 1rem; font-weight: 700; margin-top: 3px; color: #e6edf3; }
+    .kraken-incomplete-prompt {
+      padding: 8px 12px; border-radius: 6px; border: 1px solid #d29922;
+      background: #1f1a0d; font-size: 0.75rem; color: #e3b341; margin-top: 8px;
+    }
   </style>
 </head>
 <body>
@@ -582,6 +610,7 @@
   <div class="nav-link" onclick="nav('alerts')">Alerts</div>
   <div class="nav-link" onclick="nav('live')">Live</div>
   <div class="nav-spacer"></div>
+  <span id="exchangeDot" class="exchange-dot" title="Exchange Connection"><span class="dot grey" id="exchangeDotIcon"></span> <span id="exchangeDotText">Exchange</span></span>
   <span id="mt4Dot" class="mt4-dot off" title="MT4 Connection">&#9899; MT4</span>
   <span id="syncDot" style="font-size:0.71rem;color:#8b949e;white-space:nowrap;padding:0 4px;"></span>
   <button class="cloud-btn" onclick="openBrokerModal()" style="font-size:0.75rem;">&#9881; Broker</button>
@@ -671,6 +700,13 @@
   <div class="card">
     <div class="card-title">Execution Quality</div>
     <div id="executionQuality"></div>
+  </div>
+
+  <!-- Exchange Account Panel -->
+  <div class="card" id="exchangePanelCard" style="display:none;">
+    <div class="card-title">Exchange Account <button class="btn" onclick="syncExchangeStatus()" style="float:right;padding:3px 10px;font-size:0.7rem;background:#21262d;border:1px solid #30363d;">Sync Now</button></div>
+    <div class="kraken-panel" id="exchangePanel"></div>
+    <div style="font-size:0.62rem; color:#6e7681; margin-top:6px; text-align:right;" id="exchangeSyncTime"></div>
   </div>
 
   <!-- Recent trades -->
@@ -1766,7 +1802,7 @@ function renderJournal() {
         <div class="trade-dir ${t.direction}">${t.direction}</div>
       </div>
       <div class="trade-main">
-        <div class="trade-pair">${t.pair} ${badge}${t.source === 'mt4' ? '<span class="mt4-badge">MT4</span>' : ''}</div>
+        <div class="trade-pair">${t.pair} ${badge}${t.source === 'mt4' ? '<span class="mt4-badge">MT4</span>' : t.source === 'kraken' ? '<span class="exchange-badge kraken">Kraken</span>' : t.source === 'binance' ? '<span class="exchange-badge binance">Binance</span>' : ''}</div>
         <div class="trade-meta">${dateStr} · ${t.timeframe} · ${t.setup} · ${t.market}</div>
       </div>
       <div class="trade-right">
@@ -2583,11 +2619,14 @@ function renderRecent(list) {
     const pnlClass = !t.actualPnL ? 'neutral' : t.actualPnL >= 0 ? 'pos' : 'neg';
     const pnlStr   = t.actualPnL != null ? fmtPnL(t.actualPnL) : 'Open';
     const dateStr  = new Date(t.dateOpen).toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+    const srcBadge = t.source === 'kraken' ? '<span class="exchange-badge kraken">Kraken</span>'
+                   : t.source === 'binance' ? '<span class="exchange-badge binance">Binance</span>'
+                   : t.source === 'mt4' ? '<span class="mt4-badge">MT4</span>' : '';
     return `<div class="trade-row ${rowClass}" onclick="openModal('${t.id}')">
       <div><div class="trade-dir ${t.direction}">${t.direction}</div></div>
       <div class="trade-main">
-        <div class="trade-pair">${t.pair}</div>
-        <div class="trade-meta">${dateStr} · ${t.setup}</div>
+        <div class="trade-pair">${t.pair}${srcBadge}</div>
+        <div class="trade-meta">${dateStr} · ${t.setup || '<em style="color:#d29922">Add analysis</em>'}</div>
       </div>
       <div class="trade-right">
         <div class="trade-pnl ${pnlClass}">${pnlStr}</div>
@@ -2972,7 +3011,8 @@ function generateAnalysisExport(period) {
   sorted.forEach((t, i) => {
     if (t.status === 'closed' && t.actualPnL) equity += t.actualPnL;
     out += `---\n`;
-    out += `ID: ${String(i+1).padStart(3,'0')} | Date: ${dateStr(t.dateOpen)} | Symbol: ${t.pair}${t.source === 'mt4' ? ' [MT4 Auto-logged]' : ''}\n`;
+    const srcTag = t.source === 'mt4' ? ' [MT4 Auto-logged]' : t.source === 'kraken' ? ' [Kraken Auto-logged]' : t.source === 'binance' ? ' [Binance Auto-logged]' : '';
+    out += `ID: ${String(i+1).padStart(3,'0')} | Date: ${dateStr(t.dateOpen)} | Symbol: ${t.pair}${srcTag}\n`;
     const tradeSession = detectSession(new Date(t.dateOpen));
     const isOverlap = t.conditions?.includes('London Session') && t.conditions?.includes('NY Session') || tradeSession === 'London/NY Overlap';
     out += `Direction: ${t.direction.toUpperCase()} | Market: ${t.market} | TF: ${t.timeframe} | Setup: ${t.setup}\n`;
@@ -3206,24 +3246,29 @@ async function refreshLiveTrades() {
     panel.innerHTML = '<div style="color:#f85149; font-size:0.82rem;">Failed to load: ' + escHtml(e.message) + '</div>';
   }
 
-  // MT4 trades needing analysis
+  // Auto-logged trades needing analysis (MT4, Kraken, Binance)
   try {
-    const allTrades = trades; // from localStorage
-    const mt4Trades = allTrades.filter(t => t.source === 'mt4' && !t.htfBias && !t.setup);
-    if (!mt4Trades.length) {
-      needs.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">All MT4 trades have been analysed.</div>';
+    const allTrades = trades;
+    const autoTrades = allTrades.filter(t => (t.source === 'mt4' || t.source === 'kraken' || t.source === 'binance') && !t.htfBias && !t.setup);
+    if (!autoTrades.length) {
+      needs.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">All auto-logged trades have been analysed.</div>';
     } else {
       let html = '';
-      mt4Trades.forEach(t => {
+      autoTrades.forEach(t => {
         const outcome = t.status === 'closed' ? (t.outcome === 'win' ? ' \u2705 Win' : t.outcome === 'loss' ? ' \uD83D\uDD34 Loss' : ' \u2796 BE') : ' \uD83D\uDFE2 Open';
+        const badgeClass = t.source === 'kraken' ? 'exchange-badge kraken' : t.source === 'binance' ? 'exchange-badge binance' : 'mt4-badge';
+        const badgeLabel = t.source === 'kraken' ? 'Kraken Auto-logged' : t.source === 'binance' ? 'Binance Auto-logged' : 'MT4 Auto-logged';
         html += '<div class="live-trade" style="cursor:pointer;" onclick="editMT4Trade(\'' + t.id + '\')">';
         html += '<div class="live-trade-header">';
-        html += '<div><span class="live-trade-pair">' + escHtml(t.pair || '') + '</span><span class="mt4-badge">MT4 Auto-logged</span>' + outcome + '</div>';
+        html += '<div><span class="live-trade-pair">' + escHtml(t.pair || '') + '</span><span class="' + badgeClass + '">' + badgeLabel + '</span>' + outcome + '</div>';
         html += '<div style="font-size:0.72rem;color:#58a6ff;">Click to add analysis \u2192</div>';
         html += '</div>';
         html += '<div style="font-size:0.78rem; color:#8b949e; margin-top:4px;">';
-        html += (t.direction || '') + ' \u00b7 Entry: $' + Number(t.entry || 0).toLocaleString() + ' \u00b7 SL: $' + Number(t.sl || 0).toLocaleString() + ' \u00b7 TP: $' + Number(t.tp || 0).toLocaleString();
+        html += (t.direction || '') + ' \u00b7 Entry: $' + Number(t.entry || 0).toLocaleString();
+        if (t.exitPrice) html += ' \u2192 Exit: $' + Number(t.exitPrice).toLocaleString();
+        if (t.actualPnL != null) html += ' \u00b7 P&L: ' + (t.actualPnL >= 0 ? '+' : '') + '$' + t.actualPnL.toFixed(2);
         html += '</div>';
+        if (!t.setup) html += '<div class="kraken-incomplete-prompt">Add your pre-trade analysis to complete this entry</div>';
         html += '</div>';
       });
       needs.innerHTML = html;
@@ -3803,6 +3848,88 @@ function lightbox(src) {
 }
 
 // ═══════════════════════════════════════════════════════
+// EXCHANGE STATUS
+// ═══════════════════════════════════════════════════════
+
+function syncExchangeStatus() {
+  const cfg = getGistCfg();
+  if (!cfg.token) return;
+  const backendUrl = localStorage.getItem('poiwatcher_backend') || 'https://poiwatcher-backend.onrender.com';
+
+  fetch(backendUrl + '/exchange/status', { mode: 'cors' })
+    .then(r => r.json())
+    .then(data => {
+      renderExchangeStatus(data);
+    })
+    .catch(() => {
+      renderExchangeStatus(null);
+    });
+}
+
+function renderExchangeStatus(data) {
+  const dotIcon = document.getElementById('exchangeDotIcon');
+  const dotText = document.getElementById('exchangeDotText');
+  const panelCard = document.getElementById('exchangePanelCard');
+  const panel = document.getElementById('exchangePanel');
+  const syncTime = document.getElementById('exchangeSyncTime');
+
+  if (!data) {
+    dotIcon.className = 'dot grey';
+    dotText.textContent = 'Exchange';
+    panelCard.style.display = 'none';
+    return;
+  }
+
+  const kr = data.kraken || {};
+  const bn = data.binance || {};
+  const anyConnected = kr.connected || bn.connected;
+
+  if (anyConnected) {
+    dotIcon.className = 'dot green';
+    const parts = [];
+    if (kr.connected) parts.push('Kraken $' + (kr.balance_usdt || 0).toFixed(0));
+    if (bn.connected) parts.push('Binance $' + (bn.balance_usdt || 0).toFixed(0));
+    dotText.textContent = parts.join(' · ');
+  } else if (kr.disabled && bn.disabled) {
+    dotIcon.className = 'dot red';
+    dotText.textContent = 'Exchange Error';
+  } else {
+    dotIcon.className = 'dot grey';
+    dotText.textContent = 'Exchange';
+  }
+
+  // Panel
+  if (kr.connected || bn.connected) {
+    panelCard.style.display = 'block';
+    let html = '';
+    if (kr.connected) {
+      html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Kraken USDT</div><div class="kraken-panel-value">$${(kr.balance_usdt||0).toFixed(2)}</div></div>`;
+      html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Kraken BTC</div><div class="kraken-panel-value">${(kr.balance_btc||0).toFixed(6)}</div></div>`;
+      html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Open Positions</div><div class="kraken-panel-value">${kr.open_positions||0}</div></div>`;
+    }
+    if (bn.connected) {
+      html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Binance USDT</div><div class="kraken-panel-value">$${(bn.balance_usdt||0).toFixed(2)}</div></div>`;
+      html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Binance BTC</div><div class="kraken-panel-value">${(bn.balance_btc||0).toFixed(6)}</div></div>`;
+      html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Open Orders</div><div class="kraken-panel-value">${bn.open_positions||0}</div></div>`;
+    }
+    // Today's P&L from journal
+    const today = new Date().toISOString().slice(0,10);
+    const todayPnL = trades.filter(t => t.status === 'closed' && (t.source === 'kraken' || t.source === 'binance')
+      && t.dateClose && t.dateClose.startsWith(today)).reduce((s,t) => s + (t.actualPnL||0), 0);
+    html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Today P&L</div><div class="kraken-panel-value" style="color:${todayPnL>=0?'#3fb950':'#f85149'}">${todayPnL>=0?'+':''}$${todayPnL.toFixed(2)}</div></div>`;
+    panel.innerHTML = html;
+
+    const lastSync = kr.last_sync || bn.last_sync;
+    syncTime.textContent = lastSync ? 'Last sync: ' + new Date(lastSync).toLocaleTimeString() : '';
+  } else {
+    panelCard.style.display = 'none';
+  }
+}
+
+// Poll exchange status every 60s
+setInterval(syncExchangeStatus, 60000);
+
+// ═══════════════════════════════════════════════════════
 // SESSION MONITOR
 // ═══════════════════════════════════════════════════════
 
@@ -4010,6 +4137,7 @@ renderDashboard();
 startMT4Polling();
 updateSessionBar();
 setInterval(updateSessionBar, 1000);
+syncExchangeStatus();
 (async () => {
   try {
     const added = await gistPullRaw();
