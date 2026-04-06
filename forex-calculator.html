@@ -100,6 +100,11 @@
     button.reset-btn { width: 100%; padding: 11px; background: #21262d; border: 1px solid #30363d; border-radius: 8px; color: #8b949e; font-size: 0.87rem; cursor: pointer; transition: all 0.2s; margin-top: 2px; }
     button.reset-btn:hover { background: #30363d; color: #e6edf3; }
     .hidden { display: none !important; }
+
+    /* SL/TP mode toggle */
+    .mode-toggle { display: inline-flex; border: 1px solid #30363d; border-radius: 5px; overflow: hidden; margin-left: 6px; vertical-align: middle; }
+    .mode-btn { padding: 2px 8px; font-size: 0.68rem; font-weight: 600; cursor: pointer; background: #0d1117; color: #6e7681; border: none; transition: all 0.15s; }
+    .mode-btn.active { background: #21262d; color: #58a6ff; }
   </style>
 </head>
 <body>
@@ -154,34 +159,33 @@
           <div class="dir-btn short" id="fxBtnShort" onclick="setFxDir('short')">Short</div>
         </div>
       </div>
-      <div class="grid-2">
-        <div class="field">
-          <label>Entry Price</label>
-          <div class="input-wrap">
-            <input type="number" id="fxEntry" value="1.2500" min="0.0001" step="0.0001">
-          </div>
-        </div>
-        <div class="field">
-          <label>Stop Loss</label>
-          <div class="input-wrap">
-            <input type="number" id="fxSL" value="20" min="0.1" step="0.5">
-            <span class="unit">pips</span>
-          </div>
+      <div class="field">
+        <label>Entry Price</label>
+        <div class="input-wrap">
+          <input type="number" id="fxEntry" value="1.2500" min="0.0001" step="0.0001">
         </div>
       </div>
       <div class="grid-2">
         <div class="field">
-          <label>Take Profit Price</label>
+          <label>Stop Loss <span class="mode-toggle" id="fxSLToggle"><button class="mode-btn" onclick="setFxSLMode('price')">Price</button><button class="mode-btn active" onclick="setFxSLMode('pips')">Pips</button></span></label>
           <div class="input-wrap">
-            <input type="number" id="fxTP" placeholder="Auto or enter" step="any">
+            <input type="number" id="fxSL" value="20" step="any">
+            <span class="unit" id="fxSLUnit">pips</span>
           </div>
         </div>
         <div class="field">
-          <label>Risk : Reward</label>
+          <label>Take Profit <span class="mode-toggle" id="fxTPToggle"><button class="mode-btn" onclick="setFxTPMode('price')">Price</button><button class="mode-btn active" onclick="setFxTPMode('pips')">Pips</button></span></label>
           <div class="input-wrap">
-            <input type="number" id="fxRR" value="2" min="0.1" step="0.1">
-            <span class="unit">R</span>
+            <input type="number" id="fxTP" placeholder="Auto or enter" step="any">
+            <span class="unit" id="fxTPUnit">pips</span>
           </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Risk : Reward</label>
+        <div class="input-wrap" style="max-width:200px">
+          <input type="number" id="fxRR" value="2" min="0.1" step="0.1">
+          <span class="unit">R</span>
         </div>
       </div>
       <div class="field">
@@ -503,8 +507,10 @@
   let fxDir = 'long';
   let splitOn = false;
   let fxSplitOn = false;
-  let fxLastEdited = 'rr';   // 'rr' or 'tp' — which was last typed
+  let fxLastEdited = 'rr';   // 'rr', 'tp', or 'sl' — which was last typed
   let btcLastEdited = 'rr';  // 'rr' or 'tp'
+  let fxSLMode = 'pips';     // 'price' or 'pips'
+  let fxTPMode = 'pips';     // 'price' or 'pips'
 
   function fmt(n, dec = 2) { return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
   function fmtPrice(n) {
@@ -555,6 +561,55 @@
     calculate();
   }
 
+  // ── SL/TP Mode toggles ───────────────────────────────────
+  function setFxSLMode(m) {
+    const entry = parseFloat(document.getElementById('fxEntry').value) || 0;
+    const pipSz = fxPipSize(entry);
+    const oldVal = parseFloat(document.getElementById('fxSL').value);
+    fxSLMode = m;
+    // Convert value between modes
+    if (m === 'price' && oldVal && entry) {
+      // pips → price: calculate price from pips
+      const dist = oldVal * pipSz;
+      document.getElementById('fxSL').value = fxDir === 'long' ? (entry - dist).toFixed(entry > 20 ? 3 : 5) : (entry + dist).toFixed(entry > 20 ? 3 : 5);
+    } else if (m === 'pips' && oldVal && entry) {
+      // price → pips
+      const dist = Math.abs(entry - oldVal);
+      document.getElementById('fxSL').value = (dist / pipSz).toFixed(1);
+    }
+    document.getElementById('fxSLUnit').textContent = m === 'price' ? '' : 'pips';
+    document.querySelectorAll('#fxSLToggle .mode-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`#fxSLToggle .mode-btn:${m === 'price' ? 'first-child' : 'last-child'}`).classList.add('active');
+    localStorage.setItem('fxSLMode', m);
+    calculate();
+  }
+
+  function setFxTPMode(m) {
+    const entry = parseFloat(document.getElementById('fxEntry').value) || 0;
+    const pipSz = fxPipSize(entry);
+    const oldVal = parseFloat(document.getElementById('fxTP').value);
+    fxTPMode = m;
+    if (m === 'price' && oldVal && entry) {
+      const dist = oldVal * pipSz;
+      document.getElementById('fxTP').value = fxDir === 'long' ? (entry + dist).toFixed(entry > 20 ? 3 : 5) : (entry - dist).toFixed(entry > 20 ? 3 : 5);
+    } else if (m === 'pips' && oldVal && entry) {
+      const dist = Math.abs(entry - oldVal);
+      document.getElementById('fxTP').value = (dist / pipSz).toFixed(1);
+    }
+    document.getElementById('fxTPUnit').textContent = m === 'price' ? '' : 'pips';
+    document.querySelectorAll('#fxTPToggle .mode-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`#fxTPToggle .mode-btn:${m === 'price' ? 'first-child' : 'last-child'}`).classList.add('active');
+    localStorage.setItem('fxTPMode', m);
+    calculate();
+  }
+
+  function loadFxModes() {
+    const slm = localStorage.getItem('fxSLMode');
+    const tpm = localStorage.getItem('fxTPMode');
+    if (slm === 'price') setFxSLMode('price');
+    if (tpm === 'price') setFxTPMode('price');
+  }
+
   // ── 2% Risk Cap Warning ──────────────────────────────────
   function updateRiskWarn(riskPct) {
     const el = document.getElementById('riskWarn');
@@ -600,44 +655,104 @@
 
   function calcForex(capital, riskPct) {
     const entry    = parseFloat(document.getElementById('fxEntry').value) || 0;
-    const slPips   = parseFloat(document.getElementById('fxSL').value) || 0;
     const pairType = document.getElementById('pairType').value;
-    if (!slPips || !entry) return;
+    if (!entry) return;
 
     const pipSz  = fxPipSize(entry);
     const pipVal = fxPipValue(pairType, entry);
-    const slDist = slPips * pipSz;
 
-    // SL price
-    let slPrice;
-    if (fxDir === 'long') slPrice = entry - slDist;
-    else slPrice = entry + slDist;
+    // ── Read SL (price or pips mode) ──────────────────────
+    const slRaw = parseFloat(document.getElementById('fxSL').value);
+    let slPrice, slPips;
+    if (fxSLMode === 'price' && slRaw) {
+      slPrice = slRaw;
+      slPips = Math.abs(entry - slPrice) / pipSz;
+    } else if (fxSLMode === 'pips' && slRaw) {
+      slPips = slRaw;
+      const slDist = slPips * pipSz;
+      slPrice = fxDir === 'long' ? entry - slDist : entry + slDist;
+    }
 
-    // ── Smart bidirectional TP / RR ───────────────────────
-    let rr, tpPrice, tpPips;
-    const tpInput = parseFloat(document.getElementById('fxTP').value);
-    const rrInput = parseFloat(document.getElementById('fxRR').value);
-
-    if (fxLastEdited === 'tp' && tpInput) {
-      // Mode 1: TP entered → calculate RR
-      tpPrice = tpInput;
-      if (fxDir === 'long') {
-        rr = slDist > 0 ? (tpPrice - entry) / slDist : 1;
-      } else {
-        rr = slDist > 0 ? (entry - tpPrice) / slDist : 1;
-      }
-      if (rr < 0) rr = 0;
+    // ── Read TP (price or pips mode) ──────────────────────
+    const tpRaw = parseFloat(document.getElementById('fxTP').value);
+    let tpPrice, tpPips;
+    if (fxTPMode === 'price' && tpRaw) {
+      tpPrice = tpRaw;
       tpPips = Math.abs(tpPrice - entry) / pipSz;
-      // Update RR field silently
+    } else if (fxTPMode === 'pips' && tpRaw) {
+      tpPips = tpRaw;
+      const tpDist = tpPips * pipSz;
+      tpPrice = fxDir === 'long' ? entry + tpDist : entry - tpDist;
+    }
+
+    const rrRaw = parseFloat(document.getElementById('fxRR').value);
+    const slDist = slPips ? slPips * pipSz : 0;
+
+    // ── Smart auto-calculation ────────────────────────────
+    // Priority: last-edited field stays, compute the others
+    let rr;
+    if (fxLastEdited === 'tp' && tpPrice && slPips) {
+      // TP entered → calc RR from SL + TP
+      const tpD = fxDir === 'long' ? tpPrice - entry : entry - tpPrice;
+      rr = slDist > 0 ? tpD / slDist : 1;
+      if (rr < 0) rr = 0;
       document.getElementById('fxRR').value = rr > 0 ? rr.toFixed(2) : '';
-    } else {
-      // Mode 2: RR entered → calculate TP
-      rr = rrInput || 1;
+    } else if (fxLastEdited === 'sl' && slPips && tpPrice) {
+      // SL entered with existing TP → calc RR
+      const tpD = fxDir === 'long' ? tpPrice - entry : entry - tpPrice;
+      rr = slDist > 0 ? tpD / slDist : 1;
+      if (rr < 0) rr = 0;
+      document.getElementById('fxRR').value = rr > 0 ? rr.toFixed(2) : '';
+    } else if (fxLastEdited === 'rr' && rrRaw && slPips) {
+      // RR entered → calc TP from SL + RR
+      rr = rrRaw;
       tpPips = slPips * rr;
-      if (fxDir === 'long') tpPrice = entry + slDist * rr;
-      else tpPrice = entry - slDist * rr;
-      // Update TP field silently
-      document.getElementById('fxTP').value = tpPrice > 0 ? (entry > 20 ? tpPrice.toFixed(3) : tpPrice.toFixed(5)) : '';
+      const tpDist = tpPips * pipSz;
+      tpPrice = fxDir === 'long' ? entry + tpDist : entry - tpDist;
+      // Update TP field in its current mode
+      if (fxTPMode === 'price') {
+        document.getElementById('fxTP').value = tpPrice > 0 ? (entry > 20 ? tpPrice.toFixed(3) : tpPrice.toFixed(5)) : '';
+      } else {
+        document.getElementById('fxTP').value = tpPips > 0 ? tpPips.toFixed(1) : '';
+      }
+    } else if (slPips && rrRaw && !tpPrice) {
+      // Fallback: have SL + RR, calc TP
+      rr = rrRaw;
+      tpPips = slPips * rr;
+      const tpDist = tpPips * pipSz;
+      tpPrice = fxDir === 'long' ? entry + tpDist : entry - tpDist;
+      if (fxTPMode === 'price') {
+        document.getElementById('fxTP').value = tpPrice > 0 ? (entry > 20 ? tpPrice.toFixed(3) : tpPrice.toFixed(5)) : '';
+      } else {
+        document.getElementById('fxTP').value = tpPips > 0 ? tpPips.toFixed(1) : '';
+      }
+    } else if (tpPrice && rrRaw && !slPips) {
+      // Have TP + RR, calc SL
+      rr = rrRaw;
+      const tpD = fxDir === 'long' ? tpPrice - entry : entry - tpPrice;
+      if (rr > 0) {
+        const calcSlDist = tpD / rr;
+        slPips = Math.abs(calcSlDist) / pipSz;
+        slPrice = fxDir === 'long' ? entry - Math.abs(calcSlDist) : entry + Math.abs(calcSlDist);
+        if (fxSLMode === 'price') {
+          document.getElementById('fxSL').value = slPrice > 0 ? (entry > 20 ? slPrice.toFixed(3) : slPrice.toFixed(5)) : '';
+        } else {
+          document.getElementById('fxSL').value = slPips > 0 ? slPips.toFixed(1) : '';
+        }
+      }
+    } else {
+      rr = rrRaw || 1;
+    }
+
+    if (!slPips || slPips <= 0) return;
+    if (!rr || rr <= 0) rr = rrRaw || 1;
+    if (!tpPips) tpPips = slPips * rr;
+    if (!tpPrice) {
+      const tpDist = tpPips * pipSz;
+      tpPrice = fxDir === 'long' ? entry + tpDist : entry - tpDist;
+    }
+    if (!slPrice) {
+      slPrice = fxDir === 'long' ? entry - slDist : entry + slDist;
     }
 
     const riskAmt   = capital * (riskPct / 100);
@@ -925,7 +1040,7 @@
     document.getElementById('capital').value = 10000;
     document.getElementById('riskPct').value = 2;
     document.getElementById('fxEntry').value = 1.2500;
-    document.getElementById('fxSL').value = 20;
+    document.getElementById('fxSL').value = fxSLMode === 'pips' ? 20 : 1.2480;
     document.getElementById('fxTP').value = '';
     document.getElementById('fxRR').value = 2;
     document.getElementById('pairType').value = 'usd_quote';
@@ -984,7 +1099,8 @@
   }
 
   // ── Event listeners ──────────────────────────────────────
-  // Track which TP/RR field was last edited for smart calculation
+  // Track which field was last edited for smart calculation
+  document.getElementById('fxSL').addEventListener('input', () => { fxLastEdited = 'sl'; calculate(); });
   document.getElementById('fxTP').addEventListener('input', () => { fxLastEdited = 'tp'; calculate(); });
   document.getElementById('fxRR').addEventListener('input', () => { fxLastEdited = 'rr'; calculate(); });
   document.getElementById('btcTP_input').addEventListener('input', () => { btcLastEdited = 'tp'; calculate(); });
@@ -992,7 +1108,7 @@
 
   const allInputs = [
     'capital','riskPct',
-    'fxEntry','fxSL','pairType',
+    'fxEntry','pairType',
     'fxSplitCount','fxSp1Price','fxSp1Pct','fxSp2Price','fxSp2Pct','fxSp3Price','fxSp3Pct',
     'btcEntry','btcSL',
     'splitCount','sp1Price','sp1Pct','sp2Price','sp2Pct','sp3Price','sp3Pct'
@@ -1020,6 +1136,7 @@
   });
 
   loadSettings();
+  loadFxModes();
   calculate();
   saveSettings();
 </script>
