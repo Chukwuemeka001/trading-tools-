@@ -508,6 +508,67 @@
     .live-trade-val { font-weight: 600; margin-top: 1px; }
     .live-trade-be { margin-top: 8px; font-size: 0.75rem; padding: 5px 10px; border-radius: 6px; border: 1px solid #21262d; background: #0d1117; }
     .mt4-badge { display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: #1f6feb; color: #fff; margin-left: 6px; vertical-align: middle; }
+
+    /* ── Session Monitor ── */
+    .session-bar {
+      background: #161b22; border-bottom: 1px solid #21262d;
+      padding: 6px 16px; position: sticky; top: 48px; z-index: 99;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      font-size: 0.72rem;
+    }
+    .session-clocks {
+      display: flex; gap: 12px; color: #8b949e; font-family: 'SF Mono', 'Consolas', monospace;
+      font-size: 0.68rem; margin-right: 4px; flex-shrink: 0;
+    }
+    .session-clocks span { white-space: nowrap; }
+    .session-clocks .clock-label { color: #6e7681; }
+    .session-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+    .session-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 12px; font-size: 0.68rem; font-weight: 600;
+      border: 1px solid #30363d; background: #0d1117; color: #6e7681;
+      white-space: nowrap; transition: all 0.3s;
+    }
+    .session-pill .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: #484f58; flex-shrink: 0; }
+    .session-pill .pill-sub { font-weight: 400; font-size: 0.62rem; color: #6e7681; }
+    /* Active states */
+    .session-pill.active-london { border-color: #388bfd; color: #58a6ff; background: #0d1926; }
+    .session-pill.active-london .pill-dot { background: #58a6ff; box-shadow: 0 0 6px #58a6ff; }
+    .session-pill.active-ny { border-color: #2ea043; color: #3fb950; background: #0a1f0f; }
+    .session-pill.active-ny .pill-dot { background: #3fb950; box-shadow: 0 0 6px #3fb950; }
+    .session-pill.active-asian { border-color: #8b5cf6; color: #a78bfa; background: #1a0f2e; }
+    .session-pill.active-asian .pill-dot { background: #a78bfa; box-shadow: 0 0 6px #a78bfa; }
+    .session-pill.active-overlap { border-color: #d29922; color: #e3b341; background: #1f1a0d; }
+    .session-pill.active-overlap .pill-dot { background: #e3b341; box-shadow: 0 0 6px #e3b341; }
+    /* Overlap banner */
+    .overlap-banner {
+      display: none; width: 100%; padding: 5px 12px; border-radius: 6px;
+      font-size: 0.72rem; font-weight: 600; text-align: center;
+      margin-top: 2px; line-height: 1.5;
+    }
+    .overlap-banner.active {
+      display: block; background: linear-gradient(90deg, #2d1f05 0%, #1f1a0d 50%, #2d1f05 100%);
+      border: 1px solid #d29922; color: #e3b341;
+    }
+    .overlap-banner.upcoming {
+      display: block; background: #0d1926; border: 1px solid #30363d; color: #58a6ff;
+    }
+    /* Session stats card on dashboard */
+    .session-stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+    .session-stat-item {
+      padding: 10px 12px; border-radius: 8px; border: 1px solid #30363d; background: #0d1117;
+    }
+    .session-stat-name { font-size: 0.68rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
+    .session-stat-name .ss-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .session-stat-wr { font-size: 1rem; font-weight: 700; }
+    .session-stat-detail { font-size: 0.65rem; color: #6e7681; margin-top: 2px; }
+    .session-stat-best { border-color: #2ea043; }
+    @media(max-width:600px) {
+      .session-bar { padding: 5px 10px; gap: 6px; }
+      .session-clocks { gap: 8px; font-size: 0.62rem; }
+      .session-pills { gap: 4px; }
+      .session-pill { padding: 2px 7px; font-size: 0.62rem; }
+    }
   </style>
 </head>
 <body>
@@ -530,6 +591,22 @@
   <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importTrades(event)">
   <a class="nav-ext" href="forex-calculator.html">Calculator ↗</a>
 </nav>
+
+<!-- Session Monitor Bar -->
+<div class="session-bar" id="sessionBar">
+  <div class="session-clocks">
+    <span><span class="clock-label">UTC</span> <span id="clockUTC">--:--</span></span>
+    <span><span class="clock-label">ET</span> <span id="clockET">--:--</span></span>
+    <span><span class="clock-label">Local</span> <span id="clockLocal">--:--</span></span>
+  </div>
+  <div class="session-pills">
+    <div class="session-pill" id="pillLondon"><span class="pill-dot"></span> London <span class="pill-sub" id="pillLondonSub"></span></div>
+    <div class="session-pill" id="pillNY"><span class="pill-dot"></span> New York <span class="pill-sub" id="pillNYSub"></span></div>
+    <div class="session-pill" id="pillOverlap"><span class="pill-dot"></span> Overlap <span class="pill-sub" id="pillOverlapSub"></span></div>
+    <div class="session-pill" id="pillAsian"><span class="pill-dot"></span> Asian <span class="pill-sub" id="pillAsianSub"></span></div>
+  </div>
+  <div class="overlap-banner" id="overlapBanner"></div>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════
      DASHBOARD
@@ -582,6 +659,12 @@
   <div class="card">
     <div class="card-title">Confluence Performance — "Which rules matter most?"</div>
     <div id="confluencePerformance"></div>
+  </div>
+
+  <!-- Session Performance -->
+  <div class="card">
+    <div class="card-title">Win Rate by Session</div>
+    <div id="sessionPerformance"></div>
   </div>
 
   <!-- Execution Quality -->
@@ -1455,10 +1538,28 @@ function initForm() {
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     document.getElementById('f_dateOpen').value = now.toISOString().slice(0,16);
+    // Auto-fill session chips based on current time
+    autoFillSessionChips();
   }
   updateRR();
   readSync();
   toggleSetupOther();
+}
+
+function autoFillSessionChips() {
+  const activeLabels = getActiveSessionChips();
+  const chips = document.getElementById('condChips');
+  if (!chips) return;
+  chips.querySelectorAll('.chip').forEach(chip => {
+    const label = chip.textContent.trim();
+    if (['London Session', 'NY Session', 'Asian Session'].includes(label)) {
+      if (activeLabels.includes(label)) {
+        if (!chip.classList.contains('active')) chip.classList.add('active');
+      } else {
+        chip.classList.remove('active');
+      }
+    }
+  });
 }
 
 function setFDir(d) {
@@ -2135,6 +2236,7 @@ function renderDashboard() {
   renderBreakdown(filtered);
   renderSetupPerformance(filtered);
   renderConfluencePerformance(filtered);
+  renderSessionPerformance(filtered);
   renderExecutionQuality(filtered);
   renderRecent(filtered);
 }
@@ -2821,7 +2923,7 @@ function generateAnalysisExport(period) {
   const sorted   = [...filtered].sort((a, b) => new Date(a.dateOpen) - new Date(b.dateOpen));
   const periodLabel = {all:'All Time', week:'Last 7 Days', month:'This Month', year:'This Year'}[period];
 
-  const setupMap = {}, tfMap = {}, condMap = {};
+  const setupMap = {}, tfMap = {}, condMap = {}, sessMap = {};
   closed.forEach(t => {
     const s = t.setup || 'Unknown';
     if (!setupMap[s]) setupMap[s] = {w:0, l:0, pnl:0};
@@ -2836,6 +2938,13 @@ function generateAnalysisExport(period) {
       if (!condMap[c]) condMap[c] = {w:0, l:0};
       if (t.outcome === 'win') condMap[c].w++; else if (t.outcome === 'loss') condMap[c].l++;
     });
+
+    // Session breakdown
+    let sess = detectSession(new Date(t.dateOpen));
+    if (t.conditions?.includes('London Session') && t.conditions?.includes('NY Session')) sess = 'London/NY Overlap';
+    if (!sessMap[sess]) sessMap[sess] = {w:0, l:0, pnl:0};
+    if (t.outcome === 'win') sessMap[sess].w++; else if (t.outcome === 'loss') sessMap[sess].l++;
+    sessMap[sess].pnl += t.actualPnL || 0;
   });
 
   const d = (n, dec=2) => n == null ? '—' : Number(n).toFixed(dec);
@@ -2864,7 +2973,10 @@ function generateAnalysisExport(period) {
     if (t.status === 'closed' && t.actualPnL) equity += t.actualPnL;
     out += `---\n`;
     out += `ID: ${String(i+1).padStart(3,'0')} | Date: ${dateStr(t.dateOpen)} | Symbol: ${t.pair}${t.source === 'mt4' ? ' [MT4 Auto-logged]' : ''}\n`;
+    const tradeSession = detectSession(new Date(t.dateOpen));
+    const isOverlap = t.conditions?.includes('London Session') && t.conditions?.includes('NY Session') || tradeSession === 'London/NY Overlap';
     out += `Direction: ${t.direction.toUpperCase()} | Market: ${t.market} | TF: ${t.timeframe} | Setup: ${t.setup}\n`;
+    out += `Session: ${tradeSession}${isOverlap ? ' (OVERLAP)' : ''}\n`;
     out += `Confidence: ${t.confidence}/10`;
     if (t.conditions?.length) out += ` | Conditions: ${t.conditions.join(', ')}`;
     out += `\n`;
@@ -2924,6 +3036,15 @@ function generateAnalysisExport(period) {
     out += `  ${k}: ${v.w}W / ${v.l}L (${tot ? ((v.w/tot)*100).toFixed(0) : 0}% WR)\n`;
   });
   out += `\n`;
+
+  if (Object.keys(sessMap).length) {
+    out += `By Session:\n`;
+    Object.entries(sessMap).sort((a,b) => b[1].pnl - a[1].pnl).forEach(([k,v]) => {
+      const tot = v.w + v.l;
+      out += `  ${k}: ${v.w}W / ${v.l}L (${tot ? ((v.w/tot)*100).toFixed(0) : 0}% WR) | P&L: ${money(v.pnl)}\n`;
+    });
+    out += `\n`;
+  }
 
   if (Object.keys(condMap).length) {
     out += `By Market Condition:\n`;
@@ -3682,6 +3803,204 @@ function lightbox(src) {
 }
 
 // ═══════════════════════════════════════════════════════
+// SESSION MONITOR
+// ═══════════════════════════════════════════════════════
+
+function getSessionStatus() {
+  const now = new Date();
+  const utcH = now.getUTCHours();
+  const utcM = now.getUTCMinutes();
+  const utcMins = utcH * 60 + utcM;
+
+  // Session times in UTC minutes
+  const sessions = {
+    london:  { open: 480, close: 960 },   // 08:00-16:00 UTC
+    ny:      { open: 780, close: 1260 },   // 13:00-21:00 UTC
+    asian:   { open: 0, close: 540 },      // 00:00-09:00 UTC
+    overlap: { open: 780, close: 960 },    // 13:00-16:00 UTC
+  };
+
+  function isActive(s) {
+    if (s.open < s.close) return utcMins >= s.open && utcMins < s.close;
+    return utcMins >= s.open || utcMins < s.close;
+  }
+
+  function minsUntil(targetMins) {
+    let diff = targetMins - utcMins;
+    if (diff <= 0) diff += 1440;
+    return diff;
+  }
+
+  function minsRemaining(closeMins) {
+    let diff = closeMins - utcMins;
+    if (diff <= 0) diff += 1440;
+    return diff;
+  }
+
+  function fmtCountdown(mins) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h > 0) return h + 'h ' + m + 'm';
+    return m + 'm';
+  }
+
+  const result = {};
+  for (const [name, times] of Object.entries(sessions)) {
+    const active = isActive(times);
+    result[name] = {
+      active,
+      countdown: active
+        ? 'Closes ' + fmtCountdown(minsRemaining(times.close))
+        : 'Opens ' + fmtCountdown(minsUntil(times.open))
+    };
+  }
+
+  // Overlap approaching (within 30 mins)
+  const minsToOverlap = minsUntil(sessions.overlap.open);
+  result.overlapApproaching = !result.overlap.active && minsToOverlap <= 30;
+  result.overlapCountdown = fmtCountdown(minsToOverlap);
+
+  return result;
+}
+
+function formatClock(date, tz) {
+  return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: tz, hour12: false });
+}
+
+function updateSessionBar() {
+  const now = new Date();
+
+  // Clocks
+  document.getElementById('clockUTC').textContent = formatClock(now, 'UTC');
+  document.getElementById('clockET').textContent = formatClock(now, 'America/New_York');
+  document.getElementById('clockLocal').textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
+  const s = getSessionStatus();
+
+  // Pills
+  const pillLondon = document.getElementById('pillLondon');
+  const pillNY = document.getElementById('pillNY');
+  const pillOverlap = document.getElementById('pillOverlap');
+  const pillAsian = document.getElementById('pillAsian');
+
+  pillLondon.className = 'session-pill' + (s.london.active ? ' active-london' : '');
+  pillNY.className = 'session-pill' + (s.ny.active ? ' active-ny' : '');
+  pillOverlap.className = 'session-pill' + (s.overlap.active ? ' active-overlap' : '');
+  pillAsian.className = 'session-pill' + (s.asian.active ? ' active-asian' : '');
+
+  document.getElementById('pillLondonSub').textContent = s.london.countdown;
+  document.getElementById('pillNYSub').textContent = s.ny.countdown;
+  document.getElementById('pillOverlapSub').textContent = s.overlap.countdown;
+  document.getElementById('pillAsianSub').textContent = s.asian.countdown;
+
+  // Overlap banner
+  const banner = document.getElementById('overlapBanner');
+  if (s.overlap.active) {
+    banner.className = 'overlap-banner active';
+    banner.innerHTML = '🔥 LONDON/NY OVERLAP — Peak volatility · Best conditions for your setups · ' + s.overlap.countdown;
+  } else if (s.overlapApproaching) {
+    banner.className = 'overlap-banner upcoming';
+    banner.innerHTML = '⚡ London/NY Overlap starts in ' + s.overlapCountdown + ' — Prepare your analysis';
+  } else {
+    banner.className = 'overlap-banner';
+    banner.innerHTML = '';
+  }
+}
+
+// Detect which session(s) are active right now — returns array of chip labels
+function getActiveSessionChips() {
+  const s = getSessionStatus();
+  const chips = [];
+  if (s.london.active) chips.push('London Session');
+  if (s.ny.active) chips.push('NY Session');
+  if (s.asian.active) chips.push('Asian Session');
+  return chips;
+}
+
+// Detect session for a given Date — returns string label
+function detectSession(date) {
+  const utcH = date.getUTCHours();
+  const utcM = date.getUTCMinutes();
+  const utcMins = utcH * 60 + utcM;
+  const londonActive = utcMins >= 480 && utcMins < 960;
+  const nyActive = utcMins >= 780 && utcMins < 1260;
+  const overlapActive = utcMins >= 780 && utcMins < 960;
+  const asianActive = utcMins >= 0 && utcMins < 540;
+  if (overlapActive) return 'London/NY Overlap';
+  if (londonActive) return 'London';
+  if (nyActive) return 'New York';
+  if (asianActive) return 'Asian';
+  return 'Off-hours';
+}
+
+// Render session performance on dashboard
+function renderSessionPerformance(filtered) {
+  const closed = filtered.filter(t => t.status === 'closed');
+  const sessionMap = {};
+  const sessionColors = {
+    'London': '#58a6ff', 'New York': '#3fb950', 'London/NY Overlap': '#e3b341',
+    'Asian': '#a78bfa', 'Off-hours': '#6e7681'
+  };
+
+  closed.forEach(t => {
+    // Determine session from trade open time
+    const openDate = new Date(t.dateOpen);
+    let session = detectSession(openDate);
+
+    // Also check conditions chips for explicit session tags
+    if (t.conditions) {
+      const hasLondon = t.conditions.includes('London Session');
+      const hasNY = t.conditions.includes('NY Session');
+      const hasAsian = t.conditions.includes('Asian Session');
+      if (hasLondon && hasNY) session = 'London/NY Overlap';
+      else if (hasLondon) session = 'London';
+      else if (hasNY) session = 'New York';
+      else if (hasAsian) session = 'Asian';
+    }
+
+    if (!sessionMap[session]) sessionMap[session] = { w: 0, l: 0, pnl: 0 };
+    if (t.outcome === 'win') sessionMap[session].w++;
+    else if (t.outcome === 'loss') sessionMap[session].l++;
+    sessionMap[session].pnl += t.actualPnL || 0;
+  });
+
+  const el = document.getElementById('sessionPerformance');
+  if (!Object.keys(sessionMap).length) {
+    el.innerHTML = '<div style="font-size:0.8rem;color:#6e7681;">No closed trades yet.</div>';
+    return;
+  }
+
+  // Find best session by win rate (min 2 trades)
+  let bestSession = null, bestWR = -1;
+  Object.entries(sessionMap).forEach(([name, v]) => {
+    const tot = v.w + v.l;
+    if (tot >= 2) {
+      const wr = v.w / tot;
+      if (wr > bestWR) { bestWR = wr; bestSession = name; }
+    }
+  });
+
+  const order = ['London', 'New York', 'London/NY Overlap', 'Asian', 'Off-hours'];
+  const sorted = Object.entries(sessionMap).sort((a, b) => {
+    const ai = order.indexOf(a[0]), bi = order.indexOf(b[0]);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  el.innerHTML = '<div class="session-stats-grid">' + sorted.map(([name, v]) => {
+    const tot = v.w + v.l;
+    const wr = tot > 0 ? (v.w / tot * 100) : 0;
+    const color = sessionColors[name] || '#6e7681';
+    const isBest = name === bestSession;
+    const pnlStr = v.pnl >= 0 ? '+$' + v.pnl.toFixed(2) : '-$' + Math.abs(v.pnl).toFixed(2);
+    return `<div class="session-stat-item${isBest ? ' session-stat-best' : ''}">
+      <div class="session-stat-name"><span class="ss-dot" style="background:${color}"></span>${name}${isBest ? ' ⭐' : ''}</div>
+      <div class="session-stat-wr" style="color:${wr >= 50 ? '#3fb950' : wr > 0 ? '#f85149' : '#8b949e'}">${tot > 0 ? wr.toFixed(0) + '%' : '—'}</div>
+      <div class="session-stat-detail">${v.w}W / ${v.l}L · ${pnlStr}</div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+// ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
 load();
@@ -3689,6 +4008,8 @@ updateSyncDot();
 refreshCloudStatus();
 renderDashboard();
 startMT4Polling();
+updateSessionBar();
+setInterval(updateSessionBar, 1000);
 (async () => {
   try {
     const added = await gistPullRaw();
