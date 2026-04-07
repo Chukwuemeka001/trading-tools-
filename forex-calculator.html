@@ -263,14 +263,19 @@
           <div class="result-sub" id="fxLotType">—</div>
         </div>
         <div class="result-item">
-          <div class="result-label">Take Profit Price</div>
-          <div class="result-value" id="fxTPPrice">—</div>
-          <div class="result-sub" id="fxTPPipsSub">—</div>
-        </div>
-        <div class="result-item">
           <div class="result-label">R:R Ratio</div>
           <div class="result-value" id="fxRRDisplay">—</div>
           <div class="result-sub" id="fxPipVal">—</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">Stop Loss Price</div>
+          <div class="result-value" style="color:#f85149;" id="fxSLPrice">—</div>
+          <div class="result-sub" id="fxSLPipsSub">—</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">Take Profit Price</div>
+          <div class="result-value" style="color:#3fb950;" id="fxTPPrice">—</div>
+          <div class="result-sub" id="fxTPPipsSub">—</div>
         </div>
         <div class="result-item green">
           <div class="result-label">After Win</div>
@@ -289,13 +294,14 @@
         </div>
       </div>
 
-      <!-- Forex Price Levels -->
+      <!-- Forex Price Levels & Distances -->
       <div style="margin-top:12px; padding:10px 12px; background:#0d1117; border-radius:8px; border:1px solid #21262d;">
-        <div style="font-size:0.71rem; color:#8b949e; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px;">Price Levels</div>
+        <div style="font-size:0.71rem; color:#8b949e; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px;">Price Levels & Distances</div>
         <div class="be-row"><span class="be-label">Entry</span><span class="be-val" id="fxLvlEntry">—</span></div>
         <div class="be-row"><span style="color:#f85149;">Stop Loss</span><span class="be-val" style="color:#f85149;" id="fxLvlSL">—</span></div>
         <div class="be-row"><span style="color:#3fb950;">Take Profit</span><span class="be-val" style="color:#3fb950;" id="fxLvlTP">—</span></div>
         <div class="be-row"><span class="be-label">SL Distance</span><span class="be-val" id="fxLvlSLDist">—</span></div>
+        <div class="be-row"><span class="be-label">TP Distance</span><span class="be-val" id="fxLvlTPDist">—</span></div>
       </div>
 
       <div class="rr-bar-wrap">
@@ -775,12 +781,16 @@
     const exceeded = applyRiskCap(riskPct, 'fxRiskItem', 'fxLotItem');
     const riskBadge = exceeded ? `<div class="risk-exceeded-badge">⚠ Exceeds 2% risk cap</div>` : '';
 
+    const tpDist = tpPips * pipSz;
+
     set('fxRiskAmt',   '$' + fmt(riskAmt));
     set('fxRewardAmt', '$' + fmt(rewardAmt));
     set('fxRewardPips', fmt(tpPips, 1) + ' pips TP');
     set('fxLotSize',   fmt(lotSize, 3));
+    set('fxSLPrice',   fmtFxPrice(slPrice));
+    set('fxSLPipsSub', fmt(slPips, 1) + ' pips from entry');
     set('fxTPPrice',   fmtFxPrice(tpPrice));
-    set('fxTPPipsSub', fmt(tpPips, 1) + ' pips');
+    set('fxTPPipsSub', fmt(tpPips, 1) + ' pips from entry');
     set('fxRRDisplay', '1 : ' + fmt(rr, 2));
     set('fxPipVal',    'Pip val $' + fmt(pipVal, 3));
     set('fxCapWin',    '$' + fmt(capital + rewardAmt));
@@ -796,11 +806,12 @@
     const riskSubEl = document.getElementById('fxRiskPct');
     if (riskSubEl) riskSubEl.innerHTML = fmt(riskPct, 1) + '% of capital' + riskBadge;
 
-    // Price levels
+    // Price levels & distances
     set('fxLvlEntry', fmtFxPrice(entry));
     set('fxLvlSL', fmtFxPrice(slPrice));
     set('fxLvlTP', fmtFxPrice(tpPrice));
-    set('fxLvlSLDist', slPips + ' pips (' + fmt(slDist, entry > 20 ? 3 : 5) + ')');
+    set('fxLvlSLDist', fmt(slPips, 1) + ' pips (' + fmt(slDist, entry > 20 ? 3 : 5) + ')');
+    set('fxLvlTPDist', fmt(tpPips, 1) + ' pips (' + fmt(tpDist, entry > 20 ? 3 : 5) + ')');
 
     setBar('fxBarRisk', 'fxBarReward', 'fxBarL', 'fxBarM', 'fxBarR', riskAmt, rewardAmt, rr);
 
