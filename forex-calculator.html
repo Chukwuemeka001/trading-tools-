@@ -765,6 +765,21 @@
     const rewardAmt = riskAmt * rr;
     const lotSize   = riskAmt / (slPips * pipVal);
 
+    // ── Worked example log for verification ──
+    console.log(
+      `%c━━ FOREX CALC ━━%c\n` +
+      `Direction: ${fxDir.toUpperCase()} | Pair type: ${pairType}\n` +
+      `Entry: ${entry} | Pip size: ${pipSz} | Pip val: $${pipVal.toFixed(3)}\n` +
+      `SL: ${slPrice?.toFixed(5)} (${slPips.toFixed(1)} pips) | ` +
+      `TP: ${tpPrice?.toFixed(5)} (${tpPips.toFixed(1)} pips)\n` +
+      `SL dist (price): ${slDist.toFixed(5)} | TP dist (price): ${(tpPips * pipSz).toFixed(5)}\n` +
+      `R:R = ${tpPips.toFixed(1)} / ${slPips.toFixed(1)} = 1:${rr.toFixed(2)}\n` +
+      `Risk $: ${capital} × ${riskPct}% = $${riskAmt.toFixed(2)}\n` +
+      `Reward $: $${riskAmt.toFixed(2)} × ${rr.toFixed(2)} = $${rewardAmt.toFixed(2)}\n` +
+      `Lot size: $${riskAmt.toFixed(2)} / (${slPips.toFixed(1)} × $${pipVal.toFixed(3)}) = ${lotSize.toFixed(4)}`,
+      'color:#58a6ff;font-weight:bold', 'color:inherit'
+    );
+
     let lotLabel = '';
     if (lotSize >= 0.09) lotLabel = fmt(lotSize, 3) + ' std lot(s)';
     else if (lotSize >= 0.009) lotLabel = fmt(lotSize * 10, 3) + ' mini lot(s)';

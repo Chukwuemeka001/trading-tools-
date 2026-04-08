@@ -1529,6 +1529,25 @@ let postImgData = '';
 
 function load() {
   try { trades = JSON.parse(localStorage.getItem(STORE) || '[]'); } catch { trades = []; }
+  // Data integrity: auto-correct P&L sign mismatches
+  let fixed = 0;
+  trades.forEach(t => {
+    if (t.status !== 'closed' || t.actualPnL == null) return;
+    if (t.outcome === 'loss' && t.actualPnL > 0) {
+      t.actualPnL = -Math.abs(t.actualPnL);
+      fixed++;
+    } else if (t.outcome === 'win' && t.actualPnL < 0) {
+      t.actualPnL = Math.abs(t.actualPnL);
+      fixed++;
+    } else if (t.outcome === 'be' && t.actualPnL !== 0) {
+      t.actualPnL = 0;
+      fixed++;
+    }
+  });
+  if (fixed > 0) {
+    console.warn(`P&L integrity: corrected ${fixed} trade(s) with mismatched outcome/P&L sign`);
+    save();
+  }
 }
 function save() {
   try { localStorage.setItem(STORE, JSON.stringify(trades)); }
@@ -1840,6 +1859,9 @@ function openModal(id) {
 
   const slDist = Math.abs(t.entry - t.sl);
   const tpDist = Math.abs(t.tp - t.entry);
+  const pipSz = t.pair && (t.pair.includes('JPY') || t.entry > 20) ? 0.01 : 0.0001;
+  const slPips = slDist / pipSz;
+  const tpPips = tpDist / pipSz;
 
   // System analysis fields display
   const sysFields = [
@@ -2046,8 +2068,8 @@ function openModal(id) {
       <div class="info-cell"><div class="info-cell-label">Entry</div><div class="info-cell-val">${fmt(t.entry,5)}</div></div>
       <div class="info-cell"><div class="info-cell-label">Stop Loss</div><div class="info-cell-val" style="color:#f85149">${fmt(t.sl,5)}</div></div>
       <div class="info-cell"><div class="info-cell-label">Take Profit</div><div class="info-cell-val" style="color:#3fb950">${fmt(t.tp,5)}</div></div>
-      <div class="info-cell"><div class="info-cell-label">SL Distance</div><div class="info-cell-val">${fmt(slDist,5)}</div></div>
-      <div class="info-cell"><div class="info-cell-label">TP Distance</div><div class="info-cell-val">${fmt(tpDist,5)}</div></div>
+      <div class="info-cell"><div class="info-cell-label">SL Distance</div><div class="info-cell-val">${fmt(slPips,1)} pips</div></div>
+      <div class="info-cell"><div class="info-cell-label">TP Distance</div><div class="info-cell-val">${fmt(tpPips,1)} pips</div></div>
       <div class="info-cell"><div class="info-cell-label">Planned R:R</div><div class="info-cell-val" style="color:#58a6ff">${fmt(t.plannedRR,2)}R</div></div>
       <div class="info-cell"><div class="info-cell-label">Size</div><div class="info-cell-val">${t.size || '—'}</div></div>
       <div class="info-cell"><div class="info-cell-label">Risk ($)</div><div class="info-cell-val" style="color:#f85149">$${fmt(t.risk)}</div></div>
@@ -2115,10 +2137,22 @@ function setRating(n) {
 
 function closeTrade(id) {
   const exit    = parseFloat(document.getElementById('closeExit').value);
-  const pnl     = parseFloat(document.getElementById('closePnL').value);
+  let   pnl     = parseFloat(document.getElementById('closePnL').value);
   const outcome = document.getElementById('closeOutcome').value;
   const dateClose = document.getElementById('closeDate').value;
   if (!exit || isNaN(pnl)) { alert('Please enter exit price and actual P&L.'); return; }
+
+  // ── P&L sign validation ──
+  // Loss must be negative, win must be positive
+  if (outcome === 'loss' && pnl > 0) {
+    console.warn('P&L sign corrected: outcome=loss but P&L was positive → negated');
+    pnl = -Math.abs(pnl);
+  } else if (outcome === 'win' && pnl < 0) {
+    console.warn('P&L sign corrected: outcome=win but P&L was negative → made positive');
+    pnl = Math.abs(pnl);
+  } else if (outcome === 'be') {
+    pnl = 0;
+  }
 
   // Post-trade review fields
   const scRespected = document.getElementById('closeScRespected')?.value || null;
@@ -3032,7 +3066,10 @@ function generateAnalysisExport(period) {
     if (t.distMomentum) sysLine.push(`Dist/Mom: ${t.distMomentum}`);
     if (t.poiLevel) sysLine.push(`POI Level: ${t.poiLevel}`);
     if (sysLine.length) out += `Structure: ${sysLine.join(' | ')}\n`;
-    out += `Entry: ${t.entry} | SL: ${t.sl} | TP: ${t.tp}\n`;
+    const ePipSz = t.pair && (t.pair.includes('JPY') || t.entry > 20) ? 0.01 : 0.0001;
+    const eSlPips = Math.abs(t.entry - t.sl) / ePipSz;
+    const eTpPips = Math.abs(t.tp - t.entry) / ePipSz;
+    out += `Entry: ${t.entry} | SL: ${t.sl} (${d(eSlPips)} pips) | TP: ${t.tp} (${d(eTpPips)} pips)\n`;
     out += `Planned R:R: 1:${t.plannedRR ? d(t.plannedRR) : '?'} | Risk: $${t.risk ? d(t.risk) : '?'}`;
     if (t.size) out += ` | Size: ${t.size}`;
     out += `\n`;
