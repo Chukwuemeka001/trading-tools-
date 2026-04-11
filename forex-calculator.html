@@ -99,6 +99,11 @@
 
     button.reset-btn { width: 100%; padding: 11px; background: #21262d; border: 1px solid #30363d; border-radius: 8px; color: #8b949e; font-size: 0.87rem; cursor: pointer; transition: all 0.2s; margin-top: 2px; }
     button.reset-btn:hover { background: #30363d; color: #e6edf3; }
+    button.send-journal-btn { width: 100%; padding: 11px; background: #0a1f0f; border: 1px solid #3fb950; border-radius: 8px; color: #3fb950; font-size: 0.87rem; font-weight: 600; cursor: pointer; transition: all 0.2s; margin-top: 6px; }
+    button.send-journal-btn:hover { background: #0d2a12; }
+    button.send-journal-btn:disabled { opacity: 0.4; cursor: default; }
+    .send-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #0a1f0f; border: 1px solid #3fb950; color: #3fb950; padding: 10px 20px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; z-index: 500; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    .send-toast.show { opacity: 1; }
     .hidden { display: none !important; }
 
     /* SL/TP mode toggle */
@@ -504,8 +509,10 @@
   </div>
 
   <button class="reset-btn" onclick="resetAll()">Reset to Defaults</button>
+  <button class="send-journal-btn" id="sendJournalBtn" onclick="sendToJournal()">Send to Journal →</button>
 
 </div>
+<div class="send-toast" id="sendToast">Trade details sent to journal ✓</div>
 
 <script>
   let mode = 'forex';
@@ -1160,6 +1167,70 @@
     } catch {}
     updateSyncBadge();
   });
+
+  function sendToJournal() {
+    const capital = parseFloat(document.getElementById('capital').value);
+    const riskPct = parseFloat(document.getElementById('riskPct').value);
+    if (mode === 'forex') {
+      const entry = parseFloat(document.getElementById('fxEntry').value);
+      const pairType = document.getElementById('pairType').value;
+      if (!entry) { alert('Calculate a trade first.'); return; }
+      const pipSz = fxPipSize(entry);
+      const pipVal = fxPipValue(pairType, entry);
+      // Resolve SL/TP to price
+      const slRaw = parseFloat(document.getElementById('fxSL').value);
+      const tpRaw = parseFloat(document.getElementById('fxTP').value);
+      let slPrice, tpPrice, slPips;
+      if (fxSLMode === 'pips' && slRaw) {
+        slPips = slRaw;
+        slPrice = fxDir === 'long' ? entry - slRaw * pipSz : entry + slRaw * pipSz;
+      } else if (slRaw) { slPrice = slRaw; slPips = Math.abs(entry - slRaw) / pipSz; }
+      if (fxTPMode === 'pips' && tpRaw) {
+        tpPrice = fxDir === 'long' ? entry + tpRaw * pipSz : entry - tpRaw * pipSz;
+      } else if (tpRaw) { tpPrice = tpRaw; }
+      if (!slPrice || !tpPrice) { alert('Enter SL and TP values first.'); return; }
+      const riskAmt = capital * (riskPct / 100);
+      const lotSize = riskAmt / (slPips * pipVal);
+      const slDist = Math.abs(entry - slPrice);
+      const tpDist = Math.abs(tpPrice - entry);
+      const rr = slDist > 0 ? tpDist / slDist : 1;
+      // Guess pair name from pair type
+      let pair = '';
+      if (pairType === 'usd_quote') pair = entry > 1 ? 'GBPUSD' : 'EURUSD';
+      else if (pairType === 'usd_base') pair = entry > 20 ? 'USDJPY' : 'USDCAD';
+      else pair = entry > 20 ? 'GBPJPY' : 'EURGBP';
+      const data = {
+        pair, direction: fxDir, entry,
+        sl: parseFloat(entry > 20 ? slPrice.toFixed(3) : slPrice.toFixed(5)),
+        tp: parseFloat(entry > 20 ? tpPrice.toFixed(3) : tpPrice.toFixed(5)),
+        size: lotSize.toFixed(3), risk: parseFloat(riskAmt.toFixed(2)),
+        rr: parseFloat(rr.toFixed(2))
+      };
+      localStorage.setItem('calcToJournal', JSON.stringify(data));
+    } else {
+      // BTC mode
+      const entry = parseFloat(document.getElementById('btcEntry').value);
+      if (!entry) { alert('Calculate a trade first.'); return; }
+      const slRaw = parseFloat(document.getElementById('btcSL').value);
+      const tpRaw = parseFloat(document.getElementById('btcTP').value);
+      if (!slRaw || !tpRaw) { alert('Enter SL and TP values first.'); return; }
+      const riskAmt = capital * (riskPct / 100);
+      const slDist = Math.abs(entry - slRaw);
+      const size = riskAmt / slDist;
+      const tpDist = Math.abs(tpRaw - entry);
+      const rr = slDist > 0 ? tpDist / slDist : 1;
+      const data = {
+        pair: 'BTCUSDT', direction: dir, entry,
+        sl: slRaw, tp: tpRaw,
+        size: size.toFixed(5) + ' BTC', risk: parseFloat(riskAmt.toFixed(2)),
+        rr: parseFloat(rr.toFixed(2))
+      };
+      localStorage.setItem('calcToJournal', JSON.stringify(data));
+    }
+    const toast = document.getElementById('sendToast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
 
   loadSettings();
   loadFxModes();

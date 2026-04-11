@@ -149,6 +149,21 @@
     .dir-btn.long.active  { background: #0a1f0f; border-color: #3fb950; color: #3fb950; }
     .dir-btn.short.active { background: #1f0a0a; border-color: #f85149; color: #f85149; }
 
+    /* SL/TP mode toggle (journal form) */
+    .jrn-mode-toggle { display: inline-flex; border: 1px solid #30363d; border-radius: 5px; overflow: hidden; margin-left: 6px; vertical-align: middle; }
+    .jrn-mode-btn { padding: 2px 8px; font-size: 0.68rem; font-weight: 600; cursor: pointer; background: #0d1117; color: #6e7681; border: none; transition: all 0.15s; }
+    .jrn-mode-btn.active { background: #21262d; color: #58a6ff; }
+    .jrn-pips-sub { font-size: 0.7rem; color: #6e7681; margin-top: 2px; }
+
+    /* Exit type toggle */
+    .exit-type-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .exit-type-btn { padding: 6px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #8b949e; transition: all 0.15s; }
+    .exit-type-btn.active { background: #0c1a2e; border-color: #58a6ff; color: #58a6ff; }
+
+    /* Calculator auto-fill toast */
+    .calc-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #0a1f0f; border: 1px solid #3fb950; color: #3fb950; padding: 10px 20px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; z-index: 500; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    .calc-toast.show { opacity: 1; }
+
     /* Confidence slider */
     .slider-wrap { display: flex; align-items: center; gap: 10px; }
     input[type="range"] {
@@ -896,12 +911,14 @@
           <input type="number" id="f_entry" placeholder="0.00" step="any" required>
         </div>
         <div class="field">
-          <label>Stop Loss Price</label>
+          <label>Stop Loss <span class="jrn-mode-toggle" id="jrnSLToggle"><button type="button" class="jrn-mode-btn active" onclick="setJrnSLMode('price')">Price</button><button type="button" class="jrn-mode-btn" onclick="setJrnSLMode('pips')">Pips</button></span></label>
           <input type="number" id="f_sl" placeholder="0.00" step="any" required>
+          <div class="jrn-pips-sub" id="f_sl_sub"></div>
         </div>
         <div class="field">
-          <label>Take Profit Price</label>
+          <label>Take Profit <span class="jrn-mode-toggle" id="jrnTPToggle"><button type="button" class="jrn-mode-btn active" onclick="setJrnTPMode('price')">Price</button><button type="button" class="jrn-mode-btn" onclick="setJrnTPMode('pips')">Pips</button></span></label>
           <input type="number" id="f_tp" placeholder="0.00" step="any" required>
+          <div class="jrn-pips-sub" id="f_tp_sub"></div>
         </div>
         <div class="field">
           <label>Position Size</label>
@@ -1526,6 +1543,8 @@ let activePeriod = 'all';
 let formDir = 'long';
 let preImgData = '';
 let postImgData = '';
+let jrnSLMode = 'price';
+let jrnTPMode = 'price';
 
 function load() {
   try { trades = JSON.parse(localStorage.getItem(STORE) || '[]'); } catch { trades = []; }
@@ -1631,14 +1650,30 @@ function toggleSetupOther() {
   document.getElementById('setupOtherWrap').classList.toggle('hidden', val !== 'Other');
 }
 
-function updateRR() {
+function getJrnPrices() {
   const entry = parseFloat(document.getElementById('f_entry').value);
-  const sl    = parseFloat(document.getElementById('f_sl').value);
-  const tp    = parseFloat(document.getElementById('f_tp').value);
-  if (!entry || !sl || !tp) { document.getElementById('f_rr').value = ''; return; }
+  const slRaw = parseFloat(document.getElementById('f_sl').value);
+  const tpRaw = parseFloat(document.getElementById('f_tp').value);
+  if (!entry) return {};
+  const pair = document.getElementById('f_pair').value;
+  const pipSz = (pair && pair.includes('JPY')) || entry > 20 ? 0.01 : 0.0001;
+  let sl, tp;
+  if (jrnSLMode === 'pips' && slRaw) {
+    sl = formDir === 'long' ? entry - slRaw * pipSz : entry + slRaw * pipSz;
+  } else { sl = slRaw; }
+  if (jrnTPMode === 'pips' && tpRaw) {
+    tp = formDir === 'long' ? entry + tpRaw * pipSz : entry - tpRaw * pipSz;
+  } else { tp = tpRaw; }
+  return { entry, sl, tp };
+}
+
+function updateRR() {
+  const { entry, sl, tp } = getJrnPrices();
+  if (!entry || !sl || !tp) { document.getElementById('f_rr').value = ''; updateJrnSubs(); return; }
   const slDist = Math.abs(entry - sl);
   const tpDist = Math.abs(tp - entry);
   if (slDist > 0) document.getElementById('f_rr').value = fmt(tpDist / slDist, 2);
+  updateJrnSubs();
 }
 
 ['f_entry','f_sl','f_tp'].forEach(id => {
@@ -1696,9 +1731,11 @@ function removeImg(type, e) {
 function submitTrade(e) {
   e.preventDefault();
   const editId = document.getElementById('f_editId').value;
-  const entry  = parseFloat(document.getElementById('f_entry').value);
-  const sl     = parseFloat(document.getElementById('f_sl').value);
-  const tp     = parseFloat(document.getElementById('f_tp').value);
+  const prices = getJrnPrices();
+  const entry  = prices.entry;
+  const sl     = prices.sl;
+  const tp     = prices.tp;
+  if (!entry || !sl || !tp) { alert('Please enter entry, SL, and TP.'); return; }
   const slDist = Math.abs(entry - sl);
   const tpDist = Math.abs(tp - entry);
   const conditions = [...document.querySelectorAll('#condChips .chip.active')].map(c => c.textContent);
@@ -1780,6 +1817,14 @@ function resetForm() {
   document.getElementById('confVal').textContent = '6';
   document.querySelectorAll('#condChips .chip').forEach(c => c.classList.remove('active'));
   document.getElementById('setupOtherWrap').classList.add('hidden');
+  // Reset SL/TP mode to Price
+  jrnSLMode = 'price'; jrnTPMode = 'price';
+  document.querySelectorAll('#jrnSLToggle .jrn-mode-btn').forEach((b,i) => b.classList.toggle('active', i === 0));
+  document.querySelectorAll('#jrnTPToggle .jrn-mode-btn').forEach((b,i) => b.classList.toggle('active', i === 0));
+  document.getElementById('f_sl').placeholder = '0.00';
+  document.getElementById('f_tp').placeholder = '0.00';
+  document.getElementById('f_sl_sub').textContent = '';
+  document.getElementById('f_tp_sub').textContent = '';
   updateRR();
 }
 
@@ -1891,6 +1936,16 @@ function openModal(id) {
   const closeSection = t.status === 'open' ? `
     <hr class="section-divider">
     <div class="card-title" style="margin-bottom:12px;">Close This Trade</div>
+    <div class="field">
+      <label>How was trade closed?</label>
+      <div class="exit-type-grid" id="exitTypeGrid">
+        <div class="exit-type-btn" onclick="setExitType('tp','${t.id}')">TP Hit</div>
+        <div class="exit-type-btn" onclick="setExitType('sl','${t.id}')">SL Hit</div>
+        <div class="exit-type-btn" onclick="setExitType('be','${t.id}')">Break Even</div>
+        <div class="exit-type-btn" onclick="setExitType('manual','${t.id}')">Manual Close</div>
+        <div class="exit-type-btn" onclick="setExitType('partial','${t.id}')">Partial Close</div>
+      </div>
+    </div>
     <div class="form-grid">
       <div class="field">
         <label>Exit Price</label>
@@ -2079,10 +2134,11 @@ function openModal(id) {
     ${sysHtml}
 
     ${t.status === 'closed' ? `
-    <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:12px 14px; margin-bottom:14px; display:grid; grid-template-columns:repeat(4,1fr); gap:10px;">
+    <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:12px 14px; margin-bottom:14px; display:grid; grid-template-columns:repeat(${t.exitType ? 5 : 4},1fr); gap:10px;">
       <div><div class="info-cell-label">Exit Price</div><div class="info-cell-val">${fmt(t.exitPrice,5)}</div></div>
       <div><div class="info-cell-label">Actual P&L</div><div class="info-cell-val" style="color:${t.actualPnL>=0?'#3fb950':'#f85149'}">${fmtPnL(t.actualPnL)}</div></div>
       <div><div class="info-cell-label">Actual R:R</div><div class="info-cell-val">${actualRR}</div></div>
+      ${t.exitType ? `<div><div class="info-cell-label">Exit Type</div><div class="info-cell-val" style="font-size:0.78rem">${{tp:'TP Hit',sl:'SL Hit',be:'Break Even',manual:'Manual Close',partial:'Partial Close'}[t.exitType] || t.exitType}</div></div>` : ''}
       <div><div class="info-cell-label">Closed</div><div class="info-cell-val" style="font-size:0.75rem">${dateClose}</div></div>
     </div>` : ''}
 
@@ -2141,6 +2197,11 @@ function closeTrade(id) {
   const outcome = document.getElementById('closeOutcome').value;
   const dateClose = document.getElementById('closeDate').value;
   if (!exit || isNaN(pnl)) { alert('Please enter exit price and actual P&L.'); return; }
+  // Determine exit type from selected button
+  const exitBtns = document.querySelectorAll('#exitTypeGrid .exit-type-btn');
+  const exitTypes = ['tp','sl','be','manual','partial'];
+  let exitType = null;
+  exitBtns.forEach((b, i) => { if (b.classList.contains('active')) exitType = exitTypes[i]; });
 
   // ── P&L sign validation ──
   // Loss must be negative, win must be positive
@@ -2171,7 +2232,7 @@ function closeTrade(id) {
     return {
       ...t,
       status: 'closed', dateClose, exitPrice: exit,
-      actualPnL: pnl, outcome, actualRR,
+      actualPnL: pnl, outcome, actualRR, exitType,
       review: '', postChart: postImgData || t.postChart,
       rating: modalRating,
       scRespected, mbmsPlayedOut, htfAligned, liqProperlyTaken,
@@ -3076,6 +3137,7 @@ function generateAnalysisExport(period) {
     if (t.status === 'closed') {
       out += `Result: ${(t.outcome || '?').toUpperCase()} | Exit: ${t.exitPrice} | P&L: ${money(t.actualPnL)}`;
       if (t.actualRR) out += ` | Actual R: ${d(t.actualRR)}R`;
+      if (t.exitType) out += ` | Exit Type: ${{tp:'TP Hit',sl:'SL Hit',be:'Break Even',manual:'Manual Close',partial:'Partial Close'}[t.exitType] || t.exitType}`;
       out += `\n`;
       if (t.dateClose) out += `Closed: ${dateStr(t.dateClose)}\n`;
       if (startCap)    out += `Equity After: $${d(equity)}\n`;
@@ -4175,6 +4237,7 @@ startMT4Polling();
 updateSessionBar();
 setInterval(updateSessionBar, 1000);
 syncExchangeStatus();
+checkCalcAutoFill();
 (async () => {
   try {
     const added = await gistPullRaw();
@@ -4189,6 +4252,162 @@ syncExchangeStatus();
 window.addEventListener('resize', () => {
   if (document.getElementById('page-dashboard').classList.contains('active')) renderEquity(trades.filter(t=>t.status==='closed'));
 });
+// ═══════════════════════════════════════════════════════
+// EXIT TYPE SELECTION
+// ═══════════════════════════════════════════════════════
+function setExitType(type, tradeId) {
+  const t = trades.find(x => x.id === tradeId);
+  if (!t) return;
+  document.querySelectorAll('#exitTypeGrid .exit-type-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['tp','sl','be','manual','partial'][i] === type);
+  });
+  const exitEl = document.getElementById('closeExit');
+  const outcomeEl = document.getElementById('closeOutcome');
+  if (type === 'tp') {
+    exitEl.value = t.tp;
+    outcomeEl.value = 'win';
+    updateModalRR(tradeId);
+  } else if (type === 'sl') {
+    exitEl.value = t.sl;
+    outcomeEl.value = 'loss';
+    updateModalRR(tradeId);
+  } else if (type === 'be') {
+    exitEl.value = t.entry;
+    outcomeEl.value = 'be';
+    document.getElementById('closePnL').value = '0';
+    updateModalRR(tradeId);
+  } else if (type === 'manual' || type === 'partial') {
+    exitEl.value = '';
+    exitEl.focus();
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// JOURNAL SL/TP MODE TOGGLE (Price ↔ Pips)
+// ═══════════════════════════════════════════════════════
+function setJrnSLMode(m) {
+  const entry = parseFloat(document.getElementById('f_entry').value);
+  const slEl = document.getElementById('f_sl');
+  const oldVal = parseFloat(slEl.value);
+  const pair = document.getElementById('f_pair').value;
+  const pipSz = (pair && pair.includes('JPY')) || entry > 20 ? 0.01 : 0.0001;
+
+  jrnSLMode = m;
+  document.querySelectorAll('#jrnSLToggle .jrn-mode-btn').forEach((b, i) => {
+    b.classList.toggle('active', i === (m === 'price' ? 0 : 1));
+  });
+
+  if (entry && oldVal) {
+    if (m === 'pips') {
+      // Was price → convert to pips
+      slEl.value = (Math.abs(entry - oldVal) / pipSz).toFixed(1);
+      slEl.placeholder = 'e.g. 20';
+    } else {
+      // Was pips → convert to price
+      const dir = formDir;
+      const slPrice = dir === 'long' ? entry - oldVal * pipSz : entry + oldVal * pipSz;
+      slEl.value = entry > 20 ? slPrice.toFixed(3) : slPrice.toFixed(5);
+      slEl.placeholder = '0.00';
+    }
+  } else {
+    slEl.placeholder = m === 'pips' ? 'e.g. 20' : '0.00';
+  }
+  updateJrnSubs();
+  updateRR();
+}
+
+function setJrnTPMode(m) {
+  const entry = parseFloat(document.getElementById('f_entry').value);
+  const tpEl = document.getElementById('f_tp');
+  const oldVal = parseFloat(tpEl.value);
+  const pair = document.getElementById('f_pair').value;
+  const pipSz = (pair && pair.includes('JPY')) || entry > 20 ? 0.01 : 0.0001;
+
+  jrnTPMode = m;
+  document.querySelectorAll('#jrnTPToggle .jrn-mode-btn').forEach((b, i) => {
+    b.classList.toggle('active', i === (m === 'price' ? 0 : 1));
+  });
+
+  if (entry && oldVal) {
+    if (m === 'pips') {
+      tpEl.value = (Math.abs(oldVal - entry) / pipSz).toFixed(1);
+      tpEl.placeholder = 'e.g. 50';
+    } else {
+      const dir = formDir;
+      const tpPrice = dir === 'long' ? entry + oldVal * pipSz : entry - oldVal * pipSz;
+      tpEl.value = entry > 20 ? tpPrice.toFixed(3) : tpPrice.toFixed(5);
+      tpEl.placeholder = '0.00';
+    }
+  } else {
+    tpEl.placeholder = m === 'pips' ? 'e.g. 50' : '0.00';
+  }
+  updateJrnSubs();
+  updateRR();
+}
+
+function updateJrnSubs() {
+  const entry = parseFloat(document.getElementById('f_entry').value);
+  const slRaw = parseFloat(document.getElementById('f_sl').value);
+  const tpRaw = parseFloat(document.getElementById('f_tp').value);
+  const pair = document.getElementById('f_pair').value;
+  const pipSz = (pair && pair.includes('JPY')) || entry > 20 ? 0.01 : 0.0001;
+  const slSub = document.getElementById('f_sl_sub');
+  const tpSub = document.getElementById('f_tp_sub');
+
+  if (entry && slRaw) {
+    if (jrnSLMode === 'pips') {
+      const slPrice = formDir === 'long' ? entry - slRaw * pipSz : entry + slRaw * pipSz;
+      slSub.textContent = '= ' + (entry > 20 ? slPrice.toFixed(3) : slPrice.toFixed(5));
+    } else {
+      const pips = Math.abs(entry - slRaw) / pipSz;
+      slSub.textContent = pips.toFixed(1) + ' pips';
+    }
+  } else { slSub.textContent = ''; }
+
+  if (entry && tpRaw) {
+    if (jrnTPMode === 'pips') {
+      const tpPrice = formDir === 'long' ? entry + tpRaw * pipSz : entry - tpRaw * pipSz;
+      tpSub.textContent = '= ' + (entry > 20 ? tpPrice.toFixed(3) : tpPrice.toFixed(5));
+    } else {
+      const pips = Math.abs(tpRaw - entry) / pipSz;
+      tpSub.textContent = pips.toFixed(1) + ' pips';
+    }
+  } else { tpSub.textContent = ''; }
+}
+
+// ═══════════════════════════════════════════════════════
+// CALCULATOR → JOURNAL AUTO-FILL
+// ═══════════════════════════════════════════════════════
+function checkCalcAutoFill() {
+  const data = localStorage.getItem('calcToJournal');
+  if (!data) return;
+  localStorage.removeItem('calcToJournal');
+  try {
+    const d = JSON.parse(data);
+    nav('log');
+    setTimeout(() => {
+      if (d.pair)      document.getElementById('f_pair').value = d.pair;
+      if (d.direction)  setFDir(d.direction);
+      if (d.entry)     document.getElementById('f_entry').value = d.entry;
+      if (d.sl)        document.getElementById('f_sl').value = d.sl;
+      if (d.tp)        document.getElementById('f_tp').value = d.tp;
+      if (d.size)      document.getElementById('f_size').value = d.size;
+      if (d.risk)      document.getElementById('f_risk').value = d.risk;
+      // Set SL/TP mode to price since calculator sends prices
+      jrnSLMode = 'price'; jrnTPMode = 'price';
+      document.querySelectorAll('#jrnSLToggle .jrn-mode-btn').forEach((b,i) => b.classList.toggle('active', i === 0));
+      document.querySelectorAll('#jrnTPToggle .jrn-mode-btn').forEach((b,i) => b.classList.toggle('active', i === 0));
+      updateRR();
+      updateJrnSubs();
+      // Show toast
+      const toast = document.getElementById('calcToast');
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }, 100);
+  } catch { /* ignore bad data */ }
+}
+
 </script>
+<div class="calc-toast" id="calcToast">Trade details received from calculator ✓</div>
 </body>
 </html>
