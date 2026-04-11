@@ -612,6 +612,36 @@
       padding: 8px 12px; border-radius: 6px; border: 1px solid #d29922;
       background: #1f1a0d; font-size: 0.75rem; color: #e3b341; margin-top: 8px;
     }
+
+    /* ── Settings Modal ── */
+    .settings-tabs { display: flex; gap: 2px; border-bottom: 1px solid #21262d; margin-bottom: 14px; flex-wrap: wrap; }
+    .settings-tab { padding: 8px 12px; font-size: 0.75rem; cursor: pointer; color: #8b949e; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
+    .settings-tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+    .settings-tab:hover { color: #e6edf3; }
+    .settings-section { display: none; }
+    .settings-section.active { display: block; }
+    .settings-field { margin-bottom: 12px; }
+    .settings-field label { display: block; font-size: 0.78rem; color: #8b949e; margin-bottom: 4px; }
+    .settings-field input, .settings-field select { width: 100%; background: #0d1117; border: 1px solid #30363d; border-radius: 7px; color: #e6edf3; font-size: 0.85rem; padding: 8px 10px; outline: none; font-family: inherit; }
+    .settings-field input:focus, .settings-field select:focus { border-color: #58a6ff; }
+    .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #21262d; }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-row-label { font-size: 0.82rem; color: #c9d1d9; }
+    .settings-row-sub { font-size: 0.68rem; color: #6e7681; margin-top: 1px; }
+    .stoggle { width: 36px; height: 20px; background: #30363d; border-radius: 10px; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; border: none; padding: 0; }
+    .stoggle.on { background: #238636; }
+    .stoggle::after { content:''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: #e6edf3; border-radius: 50%; transition: left 0.2s; }
+    .stoggle.on::after { left: 18px; }
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .danger-zone { border: 1px solid #f85149; border-radius: 8px; padding: 14px; margin-top: 8px; }
+    .danger-zone-title { font-size: 0.72rem; font-weight: 700; color: #f85149; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+    .danger-btn { width: 100%; padding: 8px; font-size: 0.8rem; font-weight: 600; border-radius: 6px; cursor: pointer; border: 1px solid #30363d; background: #0d1117; color: #c9d1d9; transition: all 0.15s; margin-bottom: 6px; text-align: left; }
+    .danger-btn:hover { border-color: #8b949e; }
+    .danger-btn.destructive { color: #f85149; border-color: #f85149; }
+    .danger-btn.destructive:hover { background: #1f0a0a; }
+    .coming-soon-tag { font-size: 0.62rem; color: #6e7681; background: #21262d; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+    .settings-saved-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #0a1f0f; border: 1px solid #3fb950; color: #3fb950; padding: 8px 18px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; z-index: 500; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    .settings-saved-toast.show { opacity: 1; }
   </style>
 </head>
 <body>
@@ -628,7 +658,8 @@
   <span id="exchangeDot" class="exchange-dot" title="Exchange Connection"><span class="dot grey" id="exchangeDotIcon"></span> <span id="exchangeDotText">Exchange</span></span>
   <span id="mt4Dot" class="mt4-dot off" title="MT4 Connection">&#9899; MT4</span>
   <span id="syncDot" style="font-size:0.71rem;color:#8b949e;white-space:nowrap;padding:0 4px;"></span>
-  <button class="cloud-btn" onclick="openBrokerModal()" style="font-size:0.75rem;">&#9881; Broker</button>
+  <button class="cloud-btn" onclick="openSettingsModal()" style="font-size:0.75rem;">&#9881;</button>
+  <button class="cloud-btn" onclick="openBrokerModal()" style="font-size:0.75rem;">Broker</button>
   <button id="cloudBtn" class="cloud-btn" onclick="openCloudModal()">☁ Cloud</button>
   <button onclick="exportTrades()" class="nav-ext" style="cursor:pointer;background:none;">Export</button>
   <label class="nav-ext" style="cursor:pointer;" for="importFile">Import</label>
@@ -970,6 +1001,11 @@
 
     <input type="hidden" id="f_direction" value="long">
     <input type="hidden" id="f_editId" value="">
+    <input type="hidden" id="f_dxyBias" value="">
+    <input type="hidden" id="f_dxyConfirms" value="">
+    <input type="hidden" id="f_dxyKeyLevel" value="">
+    <input type="hidden" id="f_gbpChecked" value="">
+    <input type="hidden" id="f_corrNotes" value="">
 
     <div class="btn-row">
       <button type="button" class="btn btn-ghost" onclick="openChecklist()" style="border-color:#58a6ff; color:#58a6ff;">&#9745; Pre-Trade Checklist</button>
@@ -1424,9 +1460,42 @@
         </div>
       </div>
 
-      <!-- Section 3: Trade Levels -->
+      <!-- Section 3: Correlation Check -->
       <div class="cl-section">
-        <div class="cl-section-title">3. Trade Levels</div>
+        <div class="cl-section-title">3. Correlation Check</div>
+        <div class="cl-grid">
+          <div class="cl-q">
+            <label>Checked DXY?</label>
+            <select id="cl_dxyChecked" onchange="calcAlignmentScore()"><option value="">Select…</option><option>Yes</option><option>No</option><option>Not applicable</option></select>
+          </div>
+          <div class="cl-q">
+            <label>DXY bias</label>
+            <select id="cl_dxyBias"><option value="">Select…</option><option>Bullish</option><option>Bearish</option><option>Neutral</option><option>Not checked</option></select>
+          </div>
+        </div>
+        <div class="cl-grid">
+          <div class="cl-q">
+            <label>DXY at key level?</label>
+            <select id="cl_dxyKeyLevel"><option value="">Select…</option><option>SC zone</option><option>$$ liquidity</option><option>BOS level</option><option>mbms area</option><option>Clear</option><option>Not checked</option></select>
+          </div>
+          <div class="cl-q">
+            <label>DXY confirms trade?</label>
+            <select id="cl_dxyConfirms" onchange="calcAlignmentScore()"><option value="">Select…</option><option>Yes aligned</option><option value="No conflicts">No conflicts (reconsider!)</option><option>Neutral</option></select>
+          </div>
+        </div>
+        <div class="cl-q">
+          <label>Checked GBP index (for GBP pairs)?</label>
+          <select id="cl_gbpChecked"><option value="">Select…</option><option>Yes</option><option>No</option><option>Not applicable</option></select>
+        </div>
+        <div class="cl-q">
+          <label>Correlation notes</label>
+          <textarea id="cl_corrNotes" placeholder="e.g. DXY showing bearish SC at 104.500, aligns with EURUSD long…"></textarea>
+        </div>
+      </div>
+
+      <!-- Section 4: Trade Levels -->
+      <div class="cl-section">
+        <div class="cl-section-title">4. Trade Levels</div>
         <div class="cl-grid">
           <div class="cl-q">
             <label>Entry zone (price)</label>
@@ -1447,9 +1516,9 @@
         </div>
       </div>
 
-      <!-- Section 4: Psychology Check -->
+      <!-- Section 5: Psychology Check -->
       <div class="cl-section">
-        <div class="cl-section-title">4. Psychology Check</div>
+        <div class="cl-section-title">5. Psychology Check</div>
         <div class="cl-q">
           <label>Confidence level (1–10)</label>
           <div class="slider-wrap">
@@ -1507,7 +1576,7 @@
         <div class="cl-section-title">System Alignment Score</div>
         <div id="clAlignmentScore" class="cl-alignment-score">
           <div class="cl-score-display">
-            <span class="cl-score-num" id="clScoreNum">0</span><span class="cl-score-max">/10</span>
+            <span class="cl-score-num" id="clScoreNum">0</span><span class="cl-score-max">/12</span>
           </div>
           <div class="cl-score-label" id="clScoreLabel">Answer the questions above</div>
         </div>
@@ -1532,6 +1601,154 @@
 <div class="lightbox" id="lightbox" onclick="document.getElementById('lightbox').classList.remove('open')">
   <img id="lightboxImg" src="" alt="">
 </div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SETTINGS MODAL
+════════════════════════════════════════════════════════ -->
+<div class="cloud-modal-overlay" id="settingsOverlay" onclick="maybeCloseSettings(event)">
+  <div class="cloud-modal" style="max-width:560px; max-height:90vh; overflow-y:auto;">
+    <div class="cloud-modal-header">
+      <h2>Settings</h2>
+      <button class="modal-close" onclick="closeSettingsModal()">✕</button>
+    </div>
+    <div class="cloud-modal-body">
+
+      <div class="settings-tabs" id="settingsTabs">
+        <div class="settings-tab active" onclick="setSettingsTab('profile')">Profile</div>
+        <div class="settings-tab" onclick="setSettingsTab('display')">Display</div>
+        <div class="settings-tab" onclick="setSettingsTab('sharing')">Sharing</div>
+        <div class="settings-tab" onclick="setSettingsTab('export')">Export</div>
+        <div class="settings-tab" onclick="setSettingsTab('danger')">Danger Zone</div>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="settings-section active" id="settSec_profile">
+        <div class="settings-field">
+          <label>Trader Name</label>
+          <input type="text" id="sett_name" placeholder="Your name" onchange="saveSettingsFromForm()">
+        </div>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label>Account Currency</label>
+            <select id="sett_currency" onchange="saveSettingsFromForm()">
+              <option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="CAD">CAD</option>
+            </select>
+          </div>
+          <div class="settings-field">
+            <label>Starting Capital</label>
+            <input type="number" id="sett_capital" placeholder="0.00" step="any" onchange="saveSettingsFromForm()">
+          </div>
+        </div>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label>Default Risk %</label>
+            <input type="number" id="sett_riskPct" placeholder="1" step="0.1" min="0.1" max="10" onchange="saveSettingsFromForm()">
+          </div>
+          <div class="settings-field">
+            <label>Timezone Preference</label>
+            <select id="sett_tz" onchange="saveSettingsFromForm()">
+              <option value="local">Local (browser)</option>
+              <option value="UTC">UTC</option>
+              <option value="US/Eastern">US Eastern</option>
+              <option value="Europe/London">London</option>
+            </select>
+          </div>
+        </div>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label>Default Timeframe</label>
+            <select id="sett_tf" onchange="saveSettingsFromForm()">
+              <option>M1</option><option>M5</option><option selected>M15</option><option>H1</option><option>H4</option><option>D1</option><option>W1</option>
+            </select>
+          </div>
+          <div class="settings-field">
+            <label>Default Market</label>
+            <select id="sett_market" onchange="saveSettingsFromForm()">
+              <option value="Forex">Forex</option><option value="BTC/USDT">BTC/USDT</option><option value="Crypto">Other Crypto</option><option value="Indices">Indices</option><option value="Commodities">Commodities</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- DISPLAY -->
+      <div class="settings-section" id="settSec_display">
+        <div class="settings-row">
+          <div><div class="settings-row-label">Show session monitor</div><div class="settings-row-sub">Clock bar below navigation</div></div>
+          <button class="stoggle on" id="sett_showSession" onclick="toggleSetting(this,'showSession')"></button>
+        </div>
+        <div class="settings-row">
+          <div><div class="settings-row-label">Show equity curve</div><div class="settings-row-sub">Chart on dashboard</div></div>
+          <button class="stoggle on" id="sett_showEquity" onclick="toggleSetting(this,'showEquity')"></button>
+        </div>
+      </div>
+
+      <!-- SHARING -->
+      <div class="settings-section" id="settSec_sharing">
+        <div class="settings-row">
+          <div><div class="settings-row-label">Public profile</div><div class="settings-row-sub">Share your stats publicly</div></div>
+          <button class="stoggle" id="sett_publicProfile" onclick="toggleSetting(this,'publicProfile')"></button>
+        </div>
+        <div class="settings-field" style="margin-top:10px;">
+          <label>Public Username</label>
+          <input type="text" id="sett_publicUser" placeholder="e.g. trader_001" onchange="saveSettingsFromForm()">
+        </div>
+        <div style="font-size:0.72rem; color:#8b949e; margin-bottom:10px;">What to share publicly:</div>
+        <div class="settings-row">
+          <div class="settings-row-label">P&L</div>
+          <button class="stoggle" id="sett_sharePnL" onclick="toggleSetting(this,'sharePnL')"></button>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-label">Win Rate</div>
+          <button class="stoggle" id="sett_shareWR" onclick="toggleSetting(this,'shareWR')"></button>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-label">Setup Types</div>
+          <button class="stoggle" id="sett_shareSetups" onclick="toggleSetting(this,'shareSetups')"></button>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-label">Charts</div>
+          <button class="stoggle" id="sett_shareCharts" onclick="toggleSetting(this,'shareCharts')"></button>
+        </div>
+        <div class="settings-field" style="margin-top:10px;">
+          <label>Invite Code</label>
+          <input type="text" id="sett_inviteCode" placeholder="Enter invite code" onchange="saveSettingsFromForm()">
+        </div>
+        <button class="btn btn-ghost" style="width:100%; margin-top:6px;" disabled>Copy Invite Link <span class="coming-soon-tag">Coming Soon</span></button>
+      </div>
+
+      <!-- EXPORT -->
+      <div class="settings-section" id="settSec_export">
+        <div class="settings-row">
+          <div><div class="settings-row-label">Include trader name in exports</div></div>
+          <button class="stoggle on" id="sett_exportName" onclick="toggleSetting(this,'exportName')"></button>
+        </div>
+        <div class="settings-row">
+          <div><div class="settings-row-label">Include balance in exports</div></div>
+          <button class="stoggle on" id="sett_exportBalance" onclick="toggleSetting(this,'exportBalance')"></button>
+        </div>
+        <div class="settings-field" style="margin-top:10px;">
+          <label>Default Export Period</label>
+          <select id="sett_exportPeriod" onchange="saveSettingsFromForm()">
+            <option value="all">All Time</option><option value="week">Last 7 Days</option><option value="month">This Month</option><option value="year">This Year</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- DANGER ZONE -->
+      <div class="settings-section" id="settSec_danger">
+        <div class="danger-zone">
+          <div class="danger-zone-title">Danger Zone</div>
+          <button class="danger-btn" onclick="settingsExportJSON()">Export all data as JSON backup</button>
+          <label class="danger-btn" style="cursor:pointer;">Import from JSON backup<input type="file" accept=".json" style="display:none;" onchange="settingsImportJSON(event)"></label>
+          <button class="danger-btn destructive" onclick="settingsResetAll()">Reset all settings to defaults</button>
+          <button class="danger-btn destructive" onclick="settingsClearTrades()">Clear all trades</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<div class="settings-saved-toast" id="settingsSavedToast">Settings saved ✓</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
@@ -1769,6 +1986,12 @@ function submitTrade(e) {
     entryConfirmation:document.getElementById('f_entryConf').value,
     distMomentum:     document.getElementById('f_distMomentum').value,
     poiLevel:         document.getElementById('f_poiLevel').value,
+    // Correlation
+    dxyBias:          document.getElementById('f_dxyBias').value,
+    dxyConfirms:      document.getElementById('f_dxyConfirms').value,
+    dxyKeyLevel:      document.getElementById('f_dxyKeyLevel').value,
+    gbpChecked:       document.getElementById('f_gbpChecked').value,
+    corrNotes:        document.getElementById('f_corrNotes').value,
     // Status
     status:     'open',
     // Result fields (preserved on edit)
@@ -1825,6 +2048,10 @@ function resetForm() {
   document.getElementById('f_tp').placeholder = '0.00';
   document.getElementById('f_sl_sub').textContent = '';
   document.getElementById('f_tp_sub').textContent = '';
+  // Apply defaults from settings
+  const sett = getSettings();
+  if (sett.profile.market) document.getElementById('f_market').value = sett.profile.market;
+  if (sett.profile.tf) document.getElementById('f_tf').value = sett.profile.tf;
   updateRR();
 }
 
@@ -1919,6 +2146,8 @@ function openModal(id) {
     { label: 'Entry Confirmation', val: t.entryConfirmation },
     { label: 'Distance & Momentum', val: t.distMomentum },
     { label: 'POI Level Reached', val: t.poiLevel },
+    { label: 'DXY Bias', val: t.dxyBias },
+    { label: 'DXY Confirms', val: t.dxyConfirms, color: t.dxyConfirms === 'Yes aligned' ? '#3fb950' : t.dxyConfirms === 'No conflicts' ? '#f85149' : undefined },
   ].filter(f => f.val);
 
   const sysHtml = sysFields.length ? `
@@ -2285,6 +2514,11 @@ function editTrade(id) {
     if (t.entryConfirmation) document.getElementById('f_entryConf').value = t.entryConfirmation;
     if (t.distMomentum) document.getElementById('f_distMomentum').value = t.distMomentum;
     if (t.poiLevel) document.getElementById('f_poiLevel').value = t.poiLevel;
+    if (t.dxyBias) document.getElementById('f_dxyBias').value = t.dxyBias;
+    if (t.dxyConfirms) document.getElementById('f_dxyConfirms').value = t.dxyConfirms;
+    if (t.dxyKeyLevel) document.getElementById('f_dxyKeyLevel').value = t.dxyKeyLevel;
+    if (t.gbpChecked) document.getElementById('f_gbpChecked').value = t.gbpChecked;
+    if (t.corrNotes) document.getElementById('f_corrNotes').value = t.corrNotes;
 
     setFDir(t.direction);
     updateRR();
@@ -2894,7 +3128,7 @@ async function gistPush(token, gistId) {
   const payload = {
     description: 'Trade Journal — auto-synced',
     public: false,
-    files: { [GIST_FILE]: { content: JSON.stringify({ version: 2, lastUpdated: new Date().toISOString(), trades }, null, 2) } }
+    files: { [GIST_FILE]: { content: JSON.stringify({ version: 2, lastUpdated: new Date().toISOString(), trades, settings: getSettings() }, null, 2) } }
   };
   const url    = gistId ? `https://api.github.com/gists/${gistId}` : 'https://api.github.com/gists';
   const method = gistId ? 'PATCH' : 'POST';
@@ -2917,10 +3151,16 @@ async function gistPullRaw() {
   const url  = `https://gist.githubusercontent.com/${GIST_OWNER}/${DEFAULT_GIST}/raw/${GIST_FILE}?t=${Date.now()}`;
   const resp = await fetch(url);
   if (!resp.ok) return 0;
-  const incoming    = (await resp.json()).trades || [];
+  const data = await resp.json();
+  const incoming = data.trades || [];
   const existingIds = new Set(trades.map(t => t.id));
   const newTrades   = incoming.filter(t => !existingIds.has(t.id));
   if (newTrades.length) { trades = [...trades, ...newTrades]; localStorage.setItem(STORE, JSON.stringify(trades)); }
+  // Merge settings from Gist if present and no local settings exist
+  if (data.settings && !localStorage.getItem(SETTINGS_KEY)) {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings));
+    applySettings(data.settings);
+  }
   return newTrades.length;
 }
 
@@ -3085,9 +3325,11 @@ function generateAnalysisExport(period) {
   const money = n => n == null ? '—' : (n >= 0 ? '+$' : '-$') + Math.abs(n).toFixed(2);
   const dateStr = t => new Date(t).toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
 
+  const sett = getSettings();
   let out = '';
   out += `=== CLAUDE ANALYSIS EXPORT ===\n`;
   out += `Generated: ${new Date().toLocaleString()}\n`;
+  if (sett.export.exportName && sett.profile.name) out += `Trader: ${sett.profile.name}\n`;
   out += `Period: ${periodLabel}\n\n`;
 
   out += `PERFORMANCE SUMMARY:\n`;
@@ -3126,7 +3368,10 @@ function generateAnalysisExport(period) {
     if (t.entryConfirmation) sysLine.push(`Entry Conf: ${t.entryConfirmation}`);
     if (t.distMomentum) sysLine.push(`Dist/Mom: ${t.distMomentum}`);
     if (t.poiLevel) sysLine.push(`POI Level: ${t.poiLevel}`);
+    if (t.dxyBias) sysLine.push(`DXY Bias: ${t.dxyBias}`);
+    if (t.dxyConfirms) sysLine.push(`DXY Confirms: ${t.dxyConfirms}`);
     if (sysLine.length) out += `Structure: ${sysLine.join(' | ')}\n`;
+    if (t.corrNotes?.trim()) out += `Correlation Notes: ${t.corrNotes.trim()}\n`;
     const ePipSz = t.pair && (t.pair.includes('JPY') || t.entry > 20) ? 0.01 : 0.0001;
     const eSlPips = Math.abs(t.entry - t.sl) / ePipSz;
     const eTpPips = Math.abs(t.tp - t.entry) / ePipSz;
@@ -3767,6 +4012,10 @@ function calcAlignmentScore() {
   if (g('cl_mentorCheck') === 'Yes') score++;
   // 10. My system (not improvising)
   if (g('cl_systemCheck') === 'My system') score++;
+  // 11. DXY checked
+  if (g('cl_dxyChecked') === 'Yes') score++;
+  // 12. DXY confirms trade
+  if (g('cl_dxyConfirms') === 'Yes aligned') score++;
 
   const numEl = document.getElementById('clScoreNum');
   const labelEl = document.getElementById('clScoreLabel');
@@ -3774,10 +4023,10 @@ function calcAlignmentScore() {
   numEl.textContent = score;
   wrapEl.classList.remove('green', 'amber', 'red');
 
-  if (score >= 8) {
+  if (score >= 10) {
     wrapEl.classList.add('green');
     labelEl.textContent = 'Strong setup — proceed';
-  } else if (score >= 5) {
+  } else if (score >= 6) {
     wrapEl.classList.add('amber');
     labelEl.textContent = 'Weak setup — review';
   } else {
@@ -3799,7 +4048,9 @@ function getAlignmentData() {
   if (g('cl_chasing') === 'Waiting for confirmation') score++;
   if (g('cl_mentorCheck') === 'Yes') score++;
   if (g('cl_systemCheck') === 'My system') score++;
-  const assessment = score >= 8 ? 'Strong setup — proceed' : score >= 5 ? 'Weak setup — review' : 'Do not take this trade';
+  if (g('cl_dxyChecked') === 'Yes') score++;
+  if (g('cl_dxyConfirms') === 'Yes aligned') score++;
+  const assessment = score >= 10 ? 'Strong setup — proceed' : score >= 6 ? 'Weak setup — review' : 'Do not take this trade';
   return { score, assessment };
 }
 
@@ -3828,6 +4079,15 @@ function copyChecklist() {
   txt += 'Distance & Momentum: ' + g('cl_distMom') + '\n';
   txt += '2% Risk Cap: ' + g('cl_riskCap') + '\n\n';
 
+  txt += 'CORRELATION:\n';
+  txt += 'DXY Checked: ' + g('cl_dxyChecked') + '\n';
+  txt += 'DXY Bias: ' + g('cl_dxyBias') + '\n';
+  txt += 'DXY at Key Level: ' + g('cl_dxyKeyLevel') + '\n';
+  txt += 'DXY Confirms Trade: ' + g('cl_dxyConfirms') + '\n';
+  txt += 'GBP Index Checked: ' + g('cl_gbpChecked') + '\n';
+  if (g('cl_corrNotes')) txt += 'Correlation Notes: ' + g('cl_corrNotes') + '\n';
+  txt += '\n';
+
   txt += 'LEVELS:\n';
   txt += 'Entry: ' + g('cl_entry') + '\n';
   txt += 'Stop Loss: ' + g('cl_sl') + '\n';
@@ -3843,7 +4103,7 @@ function copyChecklist() {
   txt += 'Mentor Check: ' + g('cl_mentorCheck') + '\n';
   txt += 'My System: ' + g('cl_systemCheck') + '\n\n';
 
-  txt += 'SYSTEM ALIGNMENT: ' + align.score + '/10\n';
+  txt += 'SYSTEM ALIGNMENT: ' + align.score + '/12\n';
   txt += 'ASSESSMENT: ' + align.assessment + '\n';
   txt += '================================\n';
 
@@ -3906,6 +4166,18 @@ function saveChecklistToForm() {
   if (entry) document.getElementById('f_entry').value = entry;
   if (sl) document.getElementById('f_sl').value = sl;
   if (tp) document.getElementById('f_tp').value = tp;
+
+  // Correlation fields
+  const dxyBiasEl = document.getElementById('f_dxyBias');
+  if (dxyBiasEl) dxyBiasEl.value = g('cl_dxyBias') || '';
+  const dxyConfEl = document.getElementById('f_dxyConfirms');
+  if (dxyConfEl) dxyConfEl.value = g('cl_dxyConfirms') || '';
+  const dxyKeyEl = document.getElementById('f_dxyKeyLevel');
+  if (dxyKeyEl) dxyKeyEl.value = g('cl_dxyKeyLevel') || '';
+  const gbpEl = document.getElementById('f_gbpChecked');
+  if (gbpEl) gbpEl.value = g('cl_gbpChecked') || '';
+  const corrEl = document.getElementById('f_corrNotes');
+  if (corrEl) corrEl.value = g('cl_corrNotes') || '';
 
   // Pair/symbol
   const sym = g('cl_symbol');
@@ -4227,9 +4499,172 @@ function renderSessionPerformance(filtered) {
 }
 
 // ═══════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════
+const SETTINGS_KEY = 'tradeJournal_settings';
+const DEFAULT_SETTINGS = {
+  profile: { name: '', currency: 'USD', capital: 0, riskPct: 1, tz: 'local', tf: 'M15', market: 'Forex' },
+  display: { showSession: true, showEquity: true },
+  sharing: { publicProfile: false, publicUser: '', sharePnL: false, shareWR: false, shareSetups: false, shareCharts: false, inviteCode: '' },
+  export: { exportName: true, exportBalance: true, exportPeriod: 'all' }
+};
+
+function getSettings() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    return {
+      profile: { ...DEFAULT_SETTINGS.profile, ...raw.profile },
+      display: { ...DEFAULT_SETTINGS.display, ...raw.display },
+      sharing: { ...DEFAULT_SETTINGS.sharing, ...raw.sharing },
+      export:  { ...DEFAULT_SETTINGS.export,  ...raw.export  }
+    };
+  } catch { return JSON.parse(JSON.stringify(DEFAULT_SETTINGS)); }
+}
+
+function putSettings(s) {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  applySettings(s);
+  scheduleGistPush();
+  // Toast
+  const t = document.getElementById('settingsSavedToast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function applySettings(s) {
+  const bar = document.getElementById('sessionBar');
+  if (bar) bar.style.display = s.display.showSession ? '' : 'none';
+  const eqCard = document.getElementById('equityCanvas')?.closest('.card');
+  if (eqCard) eqCard.style.display = s.display.showEquity ? '' : 'none';
+}
+
+function openSettingsModal() {
+  populateSettingsForm();
+  document.getElementById('settingsOverlay').classList.add('open');
+}
+function closeSettingsModal() { document.getElementById('settingsOverlay').classList.remove('open'); }
+function maybeCloseSettings(e) { if (e.target === e.currentTarget) closeSettingsModal(); }
+
+function setSettingsTab(tab) {
+  const tabs = ['profile','display','sharing','export','danger'];
+  document.querySelectorAll('#settingsTabs .settings-tab').forEach((t, i) => {
+    t.classList.toggle('active', tabs[i] === tab);
+  });
+  tabs.forEach(t => {
+    const sec = document.getElementById('settSec_' + t);
+    if (sec) sec.classList.toggle('active', t === tab);
+  });
+}
+
+function populateSettingsForm() {
+  const s = getSettings();
+  document.getElementById('sett_name').value = s.profile.name;
+  document.getElementById('sett_currency').value = s.profile.currency;
+  document.getElementById('sett_capital').value = s.profile.capital || '';
+  document.getElementById('sett_riskPct').value = s.profile.riskPct || '';
+  document.getElementById('sett_tz').value = s.profile.tz;
+  document.getElementById('sett_tf').value = s.profile.tf;
+  document.getElementById('sett_market').value = s.profile.market;
+  // Display toggles
+  document.getElementById('sett_showSession').classList.toggle('on', s.display.showSession);
+  document.getElementById('sett_showEquity').classList.toggle('on', s.display.showEquity);
+  // Sharing
+  document.getElementById('sett_publicProfile').classList.toggle('on', s.sharing.publicProfile);
+  document.getElementById('sett_publicUser').value = s.sharing.publicUser;
+  document.getElementById('sett_sharePnL').classList.toggle('on', s.sharing.sharePnL);
+  document.getElementById('sett_shareWR').classList.toggle('on', s.sharing.shareWR);
+  document.getElementById('sett_shareSetups').classList.toggle('on', s.sharing.shareSetups);
+  document.getElementById('sett_shareCharts').classList.toggle('on', s.sharing.shareCharts);
+  document.getElementById('sett_inviteCode').value = s.sharing.inviteCode;
+  // Export
+  document.getElementById('sett_exportName').classList.toggle('on', s.export.exportName);
+  document.getElementById('sett_exportBalance').classList.toggle('on', s.export.exportBalance);
+  document.getElementById('sett_exportPeriod').value = s.export.exportPeriod;
+}
+
+function saveSettingsFromForm() {
+  const s = getSettings();
+  s.profile.name = document.getElementById('sett_name').value;
+  s.profile.currency = document.getElementById('sett_currency').value;
+  s.profile.capital = parseFloat(document.getElementById('sett_capital').value) || 0;
+  s.profile.riskPct = parseFloat(document.getElementById('sett_riskPct').value) || 1;
+  s.profile.tz = document.getElementById('sett_tz').value;
+  s.profile.tf = document.getElementById('sett_tf').value;
+  s.profile.market = document.getElementById('sett_market').value;
+  s.sharing.publicUser = document.getElementById('sett_publicUser').value;
+  s.sharing.inviteCode = document.getElementById('sett_inviteCode').value;
+  s.export.exportPeriod = document.getElementById('sett_exportPeriod').value;
+  putSettings(s);
+}
+
+function toggleSetting(btn, key) {
+  const s = getSettings();
+  btn.classList.toggle('on');
+  const val = btn.classList.contains('on');
+  // Map key to nested path
+  if (['showSession','showEquity'].includes(key)) s.display[key] = val;
+  else if (['publicProfile','sharePnL','shareWR','shareSetups','shareCharts'].includes(key)) s.sharing[key] = val;
+  else if (['exportName','exportBalance'].includes(key)) s.export[key] = val;
+  putSettings(s);
+}
+
+function settingsExportJSON() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    version: 2,
+    trades: trades,
+    settings: getSettings()
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `trade-journal-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function settingsImportJSON(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!confirm(`Import ${data.trades?.length || 0} trades? This will REPLACE all current data.`)) return;
+      if (data.trades) { trades = data.trades; save(); }
+      if (data.settings) putSettings(data.settings);
+      renderDashboard();
+      alert('Import complete.');
+    } catch { alert('Invalid JSON file.'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function settingsResetAll() {
+  if (!confirm('Reset all settings to defaults? Your trades will NOT be affected.')) return;
+  localStorage.removeItem(SETTINGS_KEY);
+  applySettings(DEFAULT_SETTINGS);
+  populateSettingsForm();
+}
+
+function settingsClearTrades() {
+  if (!confirm('Delete ALL trades? This cannot be undone.')) return;
+  const typed = prompt('Type DELETE to confirm:');
+  if (typed !== 'DELETE') { alert('Cancelled.'); return; }
+  trades = [];
+  save();
+  renderDashboard();
+  closeSettingsModal();
+  alert('All trades cleared.');
+}
+
+// ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
 load();
+applySettings(getSettings());
 updateSyncDot();
 refreshCloudStatus();
 renderDashboard();
