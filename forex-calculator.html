@@ -293,7 +293,7 @@
           <div class="result-sub" id="fxCapLossPct">—</div>
         </div>
         <div class="result-item">
-          <div class="result-label">BE Price (1:5 R:R)</div>
+          <div class="result-label">BE Trigger Price</div>
           <div class="result-value" id="fxBEResult">—</div>
           <div class="result-sub">move SL to entry</div>
         </div>
@@ -322,16 +322,16 @@
 
     <!-- Forex Break Even Automation -->
     <div class="card">
-      <h2>Break Even at 1:5 R:R</h2>
+      <h2>Break Even at 1:1.5 R:R</h2>
       <div style="padding:10px 12px; background:#0d1117; border:1px solid #21262d; border-radius:8px;">
         <div class="be-row"><span class="be-label">Move SL to BE when price reaches</span><span class="be-val" style="color:#58a6ff;" id="fxBePrice">—</span></div>
         <div class="be-row"><span class="be-label">Distance from entry to BE trigger</span><span class="be-val" id="fxBeDist">—</span></div>
-        <div class="be-row"><span class="be-label">R:R at BE trigger</span><span class="be-val" style="color:#58a6ff;">1:5</span></div>
+        <div class="be-row"><span class="be-label">R:R at BE trigger</span><span class="be-val" style="color:#58a6ff;" id="fxBeRRLabel">1:1.5</span></div>
         <div class="be-row"><span class="be-label">Capital protected at BE</span><span class="be-val" style="color:#3fb950;" id="fxBeProtected">—</span></div>
         <div class="be-row"><span class="be-label">New SL (break even) price</span><span class="be-val" id="fxBeNewSL">—</span></div>
       </div>
       <div class="info-note" style="margin-top:10px;">
-        When your trade reaches 1:5 R:R (5× your risk in profit), move your stop loss to your entry price. You now have a risk-free trade with zero capital exposed.
+        When your trade reaches your BE trigger R:R, move your stop loss to your entry price. You now have a risk-free trade with zero capital exposed. Configure the trigger in Journal Settings.
       </div>
     </div>
   </div>
@@ -466,7 +466,7 @@
           <div class="result-sub" id="btcCapLossPct">—</div>
         </div>
         <div class="result-item">
-          <div class="result-label">BE Price (1:5 R:R)</div>
+          <div class="result-label">BE Trigger Price</div>
           <div class="result-value" id="btcBEResult">—</div>
           <div class="result-sub">move SL to entry</div>
         </div>
@@ -494,16 +494,16 @@
 
     <!-- Break Even Automation -->
     <div class="card">
-      <h2>Break Even at 1:5 R:R</h2>
+      <h2>Break Even at 1:1.5 R:R</h2>
       <div style="padding:10px 12px; background:#0d1117; border:1px solid #21262d; border-radius:8px;">
         <div class="be-row"><span class="be-label">Move SL to BE when price reaches</span><span class="be-val" style="color:#58a6ff;" id="bePrice">—</span></div>
         <div class="be-row"><span class="be-label">Distance from entry to BE trigger</span><span class="be-val" id="beDist">—</span></div>
-        <div class="be-row"><span class="be-label">R:R at BE trigger</span><span class="be-val" style="color:#58a6ff;">1:5</span></div>
+        <div class="be-row"><span class="be-label">R:R at BE trigger</span><span class="be-val" style="color:#58a6ff;" id="btcBeRRLabel">1:1.5</span></div>
         <div class="be-row"><span class="be-label">Capital protected at BE</span><span class="be-val" style="color:#3fb950;" id="beProtected">—</span></div>
         <div class="be-row"><span class="be-label">New SL (break even) price</span><span class="be-val" id="beNewSL">—</span></div>
       </div>
       <div class="info-note btc-note" style="margin-top:10px;">
-        When your trade reaches 1:5 R:R (5× your risk in profit), move your stop loss to your entry price. You now have a risk-free trade with zero capital exposed.
+        When your trade reaches your BE trigger R:R, move your stop loss to your entry price. You now have a risk-free trade with zero capital exposed. Configure the trigger in Journal Settings.
       </div>
     </div>
   </div>
@@ -524,6 +524,17 @@
   let btcLastEdited = 'rr';  // 'rr' or 'tp'
   let fxSLMode = 'pips';     // 'price' or 'pips'
   let fxTPMode = 'pips';     // 'price' or 'pips'
+
+  // Read configurable settings from journal (localStorage)
+  function getJournalSettings() {
+    try {
+      const raw = JSON.parse(localStorage.getItem('tradeJournal_settings') || '{}');
+      return {
+        riskCapPct: raw.profile?.riskCapPct || 2,
+        beTriggerRR: raw.profile?.beTriggerRR || 1.5
+      };
+    } catch { return { riskCapPct: 2, beTriggerRR: 1.5 }; }
+  }
 
   function fmt(n, dec = 2) { return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
   function fmtPrice(n) {
@@ -623,15 +634,16 @@
     if (tpm === 'price') setFxTPMode('price');
   }
 
-  // ── 2% Risk Cap Warning ──────────────────────────────────
+  // ── Risk Cap Warning (configurable) ──────────────────────
   function updateRiskWarn(riskPct) {
     const el = document.getElementById('riskWarn');
-    if (riskPct > 2) {
+    const cap = getJournalSettings().riskCapPct;
+    if (riskPct > cap) {
       el.className = 'risk-warn over';
-      el.innerHTML = `<span style="font-size:1.1rem;">&#9888;</span> RISK WARNING: ${fmt(riskPct,1)}% exceeds your 2% max rule! Reduce risk or capital exposed.`;
+      el.innerHTML = `<span style="font-size:1.1rem;">&#9888;</span> RISK WARNING: ${fmt(riskPct,1)}% exceeds your ${cap}% max rule! Reduce risk or capital exposed.`;
     } else {
       el.className = 'risk-warn ok';
-      el.innerHTML = `<span style="font-size:1rem;">&#10003;</span> Risk: ${fmt(riskPct,1)}% of capital — within 2% max rule`;
+      el.innerHTML = `<span style="font-size:1rem;">&#10003;</span> Risk: ${fmt(riskPct,1)}% of capital — within ${cap}% max rule`;
     }
   }
 
@@ -639,7 +651,8 @@
   function applyRiskCap(riskPct, riskItemId, posItemId) {
     const riskEl = document.getElementById(riskItemId);
     const posEl  = document.getElementById(posItemId);
-    const exceeded = riskPct > 2;
+    const cap = getJournalSettings().riskCapPct;
+    const exceeded = riskPct > cap;
     if (riskEl) riskEl.classList.toggle('risk-exceeded', exceeded);
     if (posEl)  posEl.classList.toggle('risk-exceeded', exceeded);
     return exceeded;
@@ -799,9 +812,10 @@
     };
     document.getElementById('fxNote').textContent = notes[pairType];
 
-    // Apply 2% cap styling
+    // Apply risk cap styling
     const exceeded = applyRiskCap(riskPct, 'fxRiskItem', 'fxLotItem');
-    const riskBadge = exceeded ? `<div class="risk-exceeded-badge">⚠ Exceeds 2% risk cap</div>` : '';
+    const capPct = getJournalSettings().riskCapPct;
+    const riskBadge = exceeded ? `<div class="risk-exceeded-badge">⚠ Exceeds ${capPct}% risk cap</div>` : '';
 
     const tpDist = tpPips * pipSz;
 
@@ -828,17 +842,19 @@
     const riskSubEl = document.getElementById('fxRiskPct');
     if (riskSubEl) riskSubEl.innerHTML = fmt(riskPct, 1) + '% of capital' + riskBadge;
 
-    // Price levels & distances
+    // Price levels & distances (with %)
+    const fxSlPct = entry > 0 ? (slDist / entry * 100) : 0;
+    const fxTpPct = entry > 0 ? (tpDist / entry * 100) : 0;
     set('fxLvlEntry', fmtFxPrice(entry));
     set('fxLvlSL', fmtFxPrice(slPrice));
     set('fxLvlTP', fmtFxPrice(tpPrice));
-    set('fxLvlSLDist', fmt(slPips, 1) + ' pips (' + fmt(slDist, entry > 20 ? 3 : 5) + ')');
-    set('fxLvlTPDist', fmt(tpPips, 1) + ' pips (' + fmt(tpDist, entry > 20 ? 3 : 5) + ')');
+    set('fxLvlSLDist', fmt(slPips, 1) + ' pips (' + fmt(fxSlPct, 2) + '%)');
+    set('fxLvlTPDist', fmt(tpPips, 1) + ' pips (' + fmt(fxTpPct, 2) + '%)');
 
     setBar('fxBarRisk', 'fxBarReward', 'fxBarL', 'fxBarM', 'fxBarR', riskAmt, rewardAmt, rr);
 
-    // ── Break Even at 1:5 R:R ─────────────────────────────
-    const beRR = 5;
+    // ── Break Even (configurable R:R trigger) ─────────────
+    const beRR = getJournalSettings().beTriggerRR || 1.5;
     const bePipDist = slPips * beRR;
     const bePriceDist = bePipDist * pipSz;
     let beTrigger;
@@ -847,9 +863,12 @@
 
     set('fxBEResult', fmtFxPrice(beTrigger));
     set('fxBePrice', fmtFxPrice(beTrigger));
-    set('fxBeDist', bePipDist + ' pips (' + fmt(bePriceDist, entry > 20 ? 3 : 5) + ')');
+    set('fxBeDist', fmt(bePipDist, 1) + ' pips (' + fmt(bePriceDist, entry > 20 ? 3 : 5) + ')');
     set('fxBeProtected', '100% — risk-free trade ($' + fmt(riskAmt) + ' no longer at risk)');
     set('fxBeNewSL', fmtFxPrice(entry) + ' (your entry price)');
+    set('fxBeRRLabel', '1:' + beRR);
+    // Update BE section title
+    document.querySelectorAll('#forexPanel .card h2').forEach(h => { if (h.textContent.startsWith('Break Even')) h.textContent = 'Break Even at 1:' + beRR + ' R:R'; });
 
     // ── Split Entry ───────────────────────────────────────
     if (fxSplitOn) calcFxSplit(capital, riskPct, entry, slPrice, riskAmt, pipVal, pipSz);
@@ -894,8 +913,9 @@
 
     const riskEl = document.getElementById('fxSpTotalRisk');
     riskEl.innerHTML = '$' + fmt(combinedRisk) + ' (' + fmt(combinedPct, 2) + '%)';
-    if (combinedPct > 2) {
-      riskEl.innerHTML += ' <span class="risk-exceeded-badge">⚠ Exceeds 2% risk cap</span>';
+    const fxSpCap = getJournalSettings().riskCapPct;
+    if (combinedPct > fxSpCap) {
+      riskEl.innerHTML += ' <span class="risk-exceeded-badge">⚠ Exceeds ' + fxSpCap + '% risk cap</span>';
     }
 
     const checkEl = document.getElementById('fxSpAllocCheck');
@@ -958,9 +978,10 @@
     document.getElementById('btcNote').textContent =
       `Position Size = Risk $ ÷ SL Distance → $${fmt(riskAmt)} ÷ $${fmt(slDist)} = ${fmt(qty,6)} BTC`;
 
-    // Apply 2% cap styling
+    // Apply risk cap styling
     const exceeded = applyRiskCap(riskPct, 'btcRiskItem', 'btcQtyItem');
-    const riskBadge = exceeded ? `<div class="risk-exceeded-badge">⚠ Exceeds 2% risk cap</div>` : '';
+    const capPct = getJournalSettings().riskCapPct;
+    const riskBadge = exceeded ? `<div class="risk-exceeded-badge">⚠ Exceeds ${capPct}% risk cap</div>` : '';
 
     set('btcRiskAmt',   '$' + fmt(riskAmt));
     set('btcRewardAmt', '$' + fmt(rewardAmt));
@@ -990,8 +1011,8 @@
 
     setBar('btcBarRisk', 'btcBarReward', 'btcBarL', 'btcBarM', 'btcBarR', riskAmt, rewardAmt, rr);
 
-    // ── Break Even at 1:5 R:R ─────────────────────────────
-    const beRR = 5;
+    // ── Break Even (configurable R:R trigger) ─────────────
+    const beRR = getJournalSettings().beTriggerRR || 1.5;
     const beTriggerDist = slDist * beRR;
     let beTrigger;
     if (dir === 'long') beTrigger = entry + beTriggerDist;
@@ -1002,6 +1023,9 @@
     set('beDist', '$' + fmt(beTriggerDist) + ' (' + fmt((beTriggerDist / entry) * 100, 2) + '%)');
     set('beProtected', '100% — risk-free trade ($' + fmt(riskAmt) + ' no longer at risk)');
     set('beNewSL', fmtPrice(entry) + ' (your entry price)');
+    set('btcBeRRLabel', '1:' + beRR);
+    // Update BE section title
+    document.querySelectorAll('#btcPanel .card h2').forEach(h => { if (h.textContent.startsWith('Break Even')) h.textContent = 'Break Even at 1:' + beRR + ' R:R'; });
 
     // ── Split Entry ───────────────────────────────────────
     if (splitOn) calcSplit(capital, riskPct, sl, riskAmt);
@@ -1042,8 +1066,9 @@
 
     const riskEl = document.getElementById('spTotalRisk');
     riskEl.innerHTML = '$' + fmt(combinedRisk) + ' (' + fmt(combinedPct, 2) + '%)';
-    if (combinedPct > 2) {
-      riskEl.innerHTML += ' <span class="risk-exceeded-badge">⚠ Exceeds 2% risk cap</span>';
+    const btcSpCap = getJournalSettings().riskCapPct;
+    if (combinedPct > btcSpCap) {
+      riskEl.innerHTML += ' <span class="risk-exceeded-badge">⚠ Exceeds ' + btcSpCap + '% risk cap</span>';
     }
 
     const checkEl = document.getElementById('spAllocCheck');

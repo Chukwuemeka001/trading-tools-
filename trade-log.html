@@ -1645,6 +1645,16 @@
             <input type="number" id="sett_riskPct" placeholder="1" step="0.1" min="0.1" max="10" onchange="saveSettingsFromForm()">
           </div>
           <div class="settings-field">
+            <label>Risk Cap % (max per trade)</label>
+            <input type="number" id="sett_riskCapPct" placeholder="2" step="0.5" min="0.5" max="20" onchange="saveSettingsFromForm()">
+          </div>
+        </div>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label>Break Even Trigger (R:R)</label>
+            <input type="number" id="sett_beTriggerRR" placeholder="1.5" step="0.5" min="1.0" max="10.0" onchange="saveSettingsFromForm()">
+          </div>
+          <div class="settings-field">
             <label>Timezone Preference</label>
             <select id="sett_tz" onchange="saveSettingsFromForm()">
               <option value="local">Local (browser)</option>
@@ -1754,6 +1764,21 @@
 // ═══════════════════════════════════════════════════════
 // DATA
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// COOKIE UTILS (unified — single source of truth)
+// ═══════════════════════════════════════════════════════
+function setCookie(name, val, days) {
+  const exp = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(val)}; expires=${exp}; path=/; SameSite=Lax`;
+}
+function getCookie(name) {
+  return document.cookie.split('; ').reduce((r, v) => {
+    const parts = v.split('=');
+    return parts[0] === name ? decodeURIComponent(parts.slice(1).join('=')) : r;
+  }, '');
+}
+function delCookie(name) { document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'; }
+
 const STORE = 'tradeJournal_v2';
 let trades = [];
 let activePeriod = 'all';
@@ -1801,6 +1826,27 @@ function fmt(n, d=2) {
 function fmtPnL(n) {
   if (n == null || isNaN(n)) return '—';
   return (n >= 0 ? '+$' : '-$') + fmt(Math.abs(n));
+}
+
+// Is this a crypto market? (BTC, crypto, etc.)
+function isCrypto(t) {
+  if (!t) return false;
+  const m = (t.market || '').toLowerCase();
+  const p = (t.pair || '').toUpperCase();
+  return m.includes('btc') || m.includes('crypto') || p.includes('BTC') || p.includes('ETH') || p.includes('USDT');
+}
+
+// Format distance: crypto = "$X,XXX (Y.YY%)" | forex = "XX.X pips (Y.YY%)"
+function fmtDist(entry, price, pair, market) {
+  const dist = Math.abs(entry - price);
+  const pct = entry > 0 ? (dist / entry * 100) : 0;
+  const crypto = isCrypto({ pair, market }) || entry > 500;
+  if (crypto) {
+    return '$' + fmt(dist, 2) + ' (' + fmt(pct, 2) + '%)';
+  }
+  const pipSz = (pair && pair.includes('JPY')) || entry > 20 ? 0.01 : 0.0001;
+  const pips = dist / pipSz;
+  return fmt(pips, 1) + ' pips (' + fmt(pct, 2) + '%)';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2085,7 +2131,7 @@ function renderJournal() {
       : t.outcome === 'loss' ? '<span class="badge badge-loss">Loss</span>'
       : '<span class="badge badge-be">BE</span>';
     const pnlStr   = t.actualPnL != null ? fmtPnL(t.actualPnL) : 'Open';
-    const rrStr    = t.actualRR != null ? fmt(t.actualRR,2) + 'R' : t.plannedRR ? fmt(t.plannedRR,2) + 'R planned' : '';
+    const rrStr    = t.actualRR != null ? (t.actualRR >= 0 ? '+' : '') + fmt(t.actualRR,2) + 'R' : t.plannedRR ? fmt(t.plannedRR,2) + 'R planned' : '';
     const dateStr  = new Date(t.dateOpen).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
 
     return `<div class="trade-row ${rowClass}" onclick="openModal('${t.id}')">
@@ -2344,7 +2390,7 @@ function openModal(id) {
     }
   }
 
-  const actualRR = t.actualRR != null ? fmt(t.actualRR,2)+'R' : '—';
+  const actualRR = t.actualRR != null ? (t.actualRR >= 0 ? '+' : '') + fmt(t.actualRR,2) + 'R' : '—';
   const dateClose = t.dateClose ? new Date(t.dateClose).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
 
   body.innerHTML = `
@@ -2352,8 +2398,8 @@ function openModal(id) {
       <div class="info-cell"><div class="info-cell-label">Entry</div><div class="info-cell-val">${fmt(t.entry,5)}</div></div>
       <div class="info-cell"><div class="info-cell-label">Stop Loss</div><div class="info-cell-val" style="color:#f85149">${fmt(t.sl,5)}</div></div>
       <div class="info-cell"><div class="info-cell-label">Take Profit</div><div class="info-cell-val" style="color:#3fb950">${fmt(t.tp,5)}</div></div>
-      <div class="info-cell"><div class="info-cell-label">SL Distance</div><div class="info-cell-val">${fmt(slPips,1)} pips</div></div>
-      <div class="info-cell"><div class="info-cell-label">TP Distance</div><div class="info-cell-val">${fmt(tpPips,1)} pips</div></div>
+      <div class="info-cell"><div class="info-cell-label">SL Distance</div><div class="info-cell-val">${fmtDist(t.entry, t.sl, t.pair, t.market)}</div></div>
+      <div class="info-cell"><div class="info-cell-label">TP Distance</div><div class="info-cell-val">${fmtDist(t.entry, t.tp, t.pair, t.market)}</div></div>
       <div class="info-cell"><div class="info-cell-label">Planned R:R</div><div class="info-cell-val" style="color:#58a6ff">${fmt(t.plannedRR,2)}R</div></div>
       <div class="info-cell"><div class="info-cell-label">Size</div><div class="info-cell-val">${t.size || '—'}</div></div>
       <div class="info-cell"><div class="info-cell-label">Risk ($)</div><div class="info-cell-val" style="color:#f85149">$${fmt(t.risk)}</div></div>
@@ -2366,7 +2412,7 @@ function openModal(id) {
     <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:12px 14px; margin-bottom:14px; display:grid; grid-template-columns:repeat(${t.exitType ? 5 : 4},1fr); gap:10px;">
       <div><div class="info-cell-label">Exit Price</div><div class="info-cell-val">${fmt(t.exitPrice,5)}</div></div>
       <div><div class="info-cell-label">Actual P&L</div><div class="info-cell-val" style="color:${t.actualPnL>=0?'#3fb950':'#f85149'}">${fmtPnL(t.actualPnL)}</div></div>
-      <div><div class="info-cell-label">Actual R:R</div><div class="info-cell-val">${actualRR}</div></div>
+      <div><div class="info-cell-label">Actual R:R</div><div class="info-cell-val" style="color:${t.actualRR>=0?'#3fb950':'#f85149'}">${actualRR}</div></div>
       ${t.exitType ? `<div><div class="info-cell-label">Exit Type</div><div class="info-cell-val" style="font-size:0.78rem">${{tp:'TP Hit',sl:'SL Hit',be:'Break Even',manual:'Manual Close',partial:'Partial Close'}[t.exitType] || t.exitType}</div></div>` : ''}
       <div><div class="info-cell-label">Closed</div><div class="info-cell-val" style="font-size:0.75rem">${dateClose}</div></div>
     </div>` : ''}
@@ -2410,9 +2456,13 @@ function updateModalRR(tradeId) {
   if (!exit) return;
   const slDist = Math.abs(t.entry - t.sl);
   if (slDist <= 0) return;
-  const actualRR = Math.abs(exit - t.entry) / slDist;
+  // Signed RR: positive = moved in trade direction, negative = moved against
+  const profit = t.direction === 'long' ? exit - t.entry : t.entry - exit;
+  const signedRR = profit / slDist;
   const el = document.getElementById('closeActualRR');
-  if (el) el.value = fmt(actualRR, 2);
+  if (el) el.value = (signedRR >= 0 ? '+' : '') + fmt(signedRR, 2);
+  // Auto-calculate P&L if we have size info
+  autoCalcPnL(t, exit);
 }
 
 function setRating(n) {
@@ -2457,7 +2507,8 @@ function closeTrade(id) {
   trades = trades.map(t => {
     if (t.id !== id) return t;
     const slDist = Math.abs(t.entry - t.sl);
-    const actualRR = slDist > 0 ? Math.abs(exit - t.entry) / slDist : 0;
+    const profit = t.direction === 'long' ? exit - t.entry : t.entry - exit;
+    const actualRR = slDist > 0 ? profit / slDist : 0;
     return {
       ...t,
       status: 'closed', dateClose, exitPrice: exit,
@@ -2959,7 +3010,7 @@ function renderRecent(list) {
       </div>
       <div class="trade-right">
         <div class="trade-pnl ${pnlClass}">${pnlStr}</div>
-        <div class="trade-rr">${t.actualRR?fmt(t.actualRR,2)+'R':t.plannedRR?fmt(t.plannedRR,2)+'R':''}</div>
+        <div class="trade-rr">${t.actualRR!=null?(t.actualRR>=0?'+':'')+fmt(t.actualRR,2)+'R':t.plannedRR?fmt(t.plannedRR,2)+'R':''}</div>
       </div>
     </div>`;
   }).join('')}</div>`;
@@ -3042,17 +3093,6 @@ const GIST_FILE    = 'trade-journal.json';
 const DEFAULT_GIST = 'bc004e07ada6586fc4492590f80b182b';
 const GIST_OWNER   = 'Chukwuemeka001';
 let   gistPushTimer = null;
-
-function setCookie(name, val, days) {
-  const exp = new Date(Date.now() + days * 864e5).toUTCString();
-  document.cookie = `${name}=${encodeURIComponent(val)}; expires=${exp}; path=/; SameSite=Lax`;
-}
-function getCookie(name) {
-  return document.cookie.split('; ').reduce((r, v) => {
-    const parts = v.split('=');
-    return parts[0] === name ? decodeURIComponent(parts.slice(1).join('=')) : r;
-  }, '');
-}
 
 function getToken() {
   return getCookie('gist_token') || JSON.parse(localStorage.getItem(GIST_STORE) || '{}').token || '';
@@ -3372,16 +3412,15 @@ function generateAnalysisExport(period) {
     if (t.dxyConfirms) sysLine.push(`DXY Confirms: ${t.dxyConfirms}`);
     if (sysLine.length) out += `Structure: ${sysLine.join(' | ')}\n`;
     if (t.corrNotes?.trim()) out += `Correlation Notes: ${t.corrNotes.trim()}\n`;
-    const ePipSz = t.pair && (t.pair.includes('JPY') || t.entry > 20) ? 0.01 : 0.0001;
-    const eSlPips = Math.abs(t.entry - t.sl) / ePipSz;
-    const eTpPips = Math.abs(t.tp - t.entry) / ePipSz;
-    out += `Entry: ${t.entry} | SL: ${t.sl} (${d(eSlPips)} pips) | TP: ${t.tp} (${d(eTpPips)} pips)\n`;
+    const eSlDist = fmtDist(t.entry, t.sl, t.pair, t.market);
+    const eTpDist = fmtDist(t.entry, t.tp, t.pair, t.market);
+    out += `Entry: ${t.entry} | SL: ${t.sl} (${eSlDist}) | TP: ${t.tp} (${eTpDist})\n`;
     out += `Planned R:R: 1:${t.plannedRR ? d(t.plannedRR) : '?'} | Risk: $${t.risk ? d(t.risk) : '?'}`;
     if (t.size) out += ` | Size: ${t.size}`;
     out += `\n`;
     if (t.status === 'closed') {
       out += `Result: ${(t.outcome || '?').toUpperCase()} | Exit: ${t.exitPrice} | P&L: ${money(t.actualPnL)}`;
-      if (t.actualRR) out += ` | Actual R: ${d(t.actualRR)}R`;
+      if (t.actualRR != null) out += ` | Actual R: ${t.actualRR >= 0 ? '+' : ''}${d(t.actualRR)}R`;
       if (t.exitType) out += ` | Exit Type: ${{tp:'TP Hit',sl:'SL Hit',be:'Break Even',manual:'Manual Close',partial:'Partial Close'}[t.exitType] || t.exitType}`;
       out += `\n`;
       if (t.dateClose) out += `Closed: ${dateStr(t.dateClose)}\n`;
@@ -3540,14 +3579,14 @@ async function refreshLiveTrades() {
           currentPrice = pd.price;
         } catch {}
 
-        let currentPnL = '—', currentRR = '—', slPips = '—', tpPips = '—';
+        let currentPnL = '—', currentRR = '—', slDistStr = '—', tpDistStr = '—';
         if (currentPrice && entry && sl) {
           const profit = dir === 'long' ? currentPrice - entry : entry - currentPrice;
           currentPnL = (profit >= 0 ? '+' : '') + profit.toFixed(2);
-          currentRR = slDist > 0 ? (Math.abs(profit) / slDist).toFixed(1) : '—';
-          if (profit < 0) currentRR = '-' + currentRR;
-          slPips = Math.abs(currentPrice - sl).toFixed(2);
-          tpPips = tp ? Math.abs(tp - currentPrice).toFixed(2) : '—';
+          const signedRR = slDist > 0 ? profit / slDist : 0;
+          currentRR = (signedRR >= 0 ? '+' : '') + signedRR.toFixed(1) + 'R';
+          slDistStr = fmtDist(currentPrice, sl, t.pair, t.market || 'BTC/USDT');
+          tpDistStr = tp ? fmtDist(currentPrice, tp, t.pair, t.market || 'BTC/USDT') : '—';
         }
 
         // Time open
@@ -3558,7 +3597,7 @@ async function refreshLiveTrades() {
         }
 
         // BE status
-        const beRR = 1.5;
+        const beRR = getSettings().profile.beTriggerRR || 1.5;
         let beStatus = '';
         if (sl && Math.abs(sl - entry) < 0.01) {
           beStatus = '\uD83D\uDD12 Break even set \u2014 risk free!';
@@ -3578,8 +3617,8 @@ async function refreshLiveTrades() {
         html += '<div class="live-trade-item"><div class="live-trade-label">Current</div><div class="live-trade-val" style="color:' + (currentPnL.startsWith('+') ? '#3fb950' : currentPnL.startsWith('-') ? '#f85149' : '#e6edf3') + '">$' + (currentPrice ? Number(currentPrice).toLocaleString() : '—') + '</div></div>';
         html += '<div class="live-trade-item"><div class="live-trade-label">P&L</div><div class="live-trade-val" style="color:' + (currentPnL.startsWith('+') ? '#3fb950' : currentPnL.startsWith('-') ? '#f85149' : '#e6edf3') + '">' + currentPnL + '</div></div>';
         html += '<div class="live-trade-item"><div class="live-trade-label">Current RR</div><div class="live-trade-val">' + currentRR + '</div></div>';
-        html += '<div class="live-trade-item"><div class="live-trade-label">Dist to SL</div><div class="live-trade-val">' + slPips + '</div></div>';
-        html += '<div class="live-trade-item"><div class="live-trade-label">Dist to TP</div><div class="live-trade-val">' + tpPips + '</div></div>';
+        html += '<div class="live-trade-item"><div class="live-trade-label">Dist to SL</div><div class="live-trade-val">' + slDistStr + '</div></div>';
+        html += '<div class="live-trade-item"><div class="live-trade-label">Dist to TP</div><div class="live-trade-val">' + tpDistStr + '</div></div>';
         html += '</div>';
         if (beStatus) html += '<div class="live-trade-be">' + beStatus + '</div>';
         html += '</div>';
@@ -3871,16 +3910,8 @@ function addAILevel(ai) {
 
 // ═══════════════════════════════════════════════════════
 // BROKER SETTINGS (cookie-based — NEVER Gist/export)
+// (setCookie/getCookie/delCookie defined at top of script)
 // ═══════════════════════════════════════════════════════
-function setCookie(name, val, days) {
-  const d = new Date(); d.setTime(d.getTime() + days * 86400000);
-  document.cookie = name + '=' + encodeURIComponent(val) + ';expires=' + d.toUTCString() + ';path=/;SameSite=Strict';
-}
-function getCookie(name) {
-  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
-  return m ? decodeURIComponent(m[1]) : '';
-}
-function delCookie(name) { document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'; }
 
 function openBrokerModal() {
   loadBrokerCreds();
@@ -4503,7 +4534,7 @@ function renderSessionPerformance(filtered) {
 // ═══════════════════════════════════════════════════════
 const SETTINGS_KEY = 'tradeJournal_settings';
 const DEFAULT_SETTINGS = {
-  profile: { name: '', currency: 'USD', capital: 0, riskPct: 1, tz: 'local', tf: 'M15', market: 'Forex' },
+  profile: { name: '', currency: 'USD', capital: 0, riskPct: 1, riskCapPct: 2, beTriggerRR: 1.5, tz: 'local', tf: 'M15', market: 'Forex' },
   display: { showSession: true, showEquity: true },
   sharing: { publicProfile: false, publicUser: '', sharePnL: false, shareWR: false, shareSetups: false, shareCharts: false, inviteCode: '' },
   export: { exportName: true, exportBalance: true, exportPeriod: 'all' }
@@ -4562,6 +4593,8 @@ function populateSettingsForm() {
   document.getElementById('sett_currency').value = s.profile.currency;
   document.getElementById('sett_capital').value = s.profile.capital || '';
   document.getElementById('sett_riskPct').value = s.profile.riskPct || '';
+  document.getElementById('sett_riskCapPct').value = s.profile.riskCapPct || 2;
+  document.getElementById('sett_beTriggerRR').value = s.profile.beTriggerRR || 1.5;
   document.getElementById('sett_tz').value = s.profile.tz;
   document.getElementById('sett_tf').value = s.profile.tf;
   document.getElementById('sett_market').value = s.profile.market;
@@ -4588,6 +4621,8 @@ function saveSettingsFromForm() {
   s.profile.currency = document.getElementById('sett_currency').value;
   s.profile.capital = parseFloat(document.getElementById('sett_capital').value) || 0;
   s.profile.riskPct = parseFloat(document.getElementById('sett_riskPct').value) || 1;
+  s.profile.riskCapPct = parseFloat(document.getElementById('sett_riskCapPct').value) || 2;
+  s.profile.beTriggerRR = parseFloat(document.getElementById('sett_beTriggerRR').value) || 1.5;
   s.profile.tz = document.getElementById('sett_tz').value;
   s.profile.tf = document.getElementById('sett_tf').value;
   s.profile.market = document.getElementById('sett_market').value;
@@ -4685,8 +4720,42 @@ checkCalcAutoFill();
   } catch { /* silent */ }
 })();
 window.addEventListener('resize', () => {
-  if (document.getElementById('page-dashboard').classList.contains('active')) renderEquity(trades.filter(t=>t.status==='closed'));
+  if (document.getElementById('page-dashboard').classList.contains('active')) {
+    const filtered = filterByPeriod(trades, activePeriod).filter(t => t.status === 'closed');
+    renderEquity(filtered);
+  }
 });
+// ═══════════════════════════════════════════════════════
+// AUTO-CALCULATE P&L
+// ═══════════════════════════════════════════════════════
+function autoCalcPnL(t, exitPrice) {
+  if (!t || !exitPrice) return;
+  const pnlEl = document.getElementById('closePnL');
+  if (!pnlEl) return;
+  const size = parseFloat(t.size);
+  if (!size || size <= 0) return;
+  const crypto = isCrypto(t);
+  let pnl;
+  if (crypto) {
+    // BTC/crypto: P&L = (exit - entry) × position size (in BTC/units)
+    const diff = t.direction === 'long' ? exitPrice - t.entry : t.entry - exitPrice;
+    pnl = diff * size;
+  } else {
+    // Forex: P&L = pip difference × pip value × lot size
+    const pair = t.pair || '';
+    const pipSz = (pair.includes('JPY') || t.entry > 20) ? 0.01 : 0.0001;
+    const pipDiff = t.direction === 'long' ? (exitPrice - t.entry) / pipSz : (t.entry - exitPrice) / pipSz;
+    // Pip value approximation: USD quote = $10/std lot, others = (pipSz/price)*100000
+    const isUsdQuote = pair.match(/USD$/i) && !pair.match(/^USD/i);
+    const pipVal = isUsdQuote ? 10 : (pipSz / t.entry) * 100000;
+    pnl = pipDiff * pipVal * size;
+  }
+  pnlEl.value = pnl.toFixed(2);
+  // Style to indicate auto-calculated
+  pnlEl.style.color = '#58a6ff';
+  pnlEl.title = 'Auto-calculated — you can override';
+}
+
 // ═══════════════════════════════════════════════════════
 // EXIT TYPE SELECTION
 // ═══════════════════════════════════════════════════════
