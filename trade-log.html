@@ -702,6 +702,39 @@
     input[type="url"]:focus { border-color: #58a6ff; }
     .tv-link { font-size: 0.72rem; color: #58a6ff; text-decoration: none; word-break: break-all; }
     .tv-link:hover { text-decoration: underline; }
+
+    /* Partial close system */
+    .badge-partial { background: #1a1a0a; color: #f0883e; border: 1px solid #4a3a1a; }
+    .trade-row.partial { border-left: 3px solid #f0883e; }
+    .close-events { margin-bottom: 14px; }
+    .close-event {
+      background: #0d1117; border: 1px solid #21262d; border-radius: 8px;
+      padding: 10px 12px; margin-bottom: 6px; font-size: 0.78rem;
+    }
+    .close-event-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .close-event-type { font-weight: 700; color: #58a6ff; }
+    .close-event-time { color: #6e7681; font-size: 0.68rem; }
+    .close-event-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .close-event-cell-label { font-size: 0.62rem; color: #6e7681; text-transform: uppercase; letter-spacing: 0.5px; }
+    .close-event-cell-val { font-size: 0.82rem; font-weight: 600; margin-top: 1px; }
+    .position-progress { margin-bottom: 14px; }
+    .position-bar {
+      height: 8px; background: #21262d; border-radius: 4px; overflow: hidden;
+      display: flex; margin-top: 4px;
+    }
+    .position-bar-fill { height: 100%; transition: width 0.3s; }
+    .position-bar-closed { background: #3fb950; }
+    .position-bar-remaining { background: #58a6ff; }
+    .position-summary {
+      display: flex; justify-content: space-between; font-size: 0.75rem;
+      color: #8b949e; margin-top: 4px;
+    }
+    .left-on-table {
+      background: #1a1a0a; border: 1px solid #4a3a1a; border-radius: 8px;
+      padding: 10px 14px; margin-bottom: 14px; font-size: 0.78rem; color: #f0883e;
+    }
+    .partial-close-slider { margin: 6px 0; }
+    .partial-close-slider input[type="range"] { width: 100%; }
   </style>
 </head>
 <body>
@@ -776,6 +809,11 @@
   </div>
 
   <div class="stats-row" id="statsRow"></div>
+
+  <!-- Left on Table -->
+  <div class="card" id="leftOnTableSummary" style="display:none;">
+    <div class="card-title">Exit Quality — "Am I leaving too early?"</div>
+  </div>
 
   <!-- Equity curve -->
   <div class="card">
@@ -1275,6 +1313,7 @@
     <select class="filter-select" id="fltStatus" onchange="renderJournal()">
       <option value="">All Status</option>
       <option value="open">Open</option>
+      <option value="partial">Partially Closed</option>
       <option value="closed">Closed</option>
     </select>
     <select class="filter-select" id="fltOutcome" onchange="renderJournal()">
@@ -2398,15 +2437,16 @@ function renderJournal() {
   }
 
   el.innerHTML = list.map(t => {
-    const rowClass = t.status === 'open' ? 'open' : (t.outcome || 'be');
+    const rowClass = t.status === 'open' ? 'open' : t.status === 'partial' ? 'partial' : (t.outcome || 'be');
     const pnlClass = !t.actualPnL ? 'neutral' : t.actualPnL >= 0 ? 'pos' : 'neg';
     const badge    = t.status === 'open'
       ? '<span class="badge badge-open">Open</span>'
+      : t.status === 'partial' ? '<span class="badge badge-partial">Partial</span>'
       : t.outcome === 'win' ? '<span class="badge badge-win">Win</span>'
       : t.outcome === 'loss' ? '<span class="badge badge-loss">Loss</span>'
       : '<span class="badge badge-be">BE</span>';
-    const pnlStr   = t.actualPnL != null ? fmtPnL(t.actualPnL) : 'Open';
-    const rrStr    = t.actualRR != null ? (t.actualRR >= 0 ? '+' : '') + fmt(t.actualRR,2) + 'R' : t.plannedRR ? fmt(t.plannedRR,2) + 'R planned' : '';
+    const pnlStr   = t.status === 'partial' ? fmtPnL(t.actualPnL||0) + ' (partial)' : t.actualPnL != null && t.status === 'closed' ? fmtPnL(t.actualPnL) : 'Open';
+    const rrStr    = t.actualRR != null && t.status !== 'open' ? (t.actualRR >= 0 ? '+' : '') + fmt(t.actualRR,2) + 'R' : t.plannedRR ? fmt(t.plannedRR,2) + 'R planned' : '';
     const dateStr  = new Date(t.dateOpen).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
 
     return `<div class="trade-row ${rowClass}" onclick="openModal('${t.id}')">
@@ -2443,6 +2483,7 @@ function openModal(id) {
   const dirColor = t.direction === 'long' ? '#3fb950' : '#f85149';
   const badge    = t.status === 'open'
     ? '<span class="badge badge-open">Open</span>'
+    : t.status === 'partial' ? '<span class="badge badge-partial">Partial</span>'
     : t.outcome === 'win' ? '<span class="badge badge-win">Win</span>'
     : t.outcome === 'loss' ? '<span class="badge badge-loss">Loss</span>'
     : '<span class="badge badge-be">Break Even</span>';
@@ -2506,126 +2547,307 @@ function openModal(id) {
       ${t.htfNotes ? `<div style="margin-top:8px;"><div class="info-cell-label">HTF Notes</div><div class="rationale-box" style="margin-top:4px;font-size:0.78rem;">${escHtml(t.htfNotes)}</div></div>` : ''}
     </div>` : '';
 
-  // Close section for open trades
-  const closeSection = t.status === 'open' ? `
+  // Close events display
+  const events = t.closeEvents || [];
+  const totalClosed = events.reduce((s, e) => s + (e.percentClosed || 0), 0);
+  const remaining = Math.max(0, 100 - totalClosed);
+  const realizedPnL = events.reduce((s, e) => s + (e.pnl || 0), 0);
+
+  const closeEventsHtml = events.length ? `
+    <div class="close-events">
+      <div class="card-title" style="margin-bottom:8px;">Close Events (${events.length})</div>
+      ${events.map((ev, i) => {
+        const evDate = ev.timestamp ? new Date(ev.timestamp).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+        const pnlCol = ev.pnl >= 0 ? '#3fb950' : '#f85149';
+        return `<div class="close-event">
+          <div class="close-event-header">
+            <span class="close-event-type">#${i+1} ${ev.type || 'Close'}</span>
+            <span class="close-event-time">${evDate}</span>
+          </div>
+          <div class="close-event-grid">
+            <div><div class="close-event-cell-label">% Closed</div><div class="close-event-cell-val">${ev.percentClosed || 0}%</div></div>
+            <div><div class="close-event-cell-label">Exit Price</div><div class="close-event-cell-val">${fmt(ev.price, 5)}</div></div>
+            <div><div class="close-event-cell-label">P&L</div><div class="close-event-cell-val" style="color:${pnlCol}">${fmtPnL(ev.pnl)}</div></div>
+            <div><div class="close-event-cell-label">R:R</div><div class="close-event-cell-val" style="color:${(ev.rrAtClose||0)>=0?'#3fb950':'#f85149'}">${ev.rrAtClose != null ? (ev.rrAtClose>=0?'+':'') + fmt(ev.rrAtClose,2) + 'R' : '—'}</div></div>
+          </div>
+          ${ev.reason ? '<div style="margin-top:4px;color:#8b949e;font-size:0.72rem;">Reason: '+escHtml(ev.reason)+'</div>' : ''}
+          ${ev.notes ? '<div style="margin-top:2px;color:#8b949e;font-size:0.72rem;font-style:italic;">'+escHtml(ev.notes)+'</div>' : ''}
+        </div>`;
+      }).join('')}
+      <div class="position-progress">
+        <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#8b949e;">
+          <span>Position Status</span>
+          <span>Closed: ${totalClosed}% | Remaining: ${remaining}%</span>
+        </div>
+        <div class="position-bar">
+          <div class="position-bar-fill position-bar-closed" style="width:${totalClosed}%"></div>
+          <div class="position-bar-fill position-bar-remaining" style="width:${remaining}%"></div>
+        </div>
+        <div class="position-summary">
+          <span>Realized P&L: <strong style="color:${realizedPnL>=0?'#3fb950':'#f85149'}">${fmtPnL(realizedPnL)}</strong></span>
+          ${remaining > 0 ? '<span>Unrealized: <strong style="color:#58a6ff">tracking...</strong></span>' : ''}
+        </div>
+      </div>
+    </div>` : '';
+
+  // Left on table calculation
+  const leftOnTableHtml = (() => {
+    if (!events.length || t.status !== 'closed') return '';
+    const lastEv = events[events.length - 1];
+    const tpDist2 = t.direction === 'long' ? t.tp - lastEv.price : lastEv.price - t.tp;
+    if (tpDist2 <= 0) return ''; // TP was reached or passed
+    const leftPct = remaining > 0 ? 0 : (lastEv.price !== t.tp ? 1 : 0);
+    // Calculate for each partial: what could they have earned if held to TP
+    let totalLeft = 0;
+    events.forEach(ev => {
+      const evDist = t.direction === 'long' ? t.tp - ev.price : ev.price - t.tp;
+      if (evDist > 0) {
+        const fraction = (ev.percentClosed || 0) / 100;
+        const sizeNum = parseFloat(t.size) || 0;
+        const evSize = sizeNum * fraction;
+        const crypto = isCrypto(t);
+        if (crypto) {
+          totalLeft += evDist * evSize;
+        } else {
+          const pair = t.pair || '';
+          const pipSz = (pair.includes('JPY') || t.entry > 20) ? 0.01 : 0.0001;
+          const pipDiff = evDist / pipSz;
+          const isUsdQuote = pair.match(/USD$/i) && !pair.match(/^USD/i);
+          const pipVal = isUsdQuote ? 10 : (pipSz / t.entry) * 100000;
+          totalLeft += pipDiff * pipVal * evSize;
+        }
+      }
+    });
+    if (totalLeft <= 0) return '';
+    return `<div class="left-on-table">Potential left on table: +$${fmt(totalLeft)} if all partials held to TP (${fmt(t.tp,5)})</div>`;
+  })();
+
+  // Blended metrics for closed trades with events
+  const blendedHtml = (() => {
+    if (!events.length) return '';
+    const wAvgExit = events.reduce((s,e) => s + e.price * (e.percentClosed||0), 0) / Math.max(1, events.reduce((s,e) => s + (e.percentClosed||0), 0));
+    const slDist2 = Math.abs(t.entry - t.sl);
+    const blendedProfit = t.direction === 'long' ? wAvgExit - t.entry : t.entry - wAvgExit;
+    const blendedRR = slDist2 > 0 ? blendedProfit / slDist2 : 0;
+    const capturedPct = (() => {
+      const maxPnl = events.reduce((s,e) => {
+        const maxExit = t.direction === 'long' ? t.tp : t.tp;
+        const maxDist = t.direction === 'long' ? maxExit - t.entry : t.entry - maxExit;
+        const evMaxDist = maxDist * (e.percentClosed||0)/100;
+        return s + evMaxDist;
+      }, 0);
+      const actualDist = events.reduce((s,e) => {
+        const dist = t.direction === 'long' ? e.price - t.entry : t.entry - e.price;
+        return s + dist * (e.percentClosed||0)/100;
+      }, 0);
+      return maxPnl > 0 ? (actualDist / maxPnl * 100) : 0;
+    })();
+    return `<div style="background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:10px 14px;margin-bottom:14px;">
+      <div style="font-size:0.68rem;color:#8b949e;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:6px;">Blended Metrics</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        <div><div class="close-event-cell-label">Weighted Avg Exit</div><div class="close-event-cell-val">${fmt(wAvgExit,5)}</div></div>
+        <div><div class="close-event-cell-label">Blended R:R</div><div class="close-event-cell-val" style="color:${blendedRR>=0?'#3fb950':'#f85149'}">${blendedRR>=0?'+':''}${fmt(blendedRR,2)}R</div></div>
+        <div><div class="close-event-cell-label">Total Realized</div><div class="close-event-cell-val" style="color:${realizedPnL>=0?'#3fb950':'#f85149'}">${fmtPnL(realizedPnL)}</div></div>
+      </div>
+      ${capturedPct > 0 ? `<div style="margin-top:6px;font-size:0.72rem;color:#8b949e;">Potential captured: <strong style="color:#58a6ff">${fmt(capturedPct,1)}%</strong> of max move to TP</div>` : ''}
+    </div>`;
+  })();
+
+  // Close section — different for open/partial vs fully closed
+  const isOpenOrPartial = t.status === 'open' || t.status === 'partial';
+  const closeSection = isOpenOrPartial ? `
     <hr class="section-divider">
-    <div class="card-title" style="margin-bottom:12px;">Close This Trade</div>
-    <div class="field">
-      <label>How was trade closed?</label>
-      <div class="exit-type-grid" id="exitTypeGrid">
-        <div class="exit-type-btn" onclick="setExitType('tp','${t.id}')">TP Hit</div>
-        <div class="exit-type-btn" onclick="setExitType('sl','${t.id}')">SL Hit</div>
-        <div class="exit-type-btn" onclick="setExitType('be','${t.id}')">Break Even</div>
-        <div class="exit-type-btn" onclick="setExitType('manual','${t.id}')">Manual Close</div>
-        <div class="exit-type-btn" onclick="setExitType('partial','${t.id}')">Partial Close</div>
+    ${closeEventsHtml}
+    ${blendedHtml}
+    ${leftOnTableHtml}
+    <div class="btn-row" style="margin-bottom:14px;">
+      <button class="btn btn-ghost" style="border-color:#f0883e;color:#f0883e;" onclick="openPartialCloseModal('${t.id}')">+ Add Partial Close</button>
+      <button class="btn btn-success" onclick="openFullCloseModal('${t.id}')">Close Trade (${remaining}%)</button>
+    </div>
+
+    <!-- Inline partial close form (hidden by default) -->
+    <div id="partialCloseForm" style="display:none;">
+      <div class="card-title" style="margin-bottom:10px;">Add Partial Close</div>
+      <div class="field">
+        <label>% of Position to Close</label>
+        <div class="partial-close-slider">
+          <input type="range" id="partialPct" min="1" max="${remaining}" value="${Math.min(90, remaining)}"
+            oninput="document.getElementById('partialPctVal').textContent=this.value+'%'; autoCalcPartialPnL('${t.id}')">
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.78rem;">
+          <span style="color:#6e7681;">1%</span>
+          <span style="color:#58a6ff;font-weight:700;" id="partialPctVal">${Math.min(90, remaining)}%</span>
+          <span style="color:#6e7681;">${remaining}%</span>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Exit Price</label>
+          <input type="number" id="partialExitPrice" placeholder="0.00" step="any" oninput="autoCalcPartialPnL('${t.id}')">
+        </div>
+        <div class="field">
+          <label>Reason</label>
+          <select id="partialReason">
+            <option value="">— Select —</option>
+            <option>Hit TP1</option>
+            <option>Reached secondary $$</option>
+            <option>Reached primary $$</option>
+            <option>Losing confidence</option>
+            <option>Hit break even</option>
+            <option>Manual</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>P&L for this portion (auto)</label>
+          <input type="number" id="partialPnL" step="any" style="color:#58a6ff;" placeholder="auto-calculated">
+        </div>
+        <div class="field">
+          <label>R:R at close (auto)</label>
+          <input type="text" id="partialRR" readonly style="color:#58a6ff;cursor:default;" placeholder="—">
+        </div>
+      </div>
+      <div class="field">
+        <label>Notes (optional)</label>
+        <textarea id="partialNotes" rows="2" placeholder="Why are you closing this portion?"></textarea>
+      </div>
+      <div class="field">
+        <label>Timestamp</label>
+        <input type="datetime-local" id="partialTimestamp">
+      </div>
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-primary" onclick="savePartialClose('${t.id}')">Save Partial Close</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('partialCloseForm').style.display='none'">Cancel</button>
       </div>
     </div>
-    <div class="form-grid">
+
+    <!-- Inline full close form (hidden by default) -->
+    <div id="fullCloseForm" style="display:none;">
+      <div class="card-title" style="margin-bottom:10px;">Close Trade — Remaining ${remaining}%</div>
       <div class="field">
-        <label>Exit Price</label>
-        <input type="number" id="closeExit" placeholder="0.00" step="any" oninput="updateModalRR('${t.id}')">
+        <label>How was trade closed?</label>
+        <div class="exit-type-grid" id="exitTypeGrid">
+          <div class="exit-type-btn" onclick="setExitType('tp','${t.id}')">TP Hit</div>
+          <div class="exit-type-btn" onclick="setExitType('sl','${t.id}')">SL Hit</div>
+          <div class="exit-type-btn" onclick="setExitType('be','${t.id}')">Break Even</div>
+          <div class="exit-type-btn" onclick="setExitType('manual','${t.id}')">Manual Close</div>
+        </div>
       </div>
-      <div class="field">
-        <label>Actual P&L ($)</label>
-        <input type="number" id="closePnL" placeholder="e.g. 150 or -75" step="any">
+      <div class="form-grid">
+        <div class="field">
+          <label>Exit Price</label>
+          <input type="number" id="closeExit" placeholder="0.00" step="any" oninput="updateModalRR('${t.id}')">
+        </div>
+        <div class="field">
+          <label>P&L for remaining ${remaining}% ($)</label>
+          <input type="number" id="closePnL" placeholder="auto-calculated" step="any">
+        </div>
+        <div class="field">
+          <label>R:R at close (auto)</label>
+          <input type="number" id="closeActualRR" readonly style="color:#58a6ff;cursor:default;" placeholder="—">
+        </div>
+        <div class="field">
+          <label>Date Closed</label>
+          <input type="datetime-local" id="closeDate">
+        </div>
+        <div class="field">
+          <label>Outcome (overall)</label>
+          <select id="closeOutcome">
+            <option value="win">Win</option>
+            <option value="loss">Loss</option>
+            <option value="be">Break Even</option>
+          </select>
+        </div>
       </div>
-      <div class="field">
-        <label>Actual R:R (auto)</label>
-        <input type="number" id="closeActualRR" readonly style="color:#58a6ff;cursor:default;" placeholder="—">
+
+      <hr class="section-divider">
+      <div class="collapsible-header open" onclick="toggleCollapsible(this)">
+        <div class="card-title" style="margin:0;">Post-Trade Review</div>
+        <span class="arrow">▶</span>
       </div>
-      <div class="field">
-        <label>Date Closed</label>
-        <input type="datetime-local" id="closeDate">
+      <div class="collapsible-body open">
+        <div class="field">
+          <label>Post-Trade Chart (optional)</label>
+          <div class="upload-zone">
+            <input type="file" accept="image/*" onchange="handleImg(event,'post')">
+            <div class="upload-zone-text">Drop chart or <span>click to upload</span></div>
+            <div class="img-preview" id="postPreview" style="display:none;">
+              <img id="postPreviewImg" src="" onclick="lightbox(this.src)">
+              <div class="rm-img" onclick="removeImg('post',event)">×</div>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Post-Trade TradingView URL (optional)</label>
+          <input type="url" id="closePostTVLink" placeholder="https://www.tradingview.com/x/..." style="width:100%;background:#0d1117;border:1px solid #30363d;border-radius:7px;color:#e6edf3;font-size:0.88rem;padding:8px 10px;outline:none;">
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Did price respect the SC zone?</label>
+            <select id="closeScRespected">
+              <option value="">—</option>
+              <option>Yes</option><option>No</option><option>Partially</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Did the mbms play out as expected?</label>
+            <select id="closeMbmsPlayed">
+              <option value="">—</option>
+              <option>Yes</option><option>No</option><option>Partially</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Did HTF bias align with the trade?</label>
+            <select id="closeHtfAligned">
+              <option value="">—</option>
+              <option>Yes</option><option>No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Was liquidity properly taken before entry?</label>
+            <select id="closeLiqProper">
+              <option value="">—</option>
+              <option>Yes</option><option>No</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>What I expected vs what happened</label>
+          <textarea id="closeExpected" rows="3" placeholder="Describe what you expected the market to do and what actually happened..."></textarea>
+        </div>
+        <div class="field">
+          <label>What would I do differently?</label>
+          <textarea id="closeDifferently" rows="3" placeholder="If you could take this trade again, what would you change?"></textarea>
+        </div>
+        <div class="field">
+          <label>Lesson learned</label>
+          <textarea id="closeLesson" rows="3" placeholder="Key takeaway from this trade..."></textarea>
+        </div>
+        <div class="field">
+          <label>Trade Execution Rating — how well did you follow the rules?</label>
+          <div class="slider-wrap">
+            <input type="range" id="closeExecRating" min="1" max="10" value="${modalExecRating}"
+              oninput="document.getElementById('execRatingVal').textContent=this.value">
+            <span class="slider-val" id="execRatingVal">${modalExecRating}</span>
+            <span style="font-size:0.72rem; color:#8b949e;">/10</span>
+          </div>
+        </div>
       </div>
-      <div class="field">
-        <label>Outcome</label>
-        <select id="closeOutcome">
-          <option value="win">Win</option>
-          <option value="loss">Loss</option>
-          <option value="be">Break Even</option>
-        </select>
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn btn-success" onclick="closeTrade('${t.id}')">Close Trade</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('fullCloseForm').style.display='none'">Cancel</button>
       </div>
     </div>
 
     <hr class="section-divider">
-    <div class="collapsible-header open" onclick="toggleCollapsible(this)">
-      <div class="card-title" style="margin:0;">Post-Trade Review</div>
-      <span class="arrow">▶</span>
-    </div>
-    <div class="collapsible-body open">
-      <div class="field">
-        <label>Post-Trade Chart (optional)</label>
-        <div class="upload-zone">
-          <input type="file" accept="image/*" onchange="handleImg(event,'post')">
-          <div class="upload-zone-text">Drop chart or <span>click to upload</span></div>
-          <div class="img-preview" id="postPreview" style="display:none;">
-            <img id="postPreviewImg" src="" onclick="lightbox(this.src)">
-            <div class="rm-img" onclick="removeImg('post',event)">×</div>
-          </div>
-        </div>
-      </div>
-      <div class="field">
-        <label>Post-Trade TradingView URL (optional)</label>
-        <input type="url" id="closePostTVLink" placeholder="https://www.tradingview.com/x/..." style="width:100%;background:#0d1117;border:1px solid #30363d;border-radius:7px;color:#e6edf3;font-size:0.88rem;padding:8px 10px;outline:none;">
-      </div>
-      <div class="form-grid">
-        <div class="field">
-          <label>Did price respect the SC zone?</label>
-          <select id="closeScRespected">
-            <option value="">—</option>
-            <option>Yes</option><option>No</option><option>Partially</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Did the mbms play out as expected?</label>
-          <select id="closeMbmsPlayed">
-            <option value="">—</option>
-            <option>Yes</option><option>No</option><option>Partially</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Did HTF bias align with the trade?</label>
-          <select id="closeHtfAligned">
-            <option value="">—</option>
-            <option>Yes</option><option>No</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Was liquidity properly taken before entry?</label>
-          <select id="closeLiqProper">
-            <option value="">—</option>
-            <option>Yes</option><option>No</option>
-          </select>
-        </div>
-      </div>
-      <div class="field">
-        <label>What I expected vs what happened</label>
-        <textarea id="closeExpected" rows="3" placeholder="Describe what you expected the market to do and what actually happened..."></textarea>
-      </div>
-      <div class="field">
-        <label>What would I do differently?</label>
-        <textarea id="closeDifferently" rows="3" placeholder="If you could take this trade again, what would you change?"></textarea>
-      </div>
-      <div class="field">
-        <label>Lesson learned</label>
-        <textarea id="closeLesson" rows="3" placeholder="Key takeaway from this trade..."></textarea>
-      </div>
-      <div class="field">
-        <label>Trade Execution Rating — how well did you follow the rules?</label>
-        <div class="slider-wrap">
-          <input type="range" id="closeExecRating" min="1" max="10" value="${modalExecRating}"
-            oninput="document.getElementById('execRatingVal').textContent=this.value">
-          <span class="slider-val" id="execRatingVal">${modalExecRating}</span>
-          <span style="font-size:0.72rem; color:#8b949e;">/10</span>
-        </div>
-      </div>
-    </div>
-    <div class="btn-row" style="margin-top:12px;">
-      <button class="btn btn-success" onclick="closeTrade('${t.id}')">Close Trade</button>
+    <div class="btn-row">
       <button class="btn btn-ghost" onclick="editTrade('${t.id}')">Edit</button>
       <button class="btn btn-danger" onclick="deleteTrade('${t.id}')">Delete</button>
     </div>` : `
     <hr class="section-divider">
+    ${closeEventsHtml}
+    ${blendedHtml}
+    ${leftOnTableHtml}
     <div class="btn-row">
       <button class="btn btn-ghost" onclick="editTrade('${t.id}')">Edit Pre-Trade Info</button>
       <button class="btn btn-danger" onclick="deleteTrade('${t.id}')">Delete Trade</button>
@@ -2963,6 +3185,126 @@ function setRating(n) {
   document.querySelectorAll('#modalStars .star').forEach((s,i) => s.classList.toggle('active', i < n));
 }
 
+// ── Partial Close System ─────────────────────────────
+
+function openPartialCloseModal(tradeId) {
+  document.getElementById('partialCloseForm').style.display = 'block';
+  document.getElementById('fullCloseForm').style.display = 'none';
+  // Set timestamp to now
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('partialTimestamp').value = now.toISOString().slice(0,16);
+  // Reset fields
+  document.getElementById('partialExitPrice').value = '';
+  document.getElementById('partialPnL').value = '';
+  document.getElementById('partialRR').value = '';
+  document.getElementById('partialNotes').value = '';
+  document.getElementById('partialReason').value = '';
+  document.getElementById('partialCloseForm').scrollIntoView({ behavior: 'smooth' });
+}
+
+function openFullCloseModal(tradeId) {
+  document.getElementById('fullCloseForm').style.display = 'block';
+  document.getElementById('partialCloseForm').style.display = 'none';
+  // Set close date to now
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('closeDate').value = now.toISOString().slice(0,16);
+  document.getElementById('fullCloseForm').scrollIntoView({ behavior: 'smooth' });
+}
+
+function autoCalcPartialPnL(tradeId) {
+  const t = trades.find(x => x.id === tradeId);
+  if (!t) return;
+  const exitPrice = parseFloat(document.getElementById('partialExitPrice')?.value);
+  if (!exitPrice) return;
+  const pct = parseInt(document.getElementById('partialPct')?.value) || 0;
+  const sizeNum = parseFloat(t.size) || 0;
+  const portionSize = sizeNum * pct / 100;
+  const crypto = isCrypto(t);
+  const slDist = Math.abs(t.entry - t.sl);
+  const profit = t.direction === 'long' ? exitPrice - t.entry : t.entry - exitPrice;
+  const rr = slDist > 0 ? profit / slDist : 0;
+
+  let pnl;
+  if (crypto) {
+    const diff = t.direction === 'long' ? exitPrice - t.entry : t.entry - exitPrice;
+    pnl = diff * portionSize;
+  } else {
+    const pair = t.pair || '';
+    const pipSz = (pair.includes('JPY') || t.entry > 20) ? 0.01 : 0.0001;
+    const pipDiff = t.direction === 'long' ? (exitPrice - t.entry) / pipSz : (t.entry - exitPrice) / pipSz;
+    const isUsdQuote = pair.match(/USD$/i) && !pair.match(/^USD/i);
+    const pipVal = isUsdQuote ? 10 : (pipSz / t.entry) * 100000;
+    pnl = pipDiff * pipVal * portionSize;
+  }
+
+  const pnlEl = document.getElementById('partialPnL');
+  if (pnlEl) { pnlEl.value = pnl.toFixed(2); pnlEl.style.color = '#58a6ff'; }
+  const rrEl = document.getElementById('partialRR');
+  if (rrEl) rrEl.value = (rr >= 0 ? '+' : '') + fmt(rr, 2) + 'R';
+}
+
+function savePartialClose(tradeId) {
+  const exitPrice = parseFloat(document.getElementById('partialExitPrice')?.value);
+  const pct = parseInt(document.getElementById('partialPct')?.value) || 0;
+  let pnl = parseFloat(document.getElementById('partialPnL')?.value);
+  const reason = document.getElementById('partialReason')?.value || '';
+  const notes = document.getElementById('partialNotes')?.value || '';
+  const timestamp = document.getElementById('partialTimestamp')?.value || new Date().toISOString();
+
+  if (!exitPrice) { alert('Please enter an exit price.'); return; }
+  if (isNaN(pnl)) pnl = 0;
+
+  const t = trades.find(x => x.id === tradeId);
+  if (!t) return;
+
+  const slDist = Math.abs(t.entry - t.sl);
+  const profit = t.direction === 'long' ? exitPrice - t.entry : t.entry - exitPrice;
+  const rr = slDist > 0 ? profit / slDist : 0;
+
+  const event = {
+    eventId: uid(),
+    tradeId: tradeId,
+    type: 'Partial Close',
+    price: exitPrice,
+    percentClosed: pct,
+    lotsOrSize: (parseFloat(t.size) || 0) * pct / 100,
+    pnl: pnl,
+    rrAtClose: rr,
+    reason: reason,
+    notes: notes,
+    timestamp: timestamp
+  };
+
+  trades = trades.map(x => {
+    if (x.id !== tradeId) return x;
+    const events = x.closeEvents || [];
+    events.push(event);
+    const totalClosed = events.reduce((s, e) => s + (e.percentClosed || 0), 0);
+    const realizedPnL = events.reduce((s, e) => s + (e.pnl || 0), 0);
+    // Compute blended RR
+    const wAvgExit = events.reduce((s,e) => s + e.price * (e.percentClosed||0), 0) / Math.max(1, totalClosed);
+    const blendedProfit = x.direction === 'long' ? wAvgExit - x.entry : x.entry - wAvgExit;
+    const blendedRR = slDist > 0 ? blendedProfit / slDist : 0;
+
+    return {
+      ...x,
+      closeEvents: events,
+      status: totalClosed >= 100 ? 'closed' : 'partial',
+      actualPnL: realizedPnL,
+      actualRR: blendedRR,
+      exitPrice: wAvgExit,
+      updatedAt: new Date().toISOString()
+    };
+  });
+
+  save();
+  pushSync();
+  // Re-open the modal to show updated events
+  openModal(tradeId);
+}
+
 function closeTrade(id) {
   const exit    = parseFloat(document.getElementById('closeExit').value);
   let   pnl     = parseFloat(document.getElementById('closePnL').value);
@@ -2971,17 +3313,14 @@ function closeTrade(id) {
   if (!exit || isNaN(pnl)) { alert('Please enter exit price and actual P&L.'); return; }
   // Determine exit type from selected button
   const exitBtns = document.querySelectorAll('#exitTypeGrid .exit-type-btn');
-  const exitTypes = ['tp','sl','be','manual','partial'];
+  const exitTypes = ['tp','sl','be','manual'];
   let exitType = null;
   exitBtns.forEach((b, i) => { if (b.classList.contains('active')) exitType = exitTypes[i]; });
 
   // ── P&L sign validation ──
-  // Loss must be negative, win must be positive
   if (outcome === 'loss' && pnl > 0) {
-    console.warn('P&L sign corrected: outcome=loss but P&L was positive → negated');
     pnl = -Math.abs(pnl);
   } else if (outcome === 'win' && pnl < 0) {
-    console.warn('P&L sign corrected: outcome=win but P&L was negative → made positive');
     pnl = Math.abs(pnl);
   } else if (outcome === 'be') {
     pnl = 0;
@@ -3001,12 +3340,40 @@ function closeTrade(id) {
   trades = trades.map(t => {
     if (t.id !== id) return t;
     const slDist = Math.abs(t.entry - t.sl);
+    const existingEvents = t.closeEvents || [];
+    const totalClosedBefore = existingEvents.reduce((s, e) => s + (e.percentClosed || 0), 0);
+    const remainingPct = Math.max(0, 100 - totalClosedBefore);
     const profit = t.direction === 'long' ? exit - t.entry : t.entry - exit;
-    const actualRR = slDist > 0 ? profit / slDist : 0;
+    const rr = slDist > 0 ? profit / slDist : 0;
+
+    // Add final close event
+    const finalEvent = {
+      eventId: uid(),
+      tradeId: id,
+      type: exitType === 'tp' ? 'TP Hit' : exitType === 'sl' ? 'SL Hit' : exitType === 'be' ? 'Break Even Stop' : 'Full Close',
+      price: exit,
+      percentClosed: remainingPct,
+      lotsOrSize: (parseFloat(t.size) || 0) * remainingPct / 100,
+      pnl: pnl,
+      rrAtClose: rr,
+      reason: exitType === 'tp' ? 'Hit TP' : exitType === 'sl' ? 'SL Hit' : exitType === 'be' ? 'Hit break even' : 'Manual',
+      notes: '',
+      timestamp: dateClose || new Date().toISOString()
+    };
+    existingEvents.push(finalEvent);
+
+    // Compute blended metrics across ALL events
+    const allPnL = existingEvents.reduce((s, e) => s + (e.pnl || 0), 0);
+    const totalClosedPct = existingEvents.reduce((s, e) => s + (e.percentClosed || 0), 0);
+    const wAvgExit = existingEvents.reduce((s, e) => s + e.price * (e.percentClosed || 0), 0) / Math.max(1, totalClosedPct);
+    const blendedProfit = t.direction === 'long' ? wAvgExit - t.entry : t.entry - wAvgExit;
+    const blendedRR = slDist > 0 ? blendedProfit / slDist : 0;
+
     return {
       ...t,
-      status: 'closed', dateClose, exitPrice: exit,
-      actualPnL: pnl, outcome, actualRR, exitType,
+      status: 'closed', dateClose, exitPrice: wAvgExit,
+      actualPnL: allPnL, outcome, actualRR: blendedRR, exitType,
+      closeEvents: existingEvents,
       review: '', postChart: postImgData || t.postChart,
       postTVLink: closePostTVLink || t.postTVLink || '',
       rating: modalRating,
@@ -3129,6 +3496,49 @@ function filterByPeriod(list, period) {
   });
 }
 
+function calcLeftOnTable(tradeList) {
+  let total = 0;
+  let capturedSum = 0;
+  let capturedCount = 0;
+  tradeList.forEach(t => {
+    const events = t.closeEvents || [];
+    if (!events.length) return;
+    const sizeNum = parseFloat(t.size) || 0;
+    if (!sizeNum) return;
+    const maxDist = t.direction === 'long' ? t.tp - t.entry : t.entry - t.tp;
+    if (maxDist <= 0) return;
+    let tradeCaptured = 0;
+    let tradeMax = 0;
+    events.forEach(ev => {
+      const evDist = t.direction === 'long' ? ev.price - t.entry : t.entry - ev.price;
+      const fraction = (ev.percentClosed || 0) / 100;
+      tradeCaptured += evDist * fraction;
+      tradeMax += maxDist * fraction;
+      // Left on table per event
+      const gap = t.direction === 'long' ? t.tp - ev.price : ev.price - t.tp;
+      if (gap > 0) {
+        const evSize = sizeNum * fraction;
+        const crypto = isCrypto(t);
+        if (crypto) {
+          total += gap * evSize;
+        } else {
+          const pair = t.pair || '';
+          const pipSz = (pair.includes('JPY') || t.entry > 20) ? 0.01 : 0.0001;
+          const pipDiff = gap / pipSz;
+          const isUsdQuote = pair.match(/USD$/i) && !pair.match(/^USD/i);
+          const pipVal = isUsdQuote ? 10 : (pipSz / t.entry) * 100000;
+          total += pipDiff * pipVal * evSize;
+        }
+      }
+    });
+    if (tradeMax > 0) {
+      capturedSum += (tradeCaptured / tradeMax) * 100;
+      capturedCount++;
+    }
+  });
+  return { total, avgCaptured: capturedCount > 0 ? capturedSum / capturedCount : 0 };
+}
+
 function renderDashboard() {
   const filtered = filterByPeriod(trades, activePeriod);
   const closed   = filtered.filter(t => t.status === 'closed');
@@ -3141,11 +3551,21 @@ function renderDashboard() {
   const grossL   = Math.abs(losses.reduce((s,t)=>s+(t.actualPnL||0),0));
   const pf       = grossL > 0 ? grossW / grossL : (grossW > 0 ? Infinity : 0);
 
+  // Include partial trades in P&L totals
+  const partials = filtered.filter(t => t.status === 'partial');
+  const partialPnL = partials.reduce((s,t) => s + (t.actualPnL||0), 0);
+  const allRealizedPnL = totalPnL + partialPnL;
+  const openCount = filtered.filter(t => t.status === 'open').length;
+  const partialCount = partials.length;
+
+  // Left on table calculation
+  const leftOnTable = calcLeftOnTable(closed.concat(partials));
+
   const stats = [
-    { label: 'Total P&L',     val: fmtPnL(totalPnL), cls: totalPnL>0?'green':totalPnL<0?'red':'' },
+    { label: 'Total P&L',     val: fmtPnL(allRealizedPnL), cls: allRealizedPnL>0?'green':allRealizedPnL<0?'red':'' },
     { label: 'Win Rate',      val: closed.length ? fmt(winRate,1)+'%' : '—', cls: winRate>=50?'green':winRate>0?'red':'' },
     { label: 'Total Trades',  val: filtered.length,  cls: 'blue' },
-    { label: 'Open',          val: filtered.filter(t=>t.status==='open').length, cls: '' },
+    { label: 'Open / Partial',val: openCount + (partialCount ? ' / ' + partialCount : ''), cls: partialCount ? 'blue' : '' },
     { label: 'Avg Actual R',  val: avgRR ? fmt(avgRR,2)+'R' : '—', cls: avgRR>=1?'green':avgRR>0?'red':'' },
     { label: 'Profit Factor', val: isFinite(pf) ? fmt(pf,2) : pf===Infinity ? '∞' : '—', cls: pf>=1.5?'green':pf>=1?'':pf>0?'red':'' },
   ];
@@ -3154,6 +3574,20 @@ function renderDashboard() {
     `<div class="stat-card"><div class="stat-label">${s.label}</div>
      <div class="stat-value ${s.cls}">${s.val}</div></div>`
   ).join('');
+
+  // Left on table summary
+  const lotEl = document.getElementById('leftOnTableSummary');
+  if (lotEl) {
+    if (leftOnTable.total > 0) {
+      lotEl.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div><div class="stat-label">Left on Table</div><div class="stat-value" style="color:#f0883e;">$${fmt(leftOnTable.total)}</div></div>
+        <div><div class="stat-label">Avg % Captured</div><div class="stat-value" style="color:#58a6ff;">${fmt(leftOnTable.avgCaptured,1)}%</div></div>
+      </div>`;
+      lotEl.style.display = '';
+    } else {
+      lotEl.style.display = 'none';
+    }
+  }
 
   renderEquity(closed);
   renderBreakdown(filtered);
@@ -3522,9 +3956,9 @@ function renderRecent(list) {
   const el = document.getElementById('recentTrades');
   if (!recent.length) { el.innerHTML = '<div class="empty-state" style="padding:20px">No trades yet.</div>'; return; }
   el.innerHTML = `<div class="trade-list">${recent.map(t => {
-    const rowClass = t.status === 'open' ? 'open' : (t.outcome||'be');
+    const rowClass = t.status === 'open' ? 'open' : t.status === 'partial' ? 'partial' : (t.outcome||'be');
     const pnlClass = !t.actualPnL ? 'neutral' : t.actualPnL >= 0 ? 'pos' : 'neg';
-    const pnlStr   = t.actualPnL != null ? fmtPnL(t.actualPnL) : 'Open';
+    const pnlStr   = t.status === 'partial' ? fmtPnL(t.actualPnL||0) + ' (partial)' : t.actualPnL != null && t.status === 'closed' ? fmtPnL(t.actualPnL) : 'Open';
     const dateStr  = new Date(t.dateOpen).toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
     const srcBadge = t.source === 'kraken' ? '<span class="exchange-badge kraken">Kraken</span>'
                    : t.source === 'binance' ? '<span class="exchange-badge binance">Binance</span>'
@@ -3955,11 +4389,48 @@ function generateAnalysisExport(period) {
     out += `Planned R:R: 1:${t.plannedRR ? d(t.plannedRR) : '?'} | Risk: $${t.risk ? d(t.risk) : '?'}`;
     if (t.size) out += ` | Size: ${t.size}`;
     out += `\n`;
-    if (t.status === 'closed') {
-      out += `Result: ${(t.outcome || '?').toUpperCase()} | Exit: ${t.exitPrice} | P&L: ${money(t.actualPnL)}`;
+    if (t.status === 'closed' || t.status === 'partial') {
+      out += `Result: ${t.status === 'partial' ? 'PARTIAL' : (t.outcome || '?').toUpperCase()} | Exit: ${fmt(t.exitPrice,5)} | P&L: ${money(t.actualPnL)}`;
       if (t.actualRR != null) out += ` | Actual R: ${t.actualRR >= 0 ? '+' : ''}${d(t.actualRR)}R`;
-      if (t.exitType) out += ` | Exit Type: ${{tp:'TP Hit',sl:'SL Hit',be:'Break Even',manual:'Manual Close',partial:'Partial Close'}[t.exitType] || t.exitType}`;
+      if (t.exitType) out += ` | Exit Type: ${{tp:'TP Hit',sl:'SL Hit',be:'Break Even',manual:'Manual Close'}[t.exitType] || t.exitType}`;
       out += `\n`;
+      // Close events
+      const cEvents = t.closeEvents || [];
+      if (cEvents.length) {
+        out += `Close Events (${cEvents.length}):\n`;
+        cEvents.forEach((ev, ci) => {
+          const evTime = ev.timestamp ? dateStr(ev.timestamp) : '—';
+          out += `  #${ci+1} ${ev.type || 'Close'}: ${ev.percentClosed}% @ ${fmt(ev.price,5)} | P&L: ${money(ev.pnl)} | R:R: ${ev.rrAtClose != null ? (ev.rrAtClose>=0?'+':'') + d(ev.rrAtClose) + 'R' : '—'}`;
+          if (ev.reason) out += ` | Reason: ${ev.reason}`;
+          out += ` | ${evTime}\n`;
+          if (ev.notes?.trim()) out += `    Notes: ${ev.notes.trim()}\n`;
+        });
+        // Left on table
+        const totalClosedPct = cEvents.reduce((s,e) => s + (e.percentClosed||0), 0);
+        out += `  Position: ${totalClosedPct}% closed`;
+        if (totalClosedPct < 100) out += ` | ${100 - totalClosedPct}% remaining`;
+        out += `\n`;
+        // Calc left on table
+        let lot = 0;
+        const sizeNum = parseFloat(t.size) || 0;
+        cEvents.forEach(ev => {
+          const gap = t.direction === 'long' ? t.tp - ev.price : ev.price - t.tp;
+          if (gap > 0 && sizeNum) {
+            const frac = (ev.percentClosed || 0) / 100;
+            const evSize = sizeNum * frac;
+            const crypto = isCrypto(t);
+            if (crypto) { lot += gap * evSize; }
+            else {
+              const pair = t.pair || '';
+              const pipSz = (pair.includes('JPY') || t.entry > 20) ? 0.01 : 0.0001;
+              const isUsdQuote = pair.match(/USD$/i) && !pair.match(/^USD/i);
+              const pipVal = isUsdQuote ? 10 : (pipSz / t.entry) * 100000;
+              lot += (gap / pipSz) * pipVal * evSize;
+            }
+          }
+        });
+        if (lot > 0) out += `  Left on Table: $${d(lot)} if held to TP\n`;
+      }
       if (t.dateClose) out += `Closed: ${dateStr(t.dateClose)}\n`;
       if (startCap)    out += `Equity After: $${d(equity)}\n`;
       // Post-trade review
@@ -5274,26 +5745,28 @@ function autoCalcPnL(t, exitPrice) {
   if (!pnlEl) return;
   const size = parseFloat(t.size);
   if (!size || size <= 0) return;
+  // Account for partial closes: only calc P&L for remaining portion
+  const events = t.closeEvents || [];
+  const totalClosedPct = events.reduce((s, e) => s + (e.percentClosed || 0), 0);
+  const remainingFraction = Math.max(0, (100 - totalClosedPct)) / 100;
+  const effectiveSize = size * remainingFraction;
+  if (effectiveSize <= 0) return;
   const crypto = isCrypto(t);
   let pnl;
   if (crypto) {
-    // BTC/crypto: P&L = (exit - entry) × position size (in BTC/units)
     const diff = t.direction === 'long' ? exitPrice - t.entry : t.entry - exitPrice;
-    pnl = diff * size;
+    pnl = diff * effectiveSize;
   } else {
-    // Forex: P&L = pip difference × pip value × lot size
     const pair = t.pair || '';
     const pipSz = (pair.includes('JPY') || t.entry > 20) ? 0.01 : 0.0001;
     const pipDiff = t.direction === 'long' ? (exitPrice - t.entry) / pipSz : (t.entry - exitPrice) / pipSz;
-    // Pip value approximation: USD quote = $10/std lot, others = (pipSz/price)*100000
     const isUsdQuote = pair.match(/USD$/i) && !pair.match(/^USD/i);
     const pipVal = isUsdQuote ? 10 : (pipSz / t.entry) * 100000;
-    pnl = pipDiff * pipVal * size;
+    pnl = pipDiff * pipVal * effectiveSize;
   }
   pnlEl.value = pnl.toFixed(2);
-  // Style to indicate auto-calculated
   pnlEl.style.color = '#58a6ff';
-  pnlEl.title = 'Auto-calculated — you can override';
+  pnlEl.title = 'Auto-calculated for remaining ' + Math.round(remainingFraction * 100) + '% — you can override';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -5303,7 +5776,7 @@ function setExitType(type, tradeId) {
   const t = trades.find(x => x.id === tradeId);
   if (!t) return;
   document.querySelectorAll('#exitTypeGrid .exit-type-btn').forEach((b, i) => {
-    b.classList.toggle('active', ['tp','sl','be','manual','partial'][i] === type);
+    b.classList.toggle('active', ['tp','sl','be','manual'][i] === type);
   });
   const exitEl = document.getElementById('closeExit');
   const outcomeEl = document.getElementById('closeOutcome');
@@ -5320,7 +5793,7 @@ function setExitType(type, tradeId) {
     outcomeEl.value = 'be';
     document.getElementById('closePnL').value = '0';
     updateModalRR(tradeId);
-  } else if (type === 'manual' || type === 'partial') {
+  } else if (type === 'manual') {
     exitEl.value = '';
     exitEl.focus();
   }
