@@ -642,6 +642,66 @@
     .coming-soon-tag { font-size: 0.62rem; color: #6e7681; background: #21262d; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
     .settings-saved-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #0a1f0f; border: 1px solid #3fb950; color: #3fb950; padding: 8px 18px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; z-index: 500; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
     .settings-saved-toast.show { opacity: 1; }
+
+    /* Section headers for form */
+    .form-section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; padding: 10px 14px; margin: -18px -20px 14px;
+      border-bottom: 1px solid #21262d; user-select: none;
+    }
+    .form-section-header .section-title {
+      font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; color: #58a6ff;
+    }
+    .form-section-header .section-tag {
+      font-size: 0.62rem; color: #6e7681; background: #21262d;
+      padding: 2px 7px; border-radius: 4px; margin-left: 8px;
+    }
+    .form-section-header .arrow { transition: transform 0.2s; color: #8b949e; font-size: 0.8rem; }
+    .form-section-header.open .arrow { transform: rotate(90deg); }
+    .form-section-body { display: none; }
+    .form-section-body.open { display: block; }
+
+    /* Draft banner */
+    .draft-banner {
+      background: #0c1a2e; border: 1px solid #1a3a6e; border-radius: 8px;
+      padding: 10px 14px; margin-bottom: 14px; display: flex;
+      align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .draft-banner-text { font-size: 0.82rem; color: #8b949e; }
+    .draft-banner-actions { display: flex; gap: 6px; }
+    .draft-indicator {
+      font-size: 0.68rem; color: #6e7681; margin-left: 12px;
+      transition: opacity 0.3s;
+    }
+
+    /* Keyboard shortcuts help */
+    .kb-help-btn {
+      font-size: 0.82rem; color: #8b949e; background: none; border: 1px solid #30363d;
+      border-radius: 6px; padding: 4px 8px; cursor: pointer; line-height: 1;
+    }
+    .kb-help-btn:hover { color: #e6edf3; border-color: #8b949e; }
+    .kb-tooltip {
+      position: absolute; top: 100%; right: 0; margin-top: 8px;
+      background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+      padding: 14px 16px; min-width: 260px; z-index: 150;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4); display: none;
+    }
+    .kb-tooltip.open { display: block; }
+    .kb-tooltip h4 { font-size: 0.78rem; color: #e6edf3; margin-bottom: 10px; }
+    .kb-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.75rem; }
+    .kb-row .kb-key { color: #58a6ff; font-family: 'SF Mono', monospace; }
+    .kb-row .kb-desc { color: #8b949e; }
+
+    /* TradingView URL input */
+    input[type="url"] {
+      width: 100%; background: #0d1117; border: 1px solid #30363d; border-radius: 7px;
+      color: #e6edf3; font-size: 0.88rem; padding: 8px 10px; outline: none;
+      transition: border-color 0.2s; font-family: inherit;
+    }
+    input[type="url"]:focus { border-color: #58a6ff; }
+    .tv-link { font-size: 0.72rem; color: #58a6ff; text-decoration: none; word-break: break-all; }
+    .tv-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -655,6 +715,18 @@
   <div class="nav-link" onclick="nav('alerts')">Alerts</div>
   <div class="nav-link" onclick="nav('live')">Live</div>
   <div class="nav-spacer"></div>
+  <span style="position:relative;">
+    <button class="kb-help-btn" onclick="toggleKbHelp()" title="Keyboard shortcuts">?</button>
+    <div class="kb-tooltip" id="kbTooltip">
+      <h4>Keyboard Shortcuts</h4>
+      <div class="kb-row"><span class="kb-desc">Save trade / draft</span><span class="kb-key">Ctrl+S</span></div>
+      <div class="kb-row"><span class="kb-desc">Log Trade tab</span><span class="kb-key">Ctrl+L</span></div>
+      <div class="kb-row"><span class="kb-desc">Dashboard tab</span><span class="kb-key">Ctrl+D</span></div>
+      <div class="kb-row"><span class="kb-desc">Journal tab</span><span class="kb-key">Ctrl+J</span></div>
+      <div class="kb-row"><span class="kb-desc">Open Calculator</span><span class="kb-key">Ctrl+K</span></div>
+      <div class="kb-row"><span class="kb-desc">Copy for Claude AI</span><span class="kb-key">Ctrl+E</span></div>
+    </div>
+  </span>
   <span id="exchangeDot" class="exchange-dot" title="Exchange Connection"><span class="dot grey" id="exchangeDotIcon"></span> <span id="exchangeDotText">Exchange</span></span>
   <span id="mt4Dot" class="mt4-dot off" title="MT4 Connection">&#9899; MT4</span>
   <span id="syncDot" style="font-size:0.71rem;color:#8b949e;white-space:nowrap;padding:0 4px;"></span>
@@ -766,7 +838,19 @@
      LOG TRADE
 ════════════════════════════════════════════════════════ -->
 <div id="page-log" class="page">
-  <h1 style="font-size:1.1rem; font-weight:700; margin-bottom:12px;" id="formTitle">Log New Trade</h1>
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+    <h1 style="font-size:1.1rem; font-weight:700; margin:0;" id="formTitle">Log New Trade</h1>
+    <span class="draft-indicator" id="draftIndicator"></span>
+  </div>
+
+  <!-- Draft resume banner -->
+  <div class="draft-banner" id="draftBanner" style="display:none;">
+    <span class="draft-banner-text">You have an unsaved trade draft.</span>
+    <div class="draft-banner-actions">
+      <button type="button" class="btn btn-primary" style="font-size:0.78rem;padding:5px 12px;" onclick="resumeDraft()">Resume</button>
+      <button type="button" class="btn btn-ghost" style="font-size:0.78rem;padding:5px 12px;" onclick="discardDraft()">Discard</button>
+    </div>
+  </div>
 
   <div id="syncBar" style="display:none; background:#0c1a2e; border:1px solid #1a3a6e; border-radius:8px; padding:9px 14px; margin-bottom:14px; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
     <span id="syncBarText" style="font-size:0.8rem; color:#8b949e;"></span>
@@ -774,84 +858,377 @@
   </div>
 
   <form id="tradeForm" onsubmit="submitTrade(event)">
-    <!-- Instrument & Setup -->
+
+    <!-- ═══════════════════════════════════════════════════
+         SECTION A — PRE-TRADE (required before entry)
+    ════════════════════════════════════════════════════ -->
     <div class="card">
-      <div class="card-title">Instrument & Setup</div>
-      <div class="form-grid">
-        <div class="field">
-          <label>Market</label>
-          <select id="f_market">
-            <option value="Forex">Forex</option>
-            <option value="BTC/USDT">BTC/USDT</option>
-            <option value="Crypto">Other Crypto</option>
-            <option value="Indices">Indices</option>
-            <option value="Commodities">Commodities</option>
-          </select>
+      <div class="form-section-header open" onclick="toggleFormSection(this)">
+        <div><span class="section-title">Section A — Pre-Trade</span><span class="section-tag">Required</span></div>
+        <span class="arrow">&#9654;</span>
+      </div>
+      <div class="form-section-body open">
+
+        <!-- Instrument & Setup -->
+        <div class="card-title" style="margin-top:0;">Instrument & Setup</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Market</label>
+            <select id="f_market">
+              <option value="Forex">Forex</option>
+              <option value="BTC/USDT">BTC/USDT</option>
+              <option value="Crypto">Other Crypto</option>
+              <option value="Indices">Indices</option>
+              <option value="Commodities">Commodities</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Pair / Symbol</label>
+            <input type="text" id="f_pair" placeholder="e.g. EURUSD, BTCUSDT" required>
+          </div>
+          <div class="field">
+            <label>Direction</label>
+            <div class="dir-toggle">
+              <div class="dir-btn long active" id="fDirLong"  onclick="setFDir('long')">Long</div>
+              <div class="dir-btn short"       id="fDirShort" onclick="setFDir('short')">Short</div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Timeframe</label>
+            <select id="f_tf">
+              <option>M1</option><option>M5</option><option>M15</option>
+              <option selected>H1</option><option>H4</option>
+              <option>D1</option><option>W1</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Setup Type</label>
+            <select id="f_setup" onchange="toggleSetupOther()">
+              <option>Secondary POI + SC entry</option>
+              <option>Primary POI + SC entry</option>
+              <option>Trusted BOS entry</option>
+              <option>mbms confirmation entry</option>
+              <option>SC reaction only</option>
+              <option>HTF liquidity sweep entry</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Date & Time Opened</label>
+            <input type="datetime-local" id="f_dateOpen" required>
+          </div>
         </div>
-        <div class="field">
-          <label>Pair / Symbol</label>
-          <input type="text" id="f_pair" placeholder="e.g. EURUSD, BTCUSDT" required>
+        <div class="field hidden" id="setupOtherWrap">
+          <label>Setup Description (Other)</label>
+          <input type="text" id="f_setupOther" placeholder="Describe your setup type">
         </div>
+
+        <!-- Structure & Confluence -->
+        <div class="card-title" style="margin-top:16px;">Structure & Confluence Analysis</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>HTF Bias (Daily) *</label>
+            <select id="f_htfBias" required>
+              <option value="">— Select —</option>
+              <option>Bullish</option>
+              <option>Bearish</option>
+              <option>Neutral</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>BOS Timeframe</label>
+            <select id="f_bosTF">
+              <option value="">— Select —</option>
+              <option>M1</option><option>M5</option><option>M15</option>
+              <option>H1</option><option>H4</option>
+              <option>D1</option><option>W1</option><option>Monthly</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Secondary or Primary POI *</label>
+            <select id="f_poiType" required>
+              <option value="">— Select —</option>
+              <option>Secondary</option>
+              <option>Primary</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Price at SC Zone? *</label>
+            <select id="f_scVisible" required>
+              <option value="">— Select —</option>
+              <option>Yes</option>
+              <option>No</option>
+              <option>Forming</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>mbms Confirmed *</label>
+            <select id="f_mbmsConfirmed" required>
+              <option value="">— Select —</option>
+              <option>Yes</option>
+              <option>Forming</option>
+              <option>No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Liquidity Taken Before Entry *</label>
+            <select id="f_liqTaken" required>
+              <option value="">— Select —</option>
+              <option>Yes</option>
+              <option>Partial</option>
+              <option>No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>DXY at key level?</label>
+            <select id="f_dxyKeyLevel">
+              <option value="">— Select —</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>DXY confirms trade?</label>
+            <select id="f_dxyConfirms">
+              <option value="">— Select —</option>
+              <option>Yes aligned</option>
+              <option>No conflicts</option>
+              <option>Neutral</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Was this a Trusted BOS?</label>
+            <select id="f_trustedBOS" onchange="toggleTrustedBOSPoi()">
+              <option value="">— Select —</option>
+              <option>Yes</option>
+              <option>No</option>
+              <option>Unsure</option>
+            </select>
+          </div>
+          <div class="field" id="trustedBOSPoiWrap" style="display:none;">
+            <label>Which POI was mitigated before BOS?</label>
+            <select id="f_trustedBOSPoi">
+              <option value="">— Select —</option>
+              <option>Secondary POI</option>
+              <option>Primary POI</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Entry Confirmation</label>
+            <select id="f_entryConf">
+              <option value="">— Select —</option>
+              <option>HH+HL (bullish)</option>
+              <option>LL+LH (bearish)</option>
+              <option>Partial</option>
+              <option>None yet</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Distance & Momentum</label>
+            <select id="f_distMomentum">
+              <option value="">— Select —</option>
+              <option>Strong</option>
+              <option>Moderate</option>
+              <option>Weak</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>POI Level Reached</label>
+            <select id="f_poiLevel">
+              <option value="">— Select —</option>
+              <option>Secondary only</option>
+              <option>Primary only</option>
+              <option>Both</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Trade Levels -->
+        <div class="card-title" style="margin-top:16px;">Trade Levels</div>
+        <div class="form-grid-3">
+          <div class="field">
+            <label>Entry Price</label>
+            <input type="number" id="f_entry" placeholder="0.00" step="any" required>
+          </div>
+          <div class="field">
+            <label>Stop Loss <span class="jrn-mode-toggle" id="jrnSLToggle"><button type="button" class="jrn-mode-btn active" onclick="setJrnSLMode('price')">Price</button><button type="button" class="jrn-mode-btn" onclick="setJrnSLMode('pips')">Pips</button></span></label>
+            <input type="number" id="f_sl" placeholder="0.00" step="any" required>
+            <div class="jrn-pips-sub" id="f_sl_sub"></div>
+          </div>
+          <div class="field">
+            <label>Take Profit <span class="jrn-mode-toggle" id="jrnTPToggle"><button type="button" class="jrn-mode-btn active" onclick="setJrnTPMode('price')">Price</button><button type="button" class="jrn-mode-btn" onclick="setJrnTPMode('pips')">Pips</button></span></label>
+            <input type="number" id="f_tp" placeholder="0.00" step="any" required>
+            <div class="jrn-pips-sub" id="f_tp_sub"></div>
+          </div>
+          <div class="field">
+            <label>Position Size</label>
+            <input type="text" id="f_size" placeholder="e.g. 0.10 lots / 0.5 BTC">
+          </div>
+          <div class="field">
+            <label>Risk Amount ($)</label>
+            <input type="number" id="f_risk" placeholder="0.00" step="any" required>
+          </div>
+          <div class="field">
+            <label>Planned R:R</label>
+            <input type="number" id="f_rr" placeholder="—" step="any" readonly style="color:#58a6ff; cursor:default;">
+          </div>
+        </div>
+
+        <!-- Confidence, Rationale, Chart -->
+        <div class="card-title" style="margin-top:16px;">Pre-Trade Analysis</div>
         <div class="field">
-          <label>Direction</label>
-          <div class="dir-toggle">
-            <div class="dir-btn long active" id="fDirLong"  onclick="setFDir('long')">Long</div>
-            <div class="dir-btn short"       id="fDirShort" onclick="setFDir('short')">Short</div>
+          <label>Confidence Level</label>
+          <div class="slider-wrap">
+            <input type="range" id="f_conf" min="1" max="10" value="6"
+              oninput="document.getElementById('confVal').textContent=this.value">
+            <span class="slider-val" id="confVal">6</span>
+            <span style="font-size:0.72rem; color:#8b949e;">/10</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Trade Rationale / Logic</label>
+          <textarea id="f_rationale" rows="5"
+            placeholder="Describe your analysis — why you're taking this trade, key levels, confluences, what the chart is telling you..."></textarea>
+        </div>
+
+        <div class="field">
+          <label>Pre-Trade Chart (optional — image or TradingView link)</label>
+          <div class="upload-zone" id="preUploadZone">
+            <input type="file" accept="image/*" onchange="handleImg(event,'pre')">
+            <div class="upload-zone-text">Drop chart here or <span>click to upload</span></div>
+            <div class="img-preview" id="prePreview" style="display:none;">
+              <img id="prePreviewImg" src="" alt="chart" onclick="lightbox(this.src)">
+              <div class="rm-img" onclick="removeImg('pre',event)">x</div>
+            </div>
           </div>
         </div>
         <div class="field">
-          <label>Timeframe</label>
-          <select id="f_tf">
-            <option>M1</option><option>M5</option><option>M15</option>
-            <option selected>H1</option><option>H4</option>
-            <option>D1</option><option>W1</option>
-          </select>
+          <label>TradingView Chart URL (optional)</label>
+          <input type="url" id="f_preTVLink" placeholder="https://www.tradingview.com/x/...">
         </div>
-        <div class="field">
-          <label>Setup Type</label>
-          <select id="f_setup" onchange="toggleSetupOther()">
-            <option>Secondary POI + SC entry</option>
-            <option>Primary POI + SC entry</option>
-            <option>Trusted BOS entry</option>
-            <option>mbms confirmation entry</option>
-            <option>SC reaction only</option>
-            <option>HTF liquidity sweep entry</option>
-            <option>Other</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Date & Time Opened</label>
-          <input type="datetime-local" id="f_dateOpen" required>
-        </div>
-      </div>
-      <div class="field hidden" id="setupOtherWrap">
-        <label>Setup Description (Other)</label>
-        <input type="text" id="f_setupOther" placeholder="Describe your setup type">
-      </div>
 
-      <div class="field">
-        <label>Market Conditions</label>
-        <div class="chips" id="condChips">
-          <div class="chip" onclick="toggleChip(this)">Trending</div>
-          <div class="chip" onclick="toggleChip(this)">Ranging</div>
-          <div class="chip" onclick="toggleChip(this)">Volatile</div>
-          <div class="chip" onclick="toggleChip(this)">Low Volume</div>
-          <div class="chip" onclick="toggleChip(this)">Pre-News</div>
-          <div class="chip" onclick="toggleChip(this)">Post-News</div>
-          <div class="chip" onclick="toggleChip(this)">London Session</div>
-          <div class="chip" onclick="toggleChip(this)">NY Session</div>
-          <div class="chip" onclick="toggleChip(this)">Asian Session</div>
+        <div class="field">
+          <label>Market Conditions</label>
+          <div class="chips" id="condChips">
+            <div class="chip" onclick="toggleChip(this)">Trending</div>
+            <div class="chip" onclick="toggleChip(this)">Ranging</div>
+            <div class="chip" onclick="toggleChip(this)">Volatile</div>
+            <div class="chip" onclick="toggleChip(this)">Low Volume</div>
+            <div class="chip" onclick="toggleChip(this)">Pre-News</div>
+            <div class="chip" onclick="toggleChip(this)">Post-News</div>
+            <div class="chip" onclick="toggleChip(this)">London Session</div>
+            <div class="chip" onclick="toggleChip(this)">NY Session</div>
+            <div class="chip" onclick="toggleChip(this)">Asian Session</div>
+          </div>
+        </div>
+
+      </div><!-- end Section A body -->
+    </div><!-- end Section A card -->
+
+    <!-- ═══════════════════════════════════════════════════
+         SECTION B — DURING/AFTER TRADE (collapsible)
+    ════════════════════════════════════════════════════ -->
+    <div class="card" id="sectionBCard">
+      <div class="form-section-header" onclick="toggleFormSection(this)">
+        <div><span class="section-title">Section B — During / After Trade</span><span class="section-tag">Post-close</span></div>
+        <span class="arrow">&#9654;</span>
+      </div>
+      <div class="form-section-body" id="sectionBBody">
+        <p style="font-size:0.78rem; color:#6e7681; margin-bottom:14px;">These fields are filled when closing the trade from the Journal detail view.</p>
+
+        <div class="field">
+          <label>Post-Trade Chart (optional)</label>
+          <div class="upload-zone">
+            <input type="file" accept="image/*" onchange="handleImg(event,'post')">
+            <div class="upload-zone-text">Drop chart or <span>click to upload</span></div>
+            <div class="img-preview" id="postPreviewForm" style="display:none;">
+              <img id="postPreviewFormImg" src="" onclick="lightbox(this.src)">
+              <div class="rm-img" onclick="removeImg('postForm',event)">x</div>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Post-Trade TradingView URL (optional)</label>
+          <input type="url" id="f_postTVLink" placeholder="https://www.tradingview.com/x/...">
+        </div>
+
+        <div class="field">
+          <label>Post-Trade Review Notes</label>
+          <textarea id="f_review" rows="3" placeholder="Reflections after closing the trade..."></textarea>
         </div>
       </div>
     </div>
 
-    <!-- System Analysis Fields -->
+    <!-- ═══════════════════════════════════════════════════
+         SECTION C — EXTENDED HTF CONTEXT (collapsible)
+    ════════════════════════════════════════════════════ -->
     <div class="card">
-      <div class="card-title">Structure & Confluence Analysis</div>
-      <div class="form-grid">
+      <div class="form-section-header" onclick="toggleFormSection(this)">
+        <div><span class="section-title">Section C — Extended HTF Context</span><span class="section-tag">Optional</span></div>
+        <span class="arrow">&#9654;</span>
+      </div>
+      <div class="form-section-body" id="sectionCBody">
+
+        <div class="form-grid">
+          <div class="field">
+            <label>Monthly Bias</label>
+            <select id="f_monthlyBias">
+              <option value="">— Select —</option>
+              <option>Bullish</option>
+              <option>Bearish</option>
+              <option>Neutral</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Weekly Bias</label>
+            <select id="f_weeklyBias">
+              <option value="">— Select —</option>
+              <option>Bullish</option>
+              <option>Bearish</option>
+              <option>Neutral</option>
+            </select>
+          </div>
+        </div>
+
         <div class="field">
-          <label>HTF Bias *</label>
-          <select id="f_htfBias" required>
+          <label>HTF Alignment Notes</label>
+          <textarea id="f_htfNotes" rows="3" placeholder="Monthly/Weekly/Daily alignment notes, key HTF levels, MBOS context..."></textarea>
+        </div>
+
+        <!-- MBOS Fields -->
+        <div class="card-title" style="margin-top:16px;">MBOS (Major Break of Structure)</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>MBOS Present?</label>
+            <select id="f_mbosPresent" onchange="toggleMbosFields()">
+              <option value="">— Select —</option>
+              <option value="Foundation">Yes — Foundation</option>
+              <option value="Context">Yes — Context</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div class="field" id="mbosTFWrap" style="display:none;">
+            <label>MBOS Timeframe</label>
+            <select id="f_mbosTF">
+              <option value="">— Select —</option>
+              <option>M5</option><option>M15</option><option>H1</option>
+              <option>H4</option><option>D1</option><option>W1</option><option>Monthly</option>
+            </select>
+          </div>
+          <div class="field" id="mbosLevelWrap" style="display:none;">
+            <label>MBOS Price Level</label>
+            <input type="number" id="f_mbosLevel" placeholder="0.00" step="any">
+          </div>
+        </div>
+        <div style="font-size:0.68rem; color:#6e7681; margin-top:4px; line-height:1.5;">
+          <strong>Foundation</strong> = this MBOS is the BASE of the trade. Trade exists because of this MBOS.<br>
+          <strong>Context</strong> = MBOS is background reference only. Trading a smaller structure within it.
+        </div>
+
+        <div class="field" style="margin-top:14px;">
+          <label>DXY Bias</label>
+          <select id="f_dxyBias">
             <option value="">— Select —</option>
             <option>Bullish</option>
             <option>Bearish</option>
@@ -859,153 +1236,23 @@
           </select>
         </div>
         <div class="field">
-          <label>POI Type *</label>
-          <select id="f_poiType" required>
-            <option value="">— Select —</option>
-            <option>Secondary</option>
-            <option>Primary</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>BOS Timeframe</label>
-          <select id="f_bosTF">
-            <option value="">— Select —</option>
-            <option>M1</option><option>M5</option><option>M15</option>
-            <option>H1</option><option>H4</option>
-            <option>D1</option><option>W1</option><option>Monthly</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Liquidity Taken Before Entry *</label>
-          <select id="f_liqTaken" required>
+          <label>GBP Index Checked</label>
+          <select id="f_gbpChecked">
             <option value="">— Select —</option>
             <option>Yes</option>
-            <option>Partial</option>
             <option>No</option>
           </select>
         </div>
         <div class="field">
-          <label>mbms Confirmed *</label>
-          <select id="f_mbmsConfirmed" required>
-            <option value="">— Select —</option>
-            <option>Yes</option>
-            <option>Forming</option>
-            <option>No</option>
-          </select>
+          <label>Correlation Notes</label>
+          <textarea id="f_corrNotes" rows="2" placeholder="DXY levels, GBP correlation notes..."></textarea>
         </div>
-        <div class="field">
-          <label>SC Candle Visible *</label>
-          <select id="f_scVisible" required>
-            <option value="">— Select —</option>
-            <option>Yes</option>
-            <option>Forming</option>
-            <option>No</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Entry Confirmation</label>
-          <select id="f_entryConf">
-            <option value="">— Select —</option>
-            <option>HH+HL (bullish)</option>
-            <option>LL+LH (bearish)</option>
-            <option>Partial</option>
-            <option>None yet</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Distance & Momentum</label>
-          <select id="f_distMomentum">
-            <option value="">— Select —</option>
-            <option>Strong</option>
-            <option>Moderate</option>
-            <option>Weak</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>POI Level Reached</label>
-          <select id="f_poiLevel">
-            <option value="">— Select —</option>
-            <option>Secondary only</option>
-            <option>Primary only</option>
-            <option>Both</option>
-          </select>
-        </div>
-      </div>
-    </div>
 
-    <!-- Prices -->
-    <div class="card">
-      <div class="card-title">Trade Levels</div>
-      <div class="form-grid-3">
-        <div class="field">
-          <label>Entry Price</label>
-          <input type="number" id="f_entry" placeholder="0.00" step="any" required>
-        </div>
-        <div class="field">
-          <label>Stop Loss <span class="jrn-mode-toggle" id="jrnSLToggle"><button type="button" class="jrn-mode-btn active" onclick="setJrnSLMode('price')">Price</button><button type="button" class="jrn-mode-btn" onclick="setJrnSLMode('pips')">Pips</button></span></label>
-          <input type="number" id="f_sl" placeholder="0.00" step="any" required>
-          <div class="jrn-pips-sub" id="f_sl_sub"></div>
-        </div>
-        <div class="field">
-          <label>Take Profit <span class="jrn-mode-toggle" id="jrnTPToggle"><button type="button" class="jrn-mode-btn active" onclick="setJrnTPMode('price')">Price</button><button type="button" class="jrn-mode-btn" onclick="setJrnTPMode('pips')">Pips</button></span></label>
-          <input type="number" id="f_tp" placeholder="0.00" step="any" required>
-          <div class="jrn-pips-sub" id="f_tp_sub"></div>
-        </div>
-        <div class="field">
-          <label>Position Size</label>
-          <input type="text" id="f_size" placeholder="e.g. 0.10 lots / 0.5 BTC">
-        </div>
-        <div class="field">
-          <label>Risk Amount ($)</label>
-          <input type="number" id="f_risk" placeholder="0.00" step="any" required>
-        </div>
-        <div class="field">
-          <label>Planned R:R</label>
-          <input type="number" id="f_rr" placeholder="—" step="any" readonly style="color:#58a6ff; cursor:default;">
-        </div>
-      </div>
-    </div>
-
-    <!-- Analysis -->
-    <div class="card">
-      <div class="card-title">Pre-Trade Analysis</div>
-
-      <div class="field">
-        <label>Confidence Level</label>
-        <div class="slider-wrap">
-          <input type="range" id="f_conf" min="1" max="10" value="6"
-            oninput="document.getElementById('confVal').textContent=this.value">
-          <span class="slider-val" id="confVal">6</span>
-          <span style="font-size:0.72rem; color:#8b949e;">/10</span>
-        </div>
-      </div>
-
-      <div class="field">
-        <label>Trade Rationale / Logic</label>
-        <textarea id="f_rationale" rows="5"
-          placeholder="Describe your analysis — why you're taking this trade, key levels, confluences, what the chart is telling you..."></textarea>
-      </div>
-
-      <div class="field">
-        <label>Pre-Trade Chart (optional)</label>
-        <div class="upload-zone" id="preUploadZone">
-          <input type="file" accept="image/*" onchange="handleImg(event,'pre')">
-          <div class="upload-zone-text">Drop chart here or <span>click to upload</span></div>
-          <div class="img-preview" id="prePreview" style="display:none;">
-            <img id="prePreviewImg" src="" alt="chart" onclick="lightbox(this.src)">
-            <div class="rm-img" onclick="removeImg('pre',event)">×</div>
-          </div>
-        </div>
       </div>
     </div>
 
     <input type="hidden" id="f_direction" value="long">
     <input type="hidden" id="f_editId" value="">
-    <input type="hidden" id="f_dxyBias" value="">
-    <input type="hidden" id="f_dxyConfirms" value="">
-    <input type="hidden" id="f_dxyKeyLevel" value="">
-    <input type="hidden" id="f_gbpChecked" value="">
-    <input type="hidden" id="f_corrNotes" value="">
 
     <div class="btn-row">
       <button type="button" class="btn btn-ghost" onclick="openChecklist()" style="border-color:#58a6ff; color:#58a6ff;">&#9745; Pre-Trade Checklist</button>
@@ -2022,6 +2269,7 @@ function submitTrade(e) {
     conditions: conditions,
     rationale:  document.getElementById('f_rationale').value,
     preChart:   preImgData,
+    preTVLink:  document.getElementById('f_preTVLink').value.trim(),
     // System analysis fields
     htfBias:          document.getElementById('f_htfBias').value,
     poiType:          document.getElementById('f_poiType').value,
@@ -2032,12 +2280,24 @@ function submitTrade(e) {
     entryConfirmation:document.getElementById('f_entryConf').value,
     distMomentum:     document.getElementById('f_distMomentum').value,
     poiLevel:         document.getElementById('f_poiLevel').value,
-    // Correlation
-    dxyBias:          document.getElementById('f_dxyBias').value,
-    dxyConfirms:      document.getElementById('f_dxyConfirms').value,
+    // Trusted BOS
+    trustedBOS:       document.getElementById('f_trustedBOS').value,
+    trustedBOSPoi:    document.getElementById('f_trustedBOSPoi').value,
+    // Correlation (Section A quick fields + Section C details)
     dxyKeyLevel:      document.getElementById('f_dxyKeyLevel').value,
+    dxyConfirms:      document.getElementById('f_dxyConfirms').value,
+    dxyBias:          document.getElementById('f_dxyBias').value,
     gbpChecked:       document.getElementById('f_gbpChecked').value,
     corrNotes:        document.getElementById('f_corrNotes').value,
+    // Section B — During/After
+    postTVLink:       document.getElementById('f_postTVLink').value.trim(),
+    // Section C — Extended HTF Context
+    monthlyBias:      document.getElementById('f_monthlyBias').value,
+    weeklyBias:       document.getElementById('f_weeklyBias').value,
+    htfNotes:         document.getElementById('f_htfNotes').value,
+    mbosPresent:      document.getElementById('f_mbosPresent').value,
+    mbosTF:           document.getElementById('f_mbosTF').value,
+    mbosLevel:        parseFloat(document.getElementById('f_mbosLevel').value) || null,
     // Status
     status:     'open',
     // Result fields (preserved on edit)
@@ -2059,18 +2319,20 @@ function submitTrade(e) {
       t.status = old.status; t.dateClose = old.dateClose;
       t.exitPrice = old.exitPrice; t.actualPnL = old.actualPnL;
       t.outcome = old.outcome; t.actualRR = old.actualRR;
-      t.review = old.review; t.postChart = old.postChart || postImgData;
+      t.review = old.review || t.review; t.postChart = old.postChart || postImgData;
       t.rating = old.rating;
       t.scRespected = old.scRespected; t.mbmsPlayedOut = old.mbmsPlayedOut;
       t.htfAligned = old.htfAligned; t.liqProperlyTaken = old.liqProperlyTaken;
       t.expectedVsActual = old.expectedVsActual; t.whatDifferently = old.whatDifferently;
       t.lessonLearned = old.lessonLearned; t.executionRating = old.executionRating;
+      if (!t.postTVLink && old.postTVLink) t.postTVLink = old.postTVLink;
     }
     trades = trades.map(x => x.id === editId ? t : x);
   } else {
     trades.unshift(t);
   }
   save();
+  clearDraft();
   resetForm();
   nav('journal');
 }
@@ -2094,6 +2356,19 @@ function resetForm() {
   document.getElementById('f_tp').placeholder = '0.00';
   document.getElementById('f_sl_sub').textContent = '';
   document.getElementById('f_tp_sub').textContent = '';
+  // Reset new fields
+  document.getElementById('trustedBOSPoiWrap').style.display = 'none';
+  document.getElementById('mbosTFWrap').style.display = 'none';
+  document.getElementById('mbosLevelWrap').style.display = 'none';
+  document.getElementById('f_preTVLink').value = '';
+  document.getElementById('f_postTVLink').value = '';
+  // Reset Section B/C to collapsed, Section A to open
+  const sections = document.querySelectorAll('#tradeForm .form-section-header');
+  sections.forEach((h, i) => {
+    const body = h.nextElementSibling;
+    if (i === 0) { h.classList.add('open'); if (body) body.classList.add('open'); }
+    else { h.classList.remove('open'); if (body) body.classList.remove('open'); }
+  });
   // Apply defaults from settings
   const sett = getSettings();
   if (sett.profile.market) document.getElementById('f_market').value = sett.profile.market;
@@ -2183,17 +2458,29 @@ function openModal(id) {
 
   // System analysis fields display
   const sysFields = [
-    { label: 'HTF Bias', val: t.htfBias, color: t.htfBias === 'Bullish' ? '#3fb950' : t.htfBias === 'Bearish' ? '#f85149' : '#8b949e' },
+    { label: 'HTF Bias (Daily)', val: t.htfBias, color: t.htfBias === 'Bullish' ? '#3fb950' : t.htfBias === 'Bearish' ? '#f85149' : '#8b949e' },
     { label: 'POI Type', val: t.poiType },
     { label: 'BOS Timeframe', val: t.bosTF },
     { label: 'Liquidity Taken', val: t.liqTaken, color: t.liqTaken === 'Yes' ? '#3fb950' : '#f85149' },
     { label: 'mbms Confirmed', val: t.mbmsConfirmed, color: t.mbmsConfirmed === 'Yes' ? '#3fb950' : '#f85149' },
-    { label: 'SC Candle Visible', val: t.scVisible, color: t.scVisible === 'Yes' ? '#3fb950' : '#f85149' },
+    { label: 'Price at SC Zone', val: t.scVisible, color: t.scVisible === 'Yes' ? '#3fb950' : '#f85149' },
     { label: 'Entry Confirmation', val: t.entryConfirmation },
     { label: 'Distance & Momentum', val: t.distMomentum },
     { label: 'POI Level Reached', val: t.poiLevel },
-    { label: 'DXY Bias', val: t.dxyBias },
+    { label: 'Trusted BOS', val: t.trustedBOS, color: t.trustedBOS === 'Yes' ? '#3fb950' : t.trustedBOS === 'No' ? '#f85149' : '#f0883e' },
+    { label: 'Trusted BOS POI', val: t.trustedBOS === 'Yes' ? t.trustedBOSPoi : null },
+    { label: 'DXY at Key Level', val: t.dxyKeyLevel },
     { label: 'DXY Confirms', val: t.dxyConfirms, color: t.dxyConfirms === 'Yes aligned' ? '#3fb950' : t.dxyConfirms === 'No conflicts' ? '#f85149' : undefined },
+  ].filter(f => f.val);
+
+  // Extended HTF context
+  const htfFields = [
+    { label: 'Monthly Bias', val: t.monthlyBias, color: t.monthlyBias === 'Bullish' ? '#3fb950' : t.monthlyBias === 'Bearish' ? '#f85149' : '#8b949e' },
+    { label: 'Weekly Bias', val: t.weeklyBias, color: t.weeklyBias === 'Bullish' ? '#3fb950' : t.weeklyBias === 'Bearish' ? '#f85149' : '#8b949e' },
+    { label: 'MBOS', val: t.mbosPresent, color: t.mbosPresent === 'Foundation' ? '#58a6ff' : t.mbosPresent === 'Context' ? '#f0883e' : undefined },
+    { label: 'MBOS TF', val: t.mbosTF },
+    { label: 'MBOS Level', val: t.mbosLevel ? String(t.mbosLevel) : null },
+    { label: 'DXY Bias', val: t.dxyBias },
   ].filter(f => f.val);
 
   const sysHtml = sysFields.length ? `
@@ -2205,6 +2492,18 @@ function openModal(id) {
           <div class="info-cell-val" style="font-size:0.82rem;${f.color ? 'color:'+f.color : ''}">${f.val}</div>
         </div>`).join('')}
       </div>
+    </div>` : '';
+
+  const htfHtml = htfFields.length ? `
+    <div style="background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:12px 14px; margin-bottom:14px;">
+      <div style="font-size:0.68rem; color:#8b949e; text-transform:uppercase; letter-spacing:0.7px; margin-bottom:8px;">Extended HTF Context</div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
+        ${htfFields.map(f => `<div>
+          <div class="info-cell-label">${f.label}</div>
+          <div class="info-cell-val" style="font-size:0.82rem;${f.color ? 'color:'+f.color : ''}">${f.val}</div>
+        </div>`).join('')}
+      </div>
+      ${t.htfNotes ? `<div style="margin-top:8px;"><div class="info-cell-label">HTF Notes</div><div class="rationale-box" style="margin-top:4px;font-size:0.78rem;">${escHtml(t.htfNotes)}</div></div>` : ''}
     </div>` : '';
 
   // Close section for open trades
@@ -2264,6 +2563,10 @@ function openModal(id) {
             <div class="rm-img" onclick="removeImg('post',event)">×</div>
           </div>
         </div>
+      </div>
+      <div class="field">
+        <label>Post-Trade TradingView URL (optional)</label>
+        <input type="url" id="closePostTVLink" placeholder="https://www.tradingview.com/x/..." style="width:100%;background:#0d1117;border:1px solid #30363d;border-radius:7px;color:#e6edf3;font-size:0.88rem;padding:8px 10px;outline:none;">
       </div>
       <div class="form-grid">
         <div class="field">
@@ -2332,18 +2635,20 @@ function openModal(id) {
     ? `<div class="cond-chips">${t.conditions.map(c=>`<div class="cond-chip active">${c}</div>`).join('')}</div>`
     : '<span style="color:#6e7681; font-size:0.78rem;">None recorded</span>';
 
-  const preChartHtml = t.preChart
+  const preTVHtml = t.preTVLink ? `<div class="field"><div class="card-title" style="margin-bottom:4px;">Pre-Trade TradingView</div><a href="${escHtml(t.preTVLink)}" target="_blank" rel="noopener" class="tv-link">${escHtml(t.preTVLink)}</a></div>` : '';
+  const preChartHtml = (t.preChart
     ? `<div class="field"><div class="card-title" style="margin-bottom:6px;">Pre-Trade Chart</div>
        <img src="${t.preChart}" style="max-width:100%; border-radius:8px; border:1px solid #30363d; cursor:zoom-in;" onclick="lightbox(this.src)"></div>`
-    : '';
+    : '') + preTVHtml;
 
   // Post-trade review display (for closed trades)
   let reviewDisplay = '';
   if (t.status === 'closed') {
-    const postChartHtml = t.postChart
+    const postTVHtml = t.postTVLink ? `<div class="field"><div class="card-title" style="margin-bottom:4px;">Post-Trade TradingView</div><a href="${escHtml(t.postTVLink)}" target="_blank" rel="noopener" class="tv-link">${escHtml(t.postTVLink)}</a></div>` : '';
+    const postChartHtml = (t.postChart
       ? `<div class="field"><div class="card-title" style="margin-bottom:6px;">Post-Trade Chart</div>
          <img src="${t.postChart}" style="max-width:100%; border-radius:8px; border:1px solid #30363d; cursor:zoom-in;" onclick="lightbox(this.src)"></div>`
-      : '';
+      : '') + postTVHtml;
 
     const reviewFields = [];
     if (t.scRespected) reviewFields.push({ l: 'SC zone respected?', v: t.scRespected });
@@ -2407,6 +2712,7 @@ function openModal(id) {
     </div>
 
     ${sysHtml}
+    ${htfHtml}
 
     ${t.status === 'closed' ? `
     <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:12px 14px; margin-bottom:14px; display:grid; grid-template-columns:repeat(${t.exitType ? 5 : 4},1fr); gap:10px;">
@@ -2448,6 +2754,193 @@ function toggleCollapsible(header) {
   const body = header.nextElementSibling;
   if (body) body.classList.toggle('open');
 }
+
+// ── Form Section Toggle ──────────────────────────────
+function toggleFormSection(header) {
+  header.classList.toggle('open');
+  const body = header.nextElementSibling;
+  if (body) body.classList.toggle('open');
+}
+
+// ── Trusted BOS conditional field ────────────────────
+function toggleTrustedBOSPoi() {
+  const val = document.getElementById('f_trustedBOS').value;
+  document.getElementById('trustedBOSPoiWrap').style.display = val === 'Yes' ? '' : 'none';
+}
+
+// ── MBOS conditional fields ─────────────────────────
+function toggleMbosFields() {
+  const val = document.getElementById('f_mbosPresent').value;
+  const show = val === 'Foundation' || val === 'Context';
+  document.getElementById('mbosTFWrap').style.display = show ? '' : 'none';
+  document.getElementById('mbosLevelWrap').style.display = show ? '' : 'none';
+}
+
+// ── Keyboard Shortcuts Help ─────────────────────────
+function toggleKbHelp() {
+  document.getElementById('kbTooltip').classList.toggle('open');
+}
+
+// ── Auto-Save Draft ─────────────────────────────────
+const DRAFT_KEY = 'tradeJournal_draft';
+let _draftInterval = null;
+let _lastDraftSave = 0;
+
+function getDraftFields() {
+  const form = document.getElementById('tradeForm');
+  if (!form) return null;
+  const data = {};
+  const fields = ['f_market','f_pair','f_tf','f_setup','f_setupOther','f_dateOpen',
+    'f_entry','f_sl','f_tp','f_size','f_risk','f_conf','f_rationale','f_preTVLink',
+    'f_htfBias','f_poiType','f_bosTF','f_liqTaken','f_mbmsConfirmed','f_scVisible',
+    'f_entryConf','f_distMomentum','f_poiLevel','f_trustedBOS','f_trustedBOSPoi',
+    'f_dxyKeyLevel','f_dxyConfirms','f_dxyBias','f_gbpChecked','f_corrNotes',
+    'f_postTVLink','f_monthlyBias','f_weeklyBias','f_htfNotes',
+    'f_mbosPresent','f_mbosTF','f_mbosLevel','f_review'];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) data[id] = el.value;
+  });
+  data._direction = formDir;
+  data._conditions = [...document.querySelectorAll('#condChips .chip.active')].map(c => c.textContent);
+  data._preImg = preImgData;
+  return data;
+}
+
+function saveDraft() {
+  const editId = document.getElementById('f_editId')?.value;
+  if (editId) return; // Don't save draft when editing existing trade
+  const data = getDraftFields();
+  if (!data) return;
+  // Check if anything has been filled
+  const hasContent = data.f_pair || data.f_entry || data.f_rationale || data.f_dateOpen;
+  if (!hasContent) return;
+  data._savedAt = Date.now();
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+  _lastDraftSave = Date.now();
+  updateDraftIndicator();
+}
+
+function updateDraftIndicator() {
+  const el = document.getElementById('draftIndicator');
+  if (!el || !_lastDraftSave) { if (el) el.textContent = ''; return; }
+  const ago = Math.round((Date.now() - _lastDraftSave) / 1000);
+  el.textContent = 'Draft saved ' + (ago < 5 ? 'just now' : ago + 's ago');
+}
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_KEY);
+  _lastDraftSave = 0;
+  const el = document.getElementById('draftIndicator');
+  if (el) el.textContent = '';
+  const banner = document.getElementById('draftBanner');
+  if (banner) banner.style.display = 'none';
+}
+
+function hasDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    return !!(d.f_pair || d.f_entry || d.f_rationale);
+  } catch { return false; }
+}
+
+function resumeDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY));
+    if (!d) return;
+    const fields = Object.keys(d).filter(k => !k.startsWith('_'));
+    fields.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && d[id]) el.value = d[id];
+    });
+    if (d._direction) setFDir(d._direction);
+    if (d._conditions?.length) {
+      document.querySelectorAll('#condChips .chip').forEach(c => {
+        c.classList.toggle('active', d._conditions.includes(c.textContent));
+      });
+    }
+    if (d._preImg) {
+      preImgData = d._preImg;
+      document.getElementById('prePreview').style.display = 'block';
+      document.getElementById('prePreviewImg').src = d._preImg;
+    }
+    toggleSetupOther();
+    toggleTrustedBOSPoi();
+    toggleMbosFields();
+    updateRR();
+    document.getElementById('confVal').textContent = document.getElementById('f_conf').value;
+  } catch(e) { console.warn('Draft resume error:', e); }
+  document.getElementById('draftBanner').style.display = 'none';
+}
+
+function discardDraft() {
+  clearDraft();
+}
+
+function startDraftAutoSave() {
+  if (_draftInterval) clearInterval(_draftInterval);
+  _draftInterval = setInterval(() => {
+    const logPage = document.getElementById('page-log');
+    if (logPage && logPage.classList.contains('active')) {
+      saveDraft();
+    }
+  }, 30000);
+  // Update indicator every 10s
+  setInterval(updateDraftIndicator, 10000);
+}
+
+function checkDraftOnLoad() {
+  if (hasDraft()) {
+    const editId = document.getElementById('f_editId')?.value;
+    if (!editId) {
+      document.getElementById('draftBanner').style.display = 'flex';
+    }
+  }
+}
+
+// ── Keyboard Shortcuts ──────────────────────────────
+document.addEventListener('keydown', function(e) {
+  // Close kb tooltip on Escape
+  if (e.key === 'Escape') {
+    document.getElementById('kbTooltip')?.classList.remove('open');
+    return;
+  }
+  const mod = e.ctrlKey || e.metaKey;
+  if (!mod) return;
+  const key = e.key.toLowerCase();
+  if (key === 's') {
+    e.preventDefault();
+    // If on log page, submit form or save draft
+    const logPage = document.getElementById('page-log');
+    if (logPage && logPage.classList.contains('active')) {
+      saveDraft();
+      const indicator = document.getElementById('draftIndicator');
+      if (indicator) { indicator.textContent = 'Draft saved just now'; indicator.style.color = '#3fb950'; setTimeout(() => { indicator.style.color = ''; }, 1500); }
+    }
+  } else if (key === 'l') {
+    e.preventDefault(); nav('log');
+  } else if (key === 'd') {
+    e.preventDefault(); nav('dashboard');
+  } else if (key === 'j') {
+    e.preventDefault(); nav('journal');
+  } else if (key === 'k') {
+    e.preventDefault();
+    window.open('forex-calculator.html', '_blank');
+  } else if (key === 'e') {
+    e.preventDefault();
+    openAnalysisModal();
+  }
+});
+
+// Close kb tooltip when clicking outside
+document.addEventListener('click', function(e) {
+  const tooltip = document.getElementById('kbTooltip');
+  if (tooltip && tooltip.classList.contains('open') && !e.target.closest('.kb-help-btn') && !e.target.closest('.kb-tooltip')) {
+    tooltip.classList.remove('open');
+  }
+});
 
 function updateModalRR(tradeId) {
   const t = trades.find(x => x.id === tradeId);
@@ -2503,6 +2996,7 @@ function closeTrade(id) {
   const whatDifferently = document.getElementById('closeDifferently')?.value || '';
   const lessonLearned = document.getElementById('closeLesson')?.value || '';
   const executionRating = parseInt(document.getElementById('closeExecRating')?.value) || 0;
+  const closePostTVLink = document.getElementById('closePostTVLink')?.value?.trim() || '';
 
   trades = trades.map(t => {
     if (t.id !== id) return t;
@@ -2514,6 +3008,7 @@ function closeTrade(id) {
       status: 'closed', dateClose, exitPrice: exit,
       actualPnL: pnl, outcome, actualRR, exitType,
       review: '', postChart: postImgData || t.postChart,
+      postTVLink: closePostTVLink || t.postTVLink || '',
       rating: modalRating,
       scRespected, mbmsPlayedOut, htfAligned, liqProperlyTaken,
       expectedVsActual, whatDifferently, lessonLearned, executionRating,
@@ -2570,6 +3065,18 @@ function editTrade(id) {
     if (t.dxyKeyLevel) document.getElementById('f_dxyKeyLevel').value = t.dxyKeyLevel;
     if (t.gbpChecked) document.getElementById('f_gbpChecked').value = t.gbpChecked;
     if (t.corrNotes) document.getElementById('f_corrNotes').value = t.corrNotes;
+    // New fields
+    if (t.trustedBOS) { document.getElementById('f_trustedBOS').value = t.trustedBOS; toggleTrustedBOSPoi(); }
+    if (t.trustedBOSPoi) document.getElementById('f_trustedBOSPoi').value = t.trustedBOSPoi;
+    if (t.preTVLink) document.getElementById('f_preTVLink').value = t.preTVLink;
+    if (t.postTVLink) document.getElementById('f_postTVLink').value = t.postTVLink;
+    if (t.monthlyBias) document.getElementById('f_monthlyBias').value = t.monthlyBias;
+    if (t.weeklyBias) document.getElementById('f_weeklyBias').value = t.weeklyBias;
+    if (t.htfNotes) document.getElementById('f_htfNotes').value = t.htfNotes;
+    if (t.mbosPresent) { document.getElementById('f_mbosPresent').value = t.mbosPresent; toggleMbosFields(); }
+    if (t.mbosTF) document.getElementById('f_mbosTF').value = t.mbosTF;
+    if (t.mbosLevel) document.getElementById('f_mbosLevel').value = t.mbosLevel;
+    if (t.review) document.getElementById('f_review').value = t.review;
 
     setFDir(t.direction);
     updateRR();
@@ -2856,7 +3363,7 @@ function renderConfluencePerformance(list) {
   const scY = calcWR(closed.filter(t => t.scVisible === 'Yes'));
   const scF = calcWR(closed.filter(t => t.scVisible === 'Forming'));
   const scN = calcWR(closed.filter(t => t.scVisible === 'No'));
-  html += renderGroup('SC Candle Visible', [
+  html += renderGroup('Price at SC Zone', [
     { label: 'Yes', ...scY }, { label: 'Forming', ...scF }, { label: 'No', ...scN }
   ]);
 
@@ -2908,8 +3415,28 @@ function renderConfluencePerformance(list) {
     { label: 'Partial', ...ecPart }, { label: 'None yet', ...ecNone }
   ]);
 
+  // Trusted BOS
+  const tbY = calcWR(closed.filter(t => t.trustedBOS === 'Yes'));
+  const tbN = calcWR(closed.filter(t => t.trustedBOS === 'No'));
+  const tbU = calcWR(closed.filter(t => t.trustedBOS === 'Unsure'));
+  if (tbY.n + tbN.n + tbU.n > 0) {
+    html += renderGroup('Trusted BOS', [
+      { label: 'Yes (trusted)', ...tbY }, { label: 'No (not trusted)', ...tbN }, { label: 'Unsure', ...tbU }
+    ]);
+  }
+
+  // MBOS
+  const mbosF = calcWR(closed.filter(t => t.mbosPresent === 'Foundation'));
+  const mbosC = calcWR(closed.filter(t => t.mbosPresent === 'Context'));
+  const mbosN = calcWR(closed.filter(t => t.mbosPresent === 'No'));
+  if (mbosF.n + mbosC.n + mbosN.n > 0) {
+    html += renderGroup('MBOS (Major Break of Structure)', [
+      { label: 'Foundation', ...mbosF }, { label: 'Context', ...mbosC }, { label: 'No MBOS', ...mbosN }
+    ]);
+  }
+
   // Check if all groups are empty
-  const totalDataPoints = [poiSec,poiPri,scY,scF,scN,mbY,mbF,mbN,lqY,lqP,lqN,dmS,dmM,dmW,ecHH,ecLL,ecPart,ecNone].reduce((s,x) => s + x.n, 0);
+  const totalDataPoints = [poiSec,poiPri,scY,scF,scN,mbY,mbF,mbN,lqY,lqP,lqN,dmS,dmM,dmW,ecHH,ecLL,ecPart,ecNone,tbY,tbN,tbU,mbosF,mbosC,mbosN].reduce((s,x) => s + x.n, 0);
   if (totalDataPoints === 0) {
     el.innerHTML = '<div style="color:#6e7681; font-size:0.78rem; padding:8px 0;">No confluence data yet — log trades with the new fields to see breakdowns here.</div>';
     return;
@@ -3404,14 +3931,24 @@ function generateAnalysisExport(period) {
     if (t.bosTF) sysLine.push(`BOS TF: ${t.bosTF}`);
     if (t.liqTaken) sysLine.push(`Liq Taken: ${t.liqTaken}`);
     if (t.mbmsConfirmed) sysLine.push(`mbms: ${t.mbmsConfirmed}`);
-    if (t.scVisible) sysLine.push(`SC Visible: ${t.scVisible}`);
+    if (t.scVisible) sysLine.push(`SC Zone: ${t.scVisible}`);
     if (t.entryConfirmation) sysLine.push(`Entry Conf: ${t.entryConfirmation}`);
     if (t.distMomentum) sysLine.push(`Dist/Mom: ${t.distMomentum}`);
     if (t.poiLevel) sysLine.push(`POI Level: ${t.poiLevel}`);
-    if (t.dxyBias) sysLine.push(`DXY Bias: ${t.dxyBias}`);
+    if (t.trustedBOS) sysLine.push(`Trusted BOS: ${t.trustedBOS}${t.trustedBOS === 'Yes' && t.trustedBOSPoi ? ' (' + t.trustedBOSPoi + ' mitigated)' : ''}`);
+    if (t.dxyKeyLevel) sysLine.push(`DXY Key Level: ${t.dxyKeyLevel}`);
     if (t.dxyConfirms) sysLine.push(`DXY Confirms: ${t.dxyConfirms}`);
     if (sysLine.length) out += `Structure: ${sysLine.join(' | ')}\n`;
+    // Extended HTF context
+    const htfLine = [];
+    if (t.monthlyBias) htfLine.push(`Monthly: ${t.monthlyBias}`);
+    if (t.weeklyBias) htfLine.push(`Weekly: ${t.weeklyBias}`);
+    if (t.mbosPresent) htfLine.push(`MBOS: ${t.mbosPresent}${t.mbosTF ? ' (' + t.mbosTF + ')' : ''}${t.mbosLevel ? ' @ ' + t.mbosLevel : ''}`);
+    if (t.dxyBias) htfLine.push(`DXY Bias: ${t.dxyBias}`);
+    if (htfLine.length) out += `HTF Context: ${htfLine.join(' | ')}\n`;
+    if (t.htfNotes?.trim()) out += `HTF Notes: ${t.htfNotes.trim()}\n`;
     if (t.corrNotes?.trim()) out += `Correlation Notes: ${t.corrNotes.trim()}\n`;
+    if (t.preTVLink) out += `Pre-Trade Chart: ${t.preTVLink}\n`;
     const eSlDist = fmtDist(t.entry, t.sl, t.pair, t.market);
     const eTpDist = fmtDist(t.entry, t.tp, t.pair, t.market);
     out += `Entry: ${t.entry} | SL: ${t.sl} (${eSlDist}) | TP: ${t.tp} (${eTpDist})\n`;
@@ -3436,6 +3973,7 @@ function generateAnalysisExport(period) {
       if (t.expectedVsActual?.trim()) out += `Expected vs Actual: ${t.expectedVsActual.trim()}\n`;
       if (t.whatDifferently?.trim()) out += `Would Do Differently: ${t.whatDifferently.trim()}\n`;
       if (t.lessonLearned?.trim()) out += `Lesson Learned: ${t.lessonLearned.trim()}\n`;
+      if (t.postTVLink) out += `Post-Trade Chart: ${t.postTVLink}\n`;
     } else {
       out += `Status: OPEN\n`;
     }
@@ -4703,6 +5241,8 @@ applySettings(getSettings());
 updateSyncDot();
 refreshCloudStatus();
 renderDashboard();
+startDraftAutoSave();
+checkDraftOnLoad();
 startMT4Polling();
 updateSessionBar();
 setInterval(updateSessionBar, 1000);
