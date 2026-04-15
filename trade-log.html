@@ -1404,19 +1404,19 @@
   </div>
 
   <div class="filters">
-    <select class="filter-select" id="fltStatus" onchange="renderJournal()">
+    <select class="filter-select" id="fltStatus" onchange="onFilterChange()">
       <option value="">All Status</option>
       <option value="open">Open</option>
       <option value="partial">Partially Closed</option>
       <option value="closed">Closed</option>
     </select>
-    <select class="filter-select" id="fltOutcome" onchange="renderJournal()">
+    <select class="filter-select" id="fltOutcome" onchange="onFilterChange()">
       <option value="">All Outcomes</option>
       <option value="win">Win</option>
       <option value="loss">Loss</option>
       <option value="be">Break Even</option>
     </select>
-    <select class="filter-select" id="fltMarket" onchange="renderJournal()">
+    <select class="filter-select" id="fltMarket" onchange="onFilterChange()">
       <option value="">All Markets</option>
       <option>Forex</option>
       <option>BTC/USDT</option>
@@ -1424,7 +1424,7 @@
       <option>Indices</option>
       <option>Commodities</option>
     </select>
-    <select class="filter-select" id="fltSetup" onchange="renderJournal()">
+    <select class="filter-select" id="fltSetup" onchange="onFilterChange()">
       <option value="">All Setups</option>
       <option>Secondary POI + SC entry</option>
       <option>Primary POI + SC entry</option>
@@ -1654,6 +1654,7 @@
       <div class="export-btn-row">
         <button class="btn btn-primary" onclick="copyAnalysis()">Copy to Clipboard</button>
         <button class="btn btn-ghost"   onclick="downloadAnalysis()">Download .txt</button>
+        <button class="btn btn-ghost"   onclick="downloadAnalysisCSV()">Download .csv</button>
         <span class="copy-ok" id="copyOk">&#10003; Copied!</span>
       </div>
       <div class="export-hint">
@@ -2145,9 +2146,14 @@
 
       <!-- DANGER ZONE -->
       <div class="settings-section" id="settSec_danger">
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;margin-bottom:14px;">
+          <div style="font-size:0.78rem;font-weight:600;color:#8b949e;margin-bottom:8px;">Storage Usage</div>
+          <div id="storageIndicator" style="font-size:0.78rem;color:#e6edf3;">Calculating...</div>
+        </div>
         <div class="danger-zone">
           <div class="danger-zone-title">Danger Zone</div>
           <button class="danger-btn" onclick="settingsExportJSON()">Export all data as JSON backup</button>
+          <button class="danger-btn" onclick="settingsExportCSV()">Export trades as CSV</button>
           <label class="danger-btn" style="cursor:pointer;">Import from JSON backup<input type="file" accept=".json" style="display:none;" onchange="settingsImportJSON(event)"></label>
           <button class="danger-btn destructive" onclick="settingsResetAll()">Reset all settings to defaults</button>
           <button class="danger-btn destructive" onclick="settingsClearTrades()">Clear all trades</button>
@@ -2186,6 +2192,126 @@ let preImgData = '';
 let postImgData = '';
 let jrnSLMode = 'price';
 let jrnTPMode = 'price';
+
+// ── IndexedDB for chart images ──
+const IDB_NAME = 'TradeJournalDB';
+const IDB_STORE = 'chartImages';
+const IDB_VERSION = 1;
+let _idb = null;
+
+function openChartDB() {
+  return new Promise((resolve, reject) => {
+    if (_idb) { resolve(_idb); return; }
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = e => { e.target.result.createObjectStore(IDB_STORE); };
+    req.onsuccess = e => { _idb = e.target.result; resolve(_idb); };
+    req.onerror = e => { console.warn('IndexedDB error:', e); reject(e); };
+  });
+}
+
+async function saveChartImage(key, base64Data) {
+  if (!base64Data || !key) return;
+  try {
+    const db = await openChartDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(base64Data, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = e => reject(e);
+    });
+  } catch(e) { console.warn('saveChartImage error:', e); }
+}
+
+async function loadChartImage(key) {
+  if (!key) return null;
+  try {
+    const db = await openChartDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = e => reject(e);
+    });
+  } catch(e) { console.warn('loadChartImage error:', e); return null; }
+}
+
+async function deleteChartImage(key) {
+  if (!key) return;
+  try {
+    const db = await openChartDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = e => reject(e);
+    });
+  } catch(e) { console.warn('deleteChartImage error:', e); }
+}
+
+function chartKey(tradeId, type) { return tradeId + '_' + type; }
+
+// Returns true if value looks like a base64 image (not a reference key)
+function isBase64Image(val) { return val && val.startsWith('data:image/'); }
+
+// Migrate embedded base64 images from localStorage trades to IndexedDB
+async function migrateChartImages() {
+  let migrated = 0;
+  for (const t of trades) {
+    if (isBase64Image(t.preChart)) {
+      const key = chartKey(t.id, 'pre');
+      await saveChartImage(key, t.preChart);
+      t.preChart = key;
+      migrated++;
+    }
+    if (isBase64Image(t.postChart)) {
+      const key = chartKey(t.id, 'post');
+      await saveChartImage(key, t.postChart);
+      t.postChart = key;
+      migrated++;
+    }
+  }
+  if (migrated > 0) {
+    console.log(`Migrated ${migrated} chart image(s) to IndexedDB`);
+    save();
+  }
+}
+
+// Get storage usage info
+async function getStorageInfo() {
+  // localStorage size
+  let lsSize = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      lsSize += (key.length + (localStorage.getItem(key) || '').length) * 2; // UTF-16
+    }
+  } catch {}
+  // IndexedDB chart image size
+  let idbSize = 0;
+  try {
+    const db = await openChartDB();
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const store = tx.objectStore(IDB_STORE);
+    const allKeys = await new Promise((res, rej) => {
+      const req = store.getAllKeys();
+      req.onsuccess = () => res(req.result);
+      req.onerror = rej;
+    });
+    const allVals = await new Promise((res, rej) => {
+      const req = store.getAll();
+      req.onsuccess = () => res(req.result);
+      req.onerror = rej;
+    });
+    allVals.forEach(v => { if (v) idbSize += v.length * 2; });
+  } catch {}
+  return { lsBytes: lsSize, idbBytes: idbSize, idbKB: idbSize / 1024, lsKB: lsSize / 1024 };
+}
+
+function fmtBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
 
 function load() {
   try { trades = JSON.parse(localStorage.getItem(STORE) || '[]'); } catch { trades = []; }
@@ -2251,14 +2377,27 @@ function fmtDist(entry, price, pair, market) {
 // ═══════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════
+function hasUnsavedFormData() {
+  const editId = document.getElementById('f_editId')?.value;
+  if (editId) return false; // editing existing trade, not a new draft
+  const pair = document.getElementById('f_pair')?.value?.trim();
+  const entry = document.getElementById('f_entry')?.value?.trim();
+  return !!(pair || entry || preImgData);
+}
+
 function nav(view) {
+  // Guard: warn if leaving Log Trade with unsaved data
+  const logPage = document.getElementById('page-log');
+  if (logPage && logPage.classList.contains('active') && view !== 'log' && hasUnsavedFormData()) {
+    if (!confirm('You have unsaved trade data. Leave anyway?')) return;
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   document.getElementById('page-' + view).classList.add('active');
   const idx = ['dashboard','log','journal','alerts','live'].indexOf(view);
   if (idx >= 0) document.querySelectorAll('.nav-link')[idx].classList.add('active');
   if (view === 'dashboard') renderDashboard();
-  if (view === 'journal')   renderJournal();
+  if (view === 'journal')   { restoreJournalFilters(); renderJournal(); }
   if (view === 'log')       initForm();
   if (view === 'alerts')    initAlerts();
   if (view === 'live')      refreshLiveTrades();
@@ -2420,7 +2559,7 @@ function submitTrade(e) {
     confidence: parseInt(document.getElementById('f_conf').value),
     conditions: conditions,
     rationale:  document.getElementById('f_rationale').value,
-    preChart:   preImgData,
+    preChart:   '',  // saved to IndexedDB below
     preTVLink:  document.getElementById('f_preTVLink').value.trim(),
     // System analysis fields
     htfBias:          document.getElementById('f_htfBias').value,
@@ -2471,7 +2610,7 @@ function submitTrade(e) {
       t.status = old.status; t.dateClose = old.dateClose;
       t.exitPrice = old.exitPrice; t.actualPnL = old.actualPnL;
       t.outcome = old.outcome; t.actualRR = old.actualRR;
-      t.review = old.review || t.review; t.postChart = old.postChart || postImgData;
+      t.review = old.review || t.review; t.postChart = old.postChart;
       t.rating = old.rating;
       t.scRespected = old.scRespected; t.mbmsPlayedOut = old.mbmsPlayedOut;
       t.htfAligned = old.htfAligned; t.liqProperlyTaken = old.liqProperlyTaken;
@@ -2482,6 +2621,18 @@ function submitTrade(e) {
     trades = trades.map(x => x.id === editId ? t : x);
   } else {
     trades.unshift(t);
+  }
+  // Save chart images to IndexedDB (async, non-blocking)
+  const tradeId = t.id;
+  if (preImgData) {
+    const key = chartKey(tradeId, 'pre');
+    t.preChart = key;
+    saveChartImage(key, preImgData).catch(() => {});
+  }
+  if (postImgData && !t.postChart) {
+    const key = chartKey(tradeId, 'post');
+    t.postChart = key;
+    saveChartImage(key, postImgData).catch(() => {});
   }
   save();
   clearDraft();
@@ -2531,11 +2682,29 @@ function resetForm() {
 // ═══════════════════════════════════════════════════════
 // JOURNAL
 // ═══════════════════════════════════════════════════════
+const JOURNAL_PAGE_SIZE = 20;
+let journalPage = 0;
+
+function restoreJournalFilters() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('tj_filters') || '{}');
+    if (saved.status)  document.getElementById('fltStatus').value  = saved.status;
+    if (saved.outcome) document.getElementById('fltOutcome').value = saved.outcome;
+    if (saved.market)  document.getElementById('fltMarket').value  = saved.market;
+    if (saved.setup)   document.getElementById('fltSetup').value   = saved.setup;
+  } catch {}
+}
+
+function onFilterChange() { journalPage = 0; renderJournal(); }
+
 function renderJournal() {
   const status  = document.getElementById('fltStatus').value;
   const outcome = document.getElementById('fltOutcome').value;
   const market  = document.getElementById('fltMarket').value;
   const setup   = document.getElementById('fltSetup').value;
+
+  // Persist filter state
+  try { sessionStorage.setItem('tj_filters', JSON.stringify({ status, outcome, market, setup })); } catch {}
 
   let list = [...trades];
   if (status)  list = list.filter(t => t.status === status);
@@ -2549,7 +2718,13 @@ function renderJournal() {
     return;
   }
 
-  el.innerHTML = list.map(t => {
+  const totalPages = Math.ceil(list.length / JOURNAL_PAGE_SIZE);
+  if (journalPage >= totalPages) journalPage = totalPages - 1;
+  if (journalPage < 0) journalPage = 0;
+  const start = journalPage * JOURNAL_PAGE_SIZE;
+  const pageItems = list.slice(start, start + JOURNAL_PAGE_SIZE);
+
+  let html = pageItems.map(t => {
     const rowClass = t.status === 'open' ? 'open' : t.status === 'partial' ? 'partial' : (t.outcome || 'be');
     const pnlClass = !t.actualPnL ? 'neutral' : t.actualPnL >= 0 ? 'pos' : 'neg';
     const badge    = t.status === 'open'
@@ -2576,6 +2751,22 @@ function renderJournal() {
       </div>
     </div>`;
   }).join('');
+
+  // Pagination controls
+  if (totalPages > 1) {
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;font-size:0.8rem;color:#8b949e;">
+      <span>Showing ${start+1}–${Math.min(start+JOURNAL_PAGE_SIZE, list.length)} of ${list.length} trades</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button class="btn" onclick="journalPage=0;renderJournal();" ${journalPage===0?'disabled':''} style="padding:4px 8px;font-size:0.75rem;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;">&#9664;&#9664;</button>
+        <button class="btn" onclick="journalPage--;renderJournal();" ${journalPage===0?'disabled':''} style="padding:4px 10px;font-size:0.75rem;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;">&#9664; Prev</button>
+        <span style="min-width:60px;text-align:center;">Page ${journalPage+1} / ${totalPages}</span>
+        <button class="btn" onclick="journalPage++;renderJournal();" ${journalPage>=totalPages-1?'disabled':''} style="padding:4px 10px;font-size:0.75rem;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;">Next &#9654;</button>
+        <button class="btn" onclick="journalPage=${totalPages-1};renderJournal();" ${journalPage>=totalPages-1?'disabled':''} style="padding:4px 8px;font-size:0.75rem;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;">&#9654;&#9654;</button>
+      </div>
+    </div>`;
+  }
+
+  el.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2973,7 +3164,8 @@ function openModal(id) {
   const preTVHtml = t.preTVLink ? `<div class="field"><div class="card-title" style="margin-bottom:4px;">Pre-Trade TradingView</div><a href="${escHtml(t.preTVLink)}" target="_blank" rel="noopener" class="tv-link">${escHtml(t.preTVLink)}</a></div>` : '';
   const preChartHtml = (t.preChart
     ? `<div class="field"><div class="card-title" style="margin-bottom:6px;">Pre-Trade Chart</div>
-       <img src="${t.preChart}" style="max-width:100%; border-radius:8px; border:1px solid #30363d; cursor:zoom-in;" onclick="lightbox(this.src)"></div>`
+       <img id="modalPreChart" src="" data-chart-key="${escHtml(t.preChart)}" style="max-width:100%; border-radius:8px; border:1px solid #30363d; cursor:zoom-in; display:none;" onclick="lightbox(this.src)">
+       <div id="modalPreChartLoading" style="color:#6e7681;font-size:0.78rem;">Loading chart...</div></div>`
     : '') + preTVHtml;
 
   // Post-trade review display (for closed trades)
@@ -2982,7 +3174,8 @@ function openModal(id) {
     const postTVHtml = t.postTVLink ? `<div class="field"><div class="card-title" style="margin-bottom:4px;">Post-Trade TradingView</div><a href="${escHtml(t.postTVLink)}" target="_blank" rel="noopener" class="tv-link">${escHtml(t.postTVLink)}</a></div>` : '';
     const postChartHtml = (t.postChart
       ? `<div class="field"><div class="card-title" style="margin-bottom:6px;">Post-Trade Chart</div>
-         <img src="${t.postChart}" style="max-width:100%; border-radius:8px; border:1px solid #30363d; cursor:zoom-in;" onclick="lightbox(this.src)"></div>`
+         <img id="modalPostChart" src="" data-chart-key="${escHtml(t.postChart)}" style="max-width:100%; border-radius:8px; border:1px solid #30363d; cursor:zoom-in; display:none;" onclick="lightbox(this.src)">
+         <div id="modalPostChartLoading" style="color:#6e7681;font-size:0.78rem;">Loading chart...</div></div>`
       : '') + postTVHtml;
 
     const reviewFields = [];
@@ -3082,6 +3275,27 @@ function openModal(id) {
   }
 
   overlay.classList.add('open');
+
+  // Load chart images from IndexedDB asynchronously
+  async function loadModalCharts() {
+    const preEl = document.getElementById('modalPreChart');
+    if (preEl) {
+      const key = preEl.dataset.chartKey;
+      const src = isBase64Image(key) ? key : await loadChartImage(key);
+      if (src) { preEl.src = src; preEl.style.display = ''; }
+      const ld = document.getElementById('modalPreChartLoading');
+      if (ld) ld.style.display = 'none';
+    }
+    const postEl = document.getElementById('modalPostChart');
+    if (postEl) {
+      const key = postEl.dataset.chartKey;
+      const src = isBase64Image(key) ? key : await loadChartImage(key);
+      if (src) { postEl.src = src; postEl.style.display = ''; }
+      const ld = document.getElementById('modalPostChartLoading');
+      if (ld) ld.style.display = 'none';
+    }
+  }
+  loadModalCharts();
 }
 
 function toggleCollapsible(header) {
@@ -3487,7 +3701,7 @@ function closeTrade(id) {
       status: 'closed', dateClose, exitPrice: wAvgExit,
       actualPnL: allPnL, outcome, actualRR: blendedRR, exitType,
       closeEvents: existingEvents,
-      review: '', postChart: postImgData || t.postChart,
+      review: '', postChart: t.postChart || '',
       postTVLink: closePostTVLink || t.postTVLink || '',
       rating: modalRating,
       scRespected, mbmsPlayedOut, htfAligned, liqProperlyTaken,
@@ -3495,6 +3709,15 @@ function closeTrade(id) {
       updatedAt: new Date().toISOString()
     };
   });
+  // Save post-trade chart to IndexedDB
+  if (postImgData) {
+    const closedTrade = trades.find(x => x.id === id);
+    if (closedTrade) {
+      const key = chartKey(id, 'post');
+      closedTrade.postChart = key;
+      saveChartImage(key, postImgData).catch(() => {});
+    }
+  }
   save();
   pushSync();
   closeModal();
@@ -3566,9 +3789,14 @@ function editTrade(id) {
       });
     }
     if (t.preChart) {
-      preImgData = t.preChart;
-      document.getElementById('prePreview').style.display = 'block';
-      document.getElementById('prePreviewImg').src = t.preChart;
+      (async () => {
+        const src = isBase64Image(t.preChart) ? t.preChart : await loadChartImage(t.preChart);
+        if (src) {
+          preImgData = src;
+          document.getElementById('prePreview').style.display = 'block';
+          document.getElementById('prePreviewImg').src = src;
+        }
+      })();
     }
   }, 50);
 }
@@ -6058,6 +6286,13 @@ function applySettings(s) {
 function openSettingsModal() {
   populateSettingsForm();
   document.getElementById('settingsOverlay').classList.add('open');
+  refreshStorageIndicator();
+}
+async function refreshStorageIndicator() {
+  const el = document.getElementById('storageIndicator');
+  if (!el) return;
+  const info = await getStorageInfo();
+  el.innerHTML = `Local storage: <strong>${fmtBytes(info.lsBytes)}</strong> / ~5 MB&nbsp;&nbsp;|&nbsp;&nbsp;Chart images: <strong>${fmtBytes(info.idbBytes)}</strong> (IndexedDB)`;
 }
 function closeSettingsModal() { document.getElementById('settingsOverlay').classList.remove('open'); }
 function maybeCloseSettings(e) { if (e.target === e.currentTarget) closeSettingsModal(); }
@@ -6191,15 +6426,15 @@ function settingsClearTrades() {
 // INIT
 // ═══════════════════════════════════════════════════════
 load();
+// Migrate any embedded base64 chart images to IndexedDB
+migrateChartImages().catch(e => console.warn('Chart migration:', e));
 applySettings(getSettings());
 updateSyncDot();
 refreshCloudStatus();
 renderDashboard();
 startDraftAutoSave();
 checkDraftOnLoad();
-startMT4Polling();
-updateSessionBar();
-setInterval(updateSessionBar, 1000);
+startBackgroundTimers();
 syncExchangeStatus();
 checkCalcAutoFill();
 (async () => {
@@ -6405,6 +6640,147 @@ function checkCalcAutoFill() {
       setTimeout(() => toast.classList.remove('show'), 3000);
     }, 100);
   } catch { /* ignore bad data */ }
+}
+
+// ═══════════════════════════════════════════════════════
+// PAGE VISIBILITY API — pause background work when hidden
+// ═══════════════════════════════════════════════════════
+let _sessionInterval = null;
+let _exchangeInterval = null;
+
+function startBackgroundTimers() {
+  if (!_sessionInterval) {
+    updateSessionBar();
+    _sessionInterval = setInterval(updateSessionBar, 10000);
+  }
+  if (!_exchangeInterval) {
+    _exchangeInterval = setInterval(syncExchangeStatus, 60000);
+  }
+  startMT4Polling();
+}
+
+function stopBackgroundTimers() {
+  if (_sessionInterval) { clearInterval(_sessionInterval); _sessionInterval = null; }
+  if (_exchangeInterval) { clearInterval(_exchangeInterval); _exchangeInterval = null; }
+  if (_mt4Interval) { clearInterval(_mt4Interval); _mt4Interval = null; }
+  clearTimeout(gistPushTimer);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopBackgroundTimers();
+  } else {
+    startBackgroundTimers();
+    // Refresh immediately on return
+    updateSessionBar();
+    syncExchangeStatus();
+    updateMT4Dot();
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// CSV EXPORT
+// ═══════════════════════════════════════════════════════
+function generateCSV(tradeList) {
+  const cols = [
+    'ID','Date Opened','Date Closed','Symbol','Direction','Market','Timeframe',
+    'Setup Type','HTF Bias','POI Type','BOS TF','Liq Taken',
+    'mbms Confirmed','SC Zone Visible','Entry Confirmation','Dist/Momentum',
+    'Trusted BOS','MBOS','DXY Key Level','DXY Confirms',
+    'Entry','SL','TP','SL Pips','TP Pips',
+    'Lot Size','Risk $','Planned RR',
+    'Exit','Actual RR','P&L','Outcome','Status',
+    'Confidence','Execution Rating',
+    'Session','Conditions',
+    'SC Respected','mbms Played Out','HTF Aligned',
+    'Expected vs Actual','Lesson Learned'
+  ];
+
+  const esc = v => {
+    if (v == null) return '';
+    const s = String(v);
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  };
+
+  const pipSz = (pair, entry) => (pair?.includes('JPY') || entry > 20) ? 0.01 : 0.0001;
+
+  const rows = tradeList.map((t, i) => {
+    const ps = pipSz(t.pair, t.entry);
+    const slPips = t.entry && t.sl ? (Math.abs(t.entry - t.sl) / ps).toFixed(1) : '';
+    const tpPips = t.entry && t.tp ? (Math.abs(t.tp - t.entry) / ps).toFixed(1) : '';
+    const session = t.dateOpen ? detectSession(new Date(t.dateOpen)) : '';
+    return [
+      i + 1,
+      t.dateOpen || '',
+      t.dateClose || '',
+      t.pair || '',
+      t.direction || '',
+      t.market || '',
+      t.timeframe || '',
+      t.setup || '',
+      t.htfBias || '',
+      t.poiType || '',
+      t.bosTF || '',
+      t.liqTaken || '',
+      t.mbmsConfirmed || '',
+      t.scVisible || '',
+      t.entryConfirmation || '',
+      t.distMomentum || '',
+      t.trustedBOS || '',
+      t.mbosPresent || '',
+      t.dxyKeyLevel || '',
+      t.dxyConfirms || '',
+      t.entry || '',
+      t.sl || '',
+      t.tp || '',
+      slPips,
+      tpPips,
+      t.size || '',
+      t.risk || '',
+      t.plannedRR ? t.plannedRR.toFixed(2) : '',
+      t.exitPrice || '',
+      t.actualRR != null ? t.actualRR.toFixed(2) : '',
+      t.actualPnL != null ? t.actualPnL.toFixed(2) : '',
+      t.outcome || '',
+      t.status || '',
+      t.confidence || '',
+      t.executionRating || '',
+      session,
+      (t.conditions || []).join('; '),
+      t.scRespected || '',
+      t.mbmsPlayedOut || '',
+      t.htfAligned || '',
+      t.expectedVsActual || '',
+      t.lessonLearned || ''
+    ].map(esc).join(',');
+  });
+
+  return cols.join(',') + '\n' + rows.join('\n');
+}
+
+function settingsExportCSV() {
+  const csv = generateCSV(trades);
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `trade-journal-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadAnalysisCSV() {
+  const period = analysisPeriod || 'all';
+  const filtered = filterByPeriod(trades, period);
+  const csv = generateCSV(filtered);
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `trade-export-${period}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 </script>
