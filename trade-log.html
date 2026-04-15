@@ -735,6 +735,79 @@
     }
     .partial-close-slider { margin: 6px 0; }
     .partial-close-slider input[type="range"] { width: 100%; }
+
+    /* ── EV Headline ── */
+    .ev-headline {
+      background: linear-gradient(135deg, #161b22 0%, #1a2332 100%);
+      border: 1px solid #30363d; border-radius: 10px;
+      padding: 18px 22px; margin-bottom: 14px; text-align: center;
+    }
+    .ev-headline .ev-value { font-size: 2rem; font-weight: 700; }
+    .ev-headline .ev-sub { font-size: 0.78rem; color: #8b949e; margin-top: 4px; }
+    .ev-headline .ev-formula { font-size: 0.68rem; color: #6e7681; margin-top: 8px; font-family: monospace; }
+    .ev-headline .ev-projection { font-size: 0.82rem; color: #58a6ff; margin-top: 6px; }
+
+    /* ── Drawdown ── */
+    .dd-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+    .dd-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; }
+    .dd-card .dd-label { font-size: 0.72rem; color: #8b949e; margin-bottom: 4px; }
+    .dd-card .dd-val { font-size: 1.15rem; font-weight: 600; }
+    .dd-progress { margin-top: 10px; }
+    .dd-progress-label { display: flex; justify-content: space-between; font-size: 0.72rem; color: #8b949e; margin-bottom: 4px; }
+    .dd-bar { height: 8px; background: #21262d; border-radius: 4px; overflow: hidden; }
+    .dd-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s; }
+    .dd-bar-ok { background: #3fb950; }
+    .dd-bar-warn { background: #d29922; }
+    .dd-bar-danger { background: #f85149; }
+    .streak-row { display: flex; gap: 14px; margin-top: 10px; font-size: 0.8rem; }
+    .streak-item { display: flex; align-items: center; gap: 5px; }
+    .streak-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* ── Calendar Heatmap ── */
+    .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .cal-nav button { background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 0.78rem; }
+    .cal-nav button:hover { background: #30363d; }
+    .cal-nav .cal-month { font-size: 0.9rem; font-weight: 600; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .cal-header { font-size: 0.65rem; color: #6e7681; text-align: center; padding: 4px 0; }
+    .cal-cell {
+      aspect-ratio: 1; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+      font-size: 0.68rem; cursor: default; position: relative; border: 1px solid transparent;
+    }
+    .cal-cell.empty { background: transparent; }
+    .cal-cell.no-trade { background: #161b22; color: #484f58; }
+    .cal-cell.win-1 { background: #0e3a1e; color: #3fb950; border-color: #1a4a2e; }
+    .cal-cell.win-2 { background: #1a5c30; color: #56d364; border-color: #2a6c40; }
+    .cal-cell.win-3 { background: #238636; color: #a5f3c0; border-color: #3fb950; }
+    .cal-cell.loss-1 { background: #3a1216; color: #f85149; border-color: #4a2226; }
+    .cal-cell.loss-2 { background: #5c1a20; color: #ff7b72; border-color: #6c2a30; }
+    .cal-cell.loss-3 { background: #8b2028; color: #ffa198; border-color: #f85149; }
+    .cal-cell.be { background: #2a2000; color: #d29922; border-color: #3a3010; }
+    .cal-tooltip {
+      display: none; position: absolute; bottom: calc(100% + 6px); left: 50%;
+      transform: translateX(-50%); background: #1c2128; border: 1px solid #30363d;
+      border-radius: 6px; padding: 8px 12px; font-size: 0.72rem; white-space: nowrap;
+      z-index: 20; box-shadow: 0 4px 12px rgba(0,0,0,0.4); color: #e6edf3;
+    }
+    .cal-cell:hover .cal-tooltip { display: block; }
+    .cal-dow-stats { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 10px; font-size: 0.7rem; text-align: center; }
+    .cal-dow-stat { background: #161b22; border-radius: 6px; padding: 6px 4px; }
+    .cal-dow-stat .dow-label { color: #6e7681; margin-bottom: 2px; }
+
+    /* ── Comparison Tool ── */
+    .cmp-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .cmp-preset {
+      background: #21262d; border: 1px solid #30363d; color: #8b949e; padding: 5px 12px;
+      border-radius: 16px; cursor: pointer; font-size: 0.75rem; transition: all 0.2s;
+    }
+    .cmp-preset:hover, .cmp-preset.active { background: #388bfd22; border-color: #388bfd; color: #58a6ff; }
+    .cmp-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .cmp-col { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px; }
+    .cmp-col-title { font-size: 0.82rem; font-weight: 600; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #21262d; }
+    .cmp-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.78rem; }
+    .cmp-row .cmp-label { color: #8b949e; }
+    .cmp-insight { background: #1a1f2e; border: 1px solid #30365d; border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 0.78rem; color: #79c0ff; }
+    .cmp-insight strong { color: #58a6ff; }
   </style>
 </head>
 <body>
@@ -810,9 +883,30 @@
 
   <div class="stats-row" id="statsRow"></div>
 
-  <!-- Left on Table -->
+  <!-- EV Headline -->
+  <div class="ev-headline" id="evHeadline" style="display:none;"></div>
+
+  <!-- Drawdown Tracking -->
+  <div class="card" id="drawdownCard" style="display:none;">
+    <div class="card-title">Drawdown &amp; Streak Tracker</div>
+    <div id="drawdownContent"></div>
+  </div>
+
+  <!-- Calendar Heatmap -->
+  <div class="card" id="calendarCard">
+    <div class="card-title">Trade Calendar</div>
+    <div id="calendarContent"></div>
+  </div>
+
+  <!-- Left on Table (enhanced) -->
   <div class="card" id="leftOnTableSummary" style="display:none;">
     <div class="card-title">Exit Quality — "Am I leaving too early?"</div>
+  </div>
+
+  <!-- Trade Comparison Tool -->
+  <div class="card" id="comparisonCard">
+    <div class="card-title">Trade Comparison Tool</div>
+    <div id="comparisonContent"></div>
   </div>
 
   <!-- Equity curve -->
@@ -1962,6 +2056,25 @@
             <select id="sett_market" onchange="saveSettingsFromForm()">
               <option value="Forex">Forex</option><option value="BTC/USDT">BTC/USDT</option><option value="Crypto">Other Crypto</option><option value="Indices">Indices</option><option value="Commodities">Commodities</option>
             </select>
+          </div>
+        </div>
+        <div style="margin-top:12px; padding-top:12px; border-top:1px solid #21262d;">
+          <div style="font-size:0.78rem; font-weight:600; margin-bottom:8px; color:#8b949e;">Drawdown Limits</div>
+          <div class="settings-grid">
+            <div class="settings-field">
+              <label>Daily Drawdown Limit %</label>
+              <input type="number" id="sett_ddDaily" placeholder="2" step="0.5" min="0.5" max="20" onchange="saveSettingsFromForm()">
+            </div>
+            <div class="settings-field">
+              <label>Weekly Drawdown Limit %</label>
+              <input type="number" id="sett_ddWeekly" placeholder="10" step="1" min="1" max="50" onchange="saveSettingsFromForm()">
+            </div>
+          </div>
+          <div class="settings-grid">
+            <div class="settings-field">
+              <label>Monthly Drawdown Limit %</label>
+              <input type="number" id="sett_ddMonthly" placeholder="25" step="1" min="1" max="100" onchange="saveSettingsFromForm()">
+            </div>
           </div>
         </div>
       </div>
@@ -3496,6 +3609,286 @@ function filterByPeriod(list, period) {
   });
 }
 
+// ═══════════════════════════════════════════════════════
+// ANALYTICS: EV, DRAWDOWN, CALENDAR, COMPARISON
+// ═══════════════════════════════════════════════════════
+
+let calendarMonth = new Date(); // tracks current calendar view month
+
+function renderEV(closed, wins, losses, winRate) {
+  const el = document.getElementById('evHeadline');
+  if (!el || closed.length < 2) { if (el) el.style.display = 'none'; return; }
+  const avgWin = wins.length ? wins.reduce((s,t) => s + (t.actualPnL||0), 0) / wins.length : 0;
+  const avgLoss = losses.length ? Math.abs(losses.reduce((s,t) => s + (t.actualPnL||0), 0) / losses.length) : 0;
+  const ev = (winRate/100 * avgWin) - ((100 - winRate)/100 * avgLoss);
+  const evClass = ev > 0 ? 'green' : ev < 0 ? 'red' : '';
+  const proj100 = ev * 100;
+  el.style.display = '';
+  el.innerHTML = `
+    <div class="ev-sub">Expected Value Per Trade</div>
+    <div class="ev-value ${evClass}">${ev >= 0 ? '+' : ''}$${fmt(Math.abs(ev))}</div>
+    <div class="ev-formula">(${fmt(winRate,1)}% × $${fmt(avgWin)}) − (${fmt(100-winRate,1)}% × $${fmt(avgLoss)})</div>
+    ${proj100 !== 0 ? `<div class="ev-projection">100 trades = <strong>${proj100 >= 0 ? '+' : ''}$${fmt(Math.abs(proj100))}</strong></div>` : ''}
+  `;
+}
+
+function renderDrawdown(allTrades) {
+  const el = document.getElementById('drawdownContent');
+  const card = document.getElementById('drawdownCard');
+  if (!el || !card) return;
+  const sett = getSettings();
+  const capital = sett.profile.capital;
+  if (!capital) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  const closed = allTrades.filter(t => t.status === 'closed' && t.actualPnL != null)
+    .sort((a,b) => new Date(a.dateClose) - new Date(b.dateClose));
+  if (!closed.length) { el.innerHTML = '<div style="color:#6e7681;font-size:0.8rem;">No closed trades yet.</div>'; return; }
+
+  // Equity curve for drawdown
+  let peak = capital, equity = capital, maxDD = 0, currentDD = 0;
+  let ddStart = null, maxDDDuration = 0, currentDDStart = null;
+  closed.forEach(t => {
+    equity += t.actualPnL;
+    if (equity > peak) { peak = equity; currentDDStart = null; }
+    const dd = ((peak - equity) / peak) * 100;
+    if (dd > 0 && !currentDDStart) currentDDStart = new Date(t.dateClose);
+    if (dd > maxDD) { maxDD = dd; }
+    currentDD = dd;
+  });
+  // Duration
+  let ddDurationDays = 0;
+  if (currentDDStart) {
+    ddDurationDays = Math.ceil((new Date() - currentDDStart) / (1000*60*60*24));
+  }
+
+  // Streaks
+  let winStreak = 0, lossStreak = 0, maxWinStreak = 0, maxLossStreak = 0, curWS = 0, curLS = 0;
+  closed.forEach(t => {
+    if (t.outcome === 'win') { curWS++; curLS = 0; if (curWS > maxWinStreak) maxWinStreak = curWS; }
+    else if (t.outcome === 'loss') { curLS++; curWS = 0; if (curLS > maxLossStreak) maxLossStreak = curLS; }
+    else { curWS = 0; curLS = 0; }
+  });
+  // Current streaks from end
+  winStreak = 0; lossStreak = 0;
+  for (let i = closed.length - 1; i >= 0; i--) {
+    if (closed[i].outcome === 'win') { if (lossStreak > 0) break; winStreak++; }
+    else if (closed[i].outcome === 'loss') { if (winStreak > 0) break; lossStreak++; }
+    else break;
+  }
+
+  // Period drawdowns (daily, weekly, monthly)
+  const now = new Date();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart = new Date(dayStart); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const ddPeriod = (start) => {
+    const inPeriod = closed.filter(t => new Date(t.dateClose) >= start);
+    const loss = inPeriod.filter(t => t.actualPnL < 0).reduce((s,t) => s + Math.abs(t.actualPnL), 0);
+    return capital > 0 ? (loss / capital) * 100 : 0;
+  };
+  const dailyDD = ddPeriod(dayStart);
+  const weeklyDD = ddPeriod(weekStart);
+  const monthlyDD = ddPeriod(monthStart);
+
+  const ddLimits = { daily: sett.profile.ddDaily || 2, weekly: sett.profile.ddWeekly || 10, monthly: sett.profile.ddMonthly || 25 };
+  const barClass = (val, limit) => val >= limit ? 'dd-bar-danger' : val >= limit * 0.7 ? 'dd-bar-warn' : 'dd-bar-ok';
+  const barPct = (val, limit) => Math.min((val / limit) * 100, 100);
+
+  el.innerHTML = `
+    <div class="dd-grid">
+      <div class="dd-card">
+        <div class="dd-label">Current Drawdown</div>
+        <div class="dd-val" style="color:${currentDD > 5 ? '#f85149' : currentDD > 0 ? '#d29922' : '#3fb950'};">${fmt(currentDD,1)}%</div>
+        ${ddDurationDays > 0 ? `<div style="font-size:0.68rem;color:#6e7681;margin-top:2px;">${ddDurationDays} day${ddDurationDays>1?'s':''} in drawdown</div>` : ''}
+      </div>
+      <div class="dd-card">
+        <div class="dd-label">Max Drawdown (All-Time)</div>
+        <div class="dd-val" style="color:${maxDD > 10 ? '#f85149' : '#d29922'};">${fmt(maxDD,1)}%</div>
+      </div>
+      <div class="dd-card">
+        <div class="dd-label">Peak Equity</div>
+        <div class="dd-val" style="color:#3fb950;">$${fmt(peak)}</div>
+        <div style="font-size:0.68rem;color:#6e7681;margin-top:2px;">Current: $${fmt(equity)}</div>
+      </div>
+    </div>
+    <div class="dd-progress">
+      <div class="dd-progress-label"><span>Daily (${fmt(dailyDD,1)}%)</span><span>Limit: ${ddLimits.daily}%</span></div>
+      <div class="dd-bar"><div class="dd-bar-fill ${barClass(dailyDD, ddLimits.daily)}" style="width:${barPct(dailyDD, ddLimits.daily)}%"></div></div>
+    </div>
+    <div class="dd-progress">
+      <div class="dd-progress-label"><span>Weekly (${fmt(weeklyDD,1)}%)</span><span>Limit: ${ddLimits.weekly}%</span></div>
+      <div class="dd-bar"><div class="dd-bar-fill ${barClass(weeklyDD, ddLimits.weekly)}" style="width:${barPct(weeklyDD, ddLimits.weekly)}%"></div></div>
+    </div>
+    <div class="dd-progress">
+      <div class="dd-progress-label"><span>Monthly (${fmt(monthlyDD,1)}%)</span><span>Limit: ${ddLimits.monthly}%</span></div>
+      <div class="dd-bar"><div class="dd-bar-fill ${barClass(monthlyDD, ddLimits.monthly)}" style="width:${barPct(monthlyDD, ddLimits.monthly)}%"></div></div>
+    </div>
+    <div class="streak-row">
+      <div class="streak-item"><div class="streak-dot" style="background:#3fb950;"></div> Win streak: <strong>${winStreak}</strong> (best: ${maxWinStreak})</div>
+      <div class="streak-item"><div class="streak-dot" style="background:#f85149;"></div> Loss streak: <strong>${lossStreak}</strong> (worst: ${maxLossStreak})</div>
+    </div>
+  `;
+}
+
+function renderCalendar(allTrades) {
+  const el = document.getElementById('calendarContent');
+  if (!el) return;
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dowNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  // Group trades by day
+  const dayMap = {};
+  allTrades.filter(t => t.status === 'closed' && t.dateClose).forEach(t => {
+    const d = new Date(t.dateClose);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if (!dayMap[key]) dayMap[key] = { pnl: 0, count: 0, wins: 0, losses: 0 };
+    dayMap[key].pnl += (t.actualPnL || 0);
+    dayMap[key].count++;
+    if (t.outcome === 'win') dayMap[key].wins++;
+    else if (t.outcome === 'loss') dayMap[key].losses++;
+  });
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Day-of-week stats
+  const dowStats = Array.from({length: 7}, () => ({ pnl: 0, count: 0, wins: 0 }));
+  Object.entries(dayMap).forEach(([key, v]) => {
+    const dow = new Date(key).getDay();
+    dowStats[dow].pnl += v.pnl;
+    dowStats[dow].count += v.count;
+    dowStats[dow].wins += v.wins;
+  });
+
+  let html = `<div class="cal-nav">
+    <button onclick="calendarMonth.setMonth(calendarMonth.getMonth()-1);renderCalendar(trades);">&#9664; Prev</button>
+    <span class="cal-month">${monthNames[month]} ${year}</span>
+    <button onclick="calendarMonth.setMonth(calendarMonth.getMonth()+1);renderCalendar(trades);">Next &#9654;</button>
+  </div>`;
+  html += `<div class="cal-grid">`;
+  dowNames.forEach(d => { html += `<div class="cal-header">${d}</div>`; });
+  // Empty cells before first day
+  for (let i = 0; i < firstDay; i++) html += `<div class="cal-cell empty"></div>`;
+  // Day cells
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const data = dayMap[key];
+    let cls = 'no-trade';
+    if (data) {
+      const pnl = data.pnl;
+      if (pnl > 0) cls = pnl > 100 ? 'win-3' : pnl > 30 ? 'win-2' : 'win-1';
+      else if (pnl < 0) cls = pnl < -100 ? 'loss-3' : pnl < -30 ? 'loss-2' : 'loss-1';
+      else cls = 'be';
+    }
+    const tooltip = data ? `<div class="cal-tooltip">${data.count} trade${data.count>1?'s':''}<br>P&L: ${data.pnl>=0?'+':''}$${fmt(Math.abs(data.pnl))}<br>${data.wins}W / ${data.losses}L</div>` : '';
+    html += `<div class="cal-cell ${cls}">${d}${tooltip}</div>`;
+  }
+  html += `</div>`;
+
+  // Day-of-week summary
+  html += `<div class="cal-dow-stats">`;
+  dowNames.forEach((name, i) => {
+    const s = dowStats[i];
+    const wr = s.count ? ((s.wins / s.count) * 100).toFixed(0) : 0;
+    html += `<div class="cal-dow-stat"><div class="dow-label">${name}</div><div style="color:${s.pnl>=0?'#3fb950':'#f85149'};font-weight:600;">${s.pnl>=0?'+':''}$${fmt(Math.abs(s.pnl),0)}</div><div style="color:#6e7681;">${s.count} trades</div></div>`;
+  });
+  html += `</div>`;
+
+  el.innerHTML = html;
+}
+
+function renderComparison(allTrades) {
+  const el = document.getElementById('comparisonContent');
+  if (!el) return;
+  const closed = allTrades.filter(t => t.status === 'closed');
+  if (closed.length < 3) {
+    el.innerHTML = '<div style="color:#6e7681;font-size:0.8rem;">Need at least 3 closed trades for comparisons.</div>';
+    return;
+  }
+
+  const presets = [
+    { id: 'poi', label: 'POI Type', field: 'poiType' },
+    { id: 'dxy', label: 'DXY Alignment', field: 'dxyConfirms' },
+    { id: 'htf', label: 'HTF Alignment', field: 'htfAligned' },
+    { id: 'session', label: 'Session', fn: t => detectSession(new Date(t.dateOpen)) },
+    { id: 'trustedBOS', label: 'Trusted BOS', field: 'trustedBOS' },
+    { id: 'confidence', label: 'Confidence', fn: t => (t.confidence||0) >= 7 ? 'High (7-10)' : (t.confidence||0) >= 4 ? 'Mid (4-6)' : 'Low (1-3)' },
+  ];
+
+  const activePreset = el.dataset.activePreset || 'poi';
+
+  let html = `<div class="cmp-presets">`;
+  presets.forEach(p => {
+    html += `<div class="cmp-preset ${p.id === activePreset ? 'active' : ''}" onclick="document.getElementById('comparisonContent').dataset.activePreset='${p.id}';renderComparison(trades);">${p.label}</div>`;
+  });
+  html += `</div>`;
+
+  const preset = presets.find(p => p.id === activePreset) || presets[0];
+  const groups = {};
+  closed.forEach(t => {
+    const val = preset.fn ? preset.fn(t) : (t[preset.field] || 'Not Set');
+    if (!val) return;
+    if (!groups[val]) groups[val] = { trades: [], wins: 0, losses: 0, pnl: 0, rr: [] };
+    groups[val].trades.push(t);
+    groups[val].pnl += (t.actualPnL || 0);
+    if (t.outcome === 'win') groups[val].wins++;
+    else if (t.outcome === 'loss') groups[val].losses++;
+    if (t.actualRR != null) groups[val].rr.push(t.actualRR);
+  });
+
+  const sorted = Object.entries(groups).sort((a,b) => b[1].pnl - a[1].pnl);
+  if (sorted.length < 2) {
+    html += '<div style="color:#6e7681;font-size:0.8rem;">Not enough variety in this category for comparison.</div>';
+    el.innerHTML = html; return;
+  }
+
+  // Show top 2 as comparison columns
+  html += `<div class="cmp-columns">`;
+  sorted.slice(0, 2).forEach(([name, g]) => {
+    const total = g.wins + g.losses;
+    const wr = total ? ((g.wins / total) * 100).toFixed(1) : 0;
+    const avgRR = g.rr.length ? (g.rr.reduce((s,r)=>s+r,0) / g.rr.length).toFixed(2) : '—';
+    const avgPnL = total ? (g.pnl / total) : 0;
+    html += `<div class="cmp-col">
+      <div class="cmp-col-title">${name}</div>
+      <div class="cmp-row"><span class="cmp-label">Trades</span><span>${total}</span></div>
+      <div class="cmp-row"><span class="cmp-label">Win Rate</span><span style="color:${wr>=50?'#3fb950':'#f85149'}">${wr}%</span></div>
+      <div class="cmp-row"><span class="cmp-label">Total P&L</span><span style="color:${g.pnl>=0?'#3fb950':'#f85149'}">${g.pnl>=0?'+':''}$${fmt(Math.abs(g.pnl))}</span></div>
+      <div class="cmp-row"><span class="cmp-label">Avg P&L/Trade</span><span style="color:${avgPnL>=0?'#3fb950':'#f85149'}">${avgPnL>=0?'+':''}$${fmt(Math.abs(avgPnL))}</span></div>
+      <div class="cmp-row"><span class="cmp-label">Avg R:R</span><span>${avgRR}R</span></div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Auto insight
+  if (sorted.length >= 2) {
+    const best = sorted[0], worst = sorted[sorted.length - 1];
+    const bestWR = (best[1].wins + best[1].losses) ? ((best[1].wins / (best[1].wins + best[1].losses)) * 100).toFixed(0) : 0;
+    const worstWR = (worst[1].wins + worst[1].losses) ? ((worst[1].wins / (worst[1].wins + worst[1].losses)) * 100).toFixed(0) : 0;
+    html += `<div class="cmp-insight">
+      <strong>Insight:</strong> <strong>${best[0]}</strong> trades outperform with ${bestWR}% win rate and $${fmt(Math.abs(best[1].pnl))} P&L${sorted.length > 2 ? `, while <strong>${worst[0]}</strong> underperforms at ${worstWR}% win rate` : ''}.
+    </div>`;
+  }
+
+  // Show remaining groups as a summary table
+  if (sorted.length > 2) {
+    html += `<div style="margin-top:12px;font-size:0.75rem;">`;
+    html += `<table style="width:100%;border-collapse:collapse;">`;
+    html += `<tr style="color:#6e7681;text-align:left;"><th style="padding:4px;">Group</th><th>Trades</th><th>WR</th><th>P&L</th></tr>`;
+    sorted.slice(2).forEach(([name, g]) => {
+      const total = g.wins + g.losses;
+      const wr = total ? ((g.wins / total) * 100).toFixed(0) : 0;
+      html += `<tr style="border-top:1px solid #21262d;"><td style="padding:4px;">${name}</td><td>${total}</td><td>${wr}%</td><td style="color:${g.pnl>=0?'#3fb950':'#f85149'}">${g.pnl>=0?'+':''}$${fmt(Math.abs(g.pnl))}</td></tr>`;
+    });
+    html += `</table></div>`;
+  }
+
+  el.innerHTML = html;
+}
+
 function calcLeftOnTable(tradeList) {
   let total = 0;
   let capturedSum = 0;
@@ -3536,7 +3929,24 @@ function calcLeftOnTable(tradeList) {
       capturedCount++;
     }
   });
-  return { total, avgCaptured: capturedCount > 0 ? capturedSum / capturedCount : 0 };
+  // Avg exit timing: how far through the trade duration did exits happen (0-100%)
+  let timingSum = 0, timingCount = 0;
+  tradeList.forEach(t => {
+    const events = t.closeEvents || [];
+    if (!events.length || !t.dateOpen) return;
+    const openTime = new Date(t.dateOpen).getTime();
+    const tpTime = t.dateClose ? new Date(t.dateClose).getTime() : Date.now();
+    const totalDuration = tpTime - openTime;
+    if (totalDuration <= 0) return;
+    events.forEach(ev => {
+      if (!ev.timestamp) return;
+      const evTime = new Date(ev.timestamp).getTime();
+      const pct = ((evTime - openTime) / totalDuration) * 100;
+      if (pct >= 0 && pct <= 100) { timingSum += pct; timingCount++; }
+    });
+  });
+  const avgExitTiming = timingCount > 0 ? timingSum / timingCount : 0;
+  return { total, avgCaptured: capturedCount > 0 ? capturedSum / capturedCount : 0, avgExitTiming, timingCount };
 }
 
 function renderDashboard() {
@@ -3575,19 +3985,33 @@ function renderDashboard() {
      <div class="stat-value ${s.cls}">${s.val}</div></div>`
   ).join('');
 
-  // Left on table summary
+  // EV headline
+  renderEV(closed, wins, losses, winRate);
+
+  // Drawdown & streaks
+  renderDrawdown(trades);
+
+  // Calendar heatmap
+  renderCalendar(trades);
+
+  // Left on table summary (enhanced)
   const lotEl = document.getElementById('leftOnTableSummary');
   if (lotEl) {
     if (leftOnTable.total > 0) {
-      lotEl.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div><div class="stat-label">Left on Table</div><div class="stat-value" style="color:#f0883e;">$${fmt(leftOnTable.total)}</div></div>
+      lotEl.innerHTML = `<div class="card-title">Exit Quality — "Am I leaving too early?"</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div><div class="stat-label">Total Left on Table</div><div class="stat-value" style="color:#f0883e;">$${fmt(leftOnTable.total)}</div></div>
         <div><div class="stat-label">Avg % Captured</div><div class="stat-value" style="color:#58a6ff;">${fmt(leftOnTable.avgCaptured,1)}%</div></div>
+        <div><div class="stat-label">Avg Exit Timing</div><div class="stat-value" style="color:#d2a8ff;">${leftOnTable.timingCount ? fmt(leftOnTable.avgExitTiming,0) + '% through trade' : '—'}</div></div>
       </div>`;
       lotEl.style.display = '';
     } else {
       lotEl.style.display = 'none';
     }
   }
+
+  // Comparison tool
+  renderComparison(filtered);
 
   renderEquity(closed);
   renderBreakdown(filtered);
@@ -4342,7 +4766,60 @@ function generateAnalysisExport(period) {
   if (startCap) {
     out += `Starting Capital: $${d(startCap)}  |  Current Equity: $${d(startCap + totalPnL)}\n`;
   }
+  // EV
+  const avgWinAmt = wins.length ? grossW / wins.length : 0;
+  const avgLossAmt = losses.length ? grossL / losses.length : 0;
+  const ev = (winRate/100 * avgWinAmt) - ((100-winRate)/100 * avgLossAmt);
+  out += `Expected Value (EV): ${ev >= 0 ? '+' : ''}$${d(ev)} per trade`;
+  if (ev !== 0) out += `  |  100-trade projection: ${ev >= 0 ? '+' : ''}$${d(ev * 100)}`;
   out += `\n`;
+  // Drawdown & Streaks
+  if (startCap && closed.length) {
+    let peak = startCap, eq = startCap, maxDDPct = 0, currentDDPct = 0;
+    const sortedClosed = [...closed].sort((a,b) => new Date(a.dateClose) - new Date(b.dateClose));
+    sortedClosed.forEach(t => { eq += t.actualPnL; if (eq > peak) peak = eq; const dd = ((peak-eq)/peak)*100; if (dd > maxDDPct) maxDDPct = dd; currentDDPct = dd; });
+    out += `Drawdown: Current ${d(currentDDPct,1)}%  |  Max ${d(maxDDPct,1)}%  |  Peak Equity: $${d(peak)}\n`;
+    // Streaks
+    let curWS=0, curLS=0, maxWS=0, maxLS=0;
+    sortedClosed.forEach(t => { if(t.outcome==='win'){curWS++;curLS=0;if(curWS>maxWS)maxWS=curWS;}else if(t.outcome==='loss'){curLS++;curWS=0;if(curLS>maxLS)maxLS=curLS;}else{curWS=0;curLS=0;} });
+    out += `Streaks: Best Win ${maxWS}  |  Worst Loss ${maxLS}\n`;
+  }
+  // Left on table
+  const lotData = calcLeftOnTable(closed.concat(filtered.filter(t => t.status === 'partial')));
+  if (lotData.total > 0) {
+    out += `Left on Table: $${d(lotData.total)}  |  Avg Captured: ${d(lotData.avgCaptured,1)}%`;
+    if (lotData.timingCount) out += `  |  Avg Exit Timing: ${d(lotData.avgExitTiming,0)}% through trade`;
+    out += `\n`;
+  }
+  out += `\n`;
+
+  // Comparison insights
+  const cmpFields = [
+    { label: 'POI Type', field: 'poiType' },
+    { label: 'Session', fn: t => detectSession(new Date(t.dateOpen)) },
+    { label: 'Trusted BOS', field: 'trustedBOS' },
+    { label: 'Confidence', fn: t => (t.confidence||0) >= 7 ? 'High (7-10)' : (t.confidence||0) >= 4 ? 'Mid (4-6)' : 'Low (1-3)' },
+  ];
+  let hasInsights = false;
+  cmpFields.forEach(cmp => {
+    const groups = {};
+    closed.forEach(t => {
+      const val = cmp.fn ? cmp.fn(t) : (t[cmp.field] || '');
+      if (!val) return;
+      if (!groups[val]) groups[val] = { w: 0, l: 0, pnl: 0 };
+      groups[val].pnl += (t.actualPnL || 0);
+      if (t.outcome === 'win') groups[val].w++; else if (t.outcome === 'loss') groups[val].l++;
+    });
+    const sorted = Object.entries(groups).filter(([,g]) => (g.w+g.l) >= 2).sort((a,b) => b[1].pnl - a[1].pnl);
+    if (sorted.length >= 2) {
+      if (!hasInsights) { out += `COMPARISON INSIGHTS:\n`; hasInsights = true; }
+      const best = sorted[0], worst = sorted[sorted.length-1];
+      const bWR = ((best[1].w/(best[1].w+best[1].l))*100).toFixed(0);
+      const wWR = ((worst[1].w/(worst[1].w+worst[1].l))*100).toFixed(0);
+      out += `  ${cmp.label}: Best="${best[0]}" (${bWR}% WR, ${money(best[1].pnl)}) vs Worst="${worst[0]}" (${wWR}% WR, ${money(worst[1].pnl)})\n`;
+    }
+  });
+  if (hasInsights) out += `\n`;
 
   out += `TRADE LOG:\n`;
   let equity = startCap;
@@ -5543,7 +6020,7 @@ function renderSessionPerformance(filtered) {
 // ═══════════════════════════════════════════════════════
 const SETTINGS_KEY = 'tradeJournal_settings';
 const DEFAULT_SETTINGS = {
-  profile: { name: '', currency: 'USD', capital: 0, riskPct: 1, riskCapPct: 2, beTriggerRR: 1.5, tz: 'local', tf: 'M15', market: 'Forex' },
+  profile: { name: '', currency: 'USD', capital: 0, riskPct: 1, riskCapPct: 2, beTriggerRR: 1.5, tz: 'local', tf: 'M15', market: 'Forex', ddDaily: 2, ddWeekly: 10, ddMonthly: 25 },
   display: { showSession: true, showEquity: true },
   sharing: { publicProfile: false, publicUser: '', sharePnL: false, shareWR: false, shareSetups: false, shareCharts: false, inviteCode: '' },
   export: { exportName: true, exportBalance: true, exportPeriod: 'all' }
@@ -5607,6 +6084,9 @@ function populateSettingsForm() {
   document.getElementById('sett_tz').value = s.profile.tz;
   document.getElementById('sett_tf').value = s.profile.tf;
   document.getElementById('sett_market').value = s.profile.market;
+  document.getElementById('sett_ddDaily').value = s.profile.ddDaily || 2;
+  document.getElementById('sett_ddWeekly').value = s.profile.ddWeekly || 10;
+  document.getElementById('sett_ddMonthly').value = s.profile.ddMonthly || 25;
   // Display toggles
   document.getElementById('sett_showSession').classList.toggle('on', s.display.showSession);
   document.getElementById('sett_showEquity').classList.toggle('on', s.display.showEquity);
@@ -5635,6 +6115,9 @@ function saveSettingsFromForm() {
   s.profile.tz = document.getElementById('sett_tz').value;
   s.profile.tf = document.getElementById('sett_tf').value;
   s.profile.market = document.getElementById('sett_market').value;
+  s.profile.ddDaily = parseFloat(document.getElementById('sett_ddDaily').value) || 2;
+  s.profile.ddWeekly = parseFloat(document.getElementById('sett_ddWeekly').value) || 10;
+  s.profile.ddMonthly = parseFloat(document.getElementById('sett_ddMonthly').value) || 25;
   s.sharing.publicUser = document.getElementById('sett_publicUser').value;
   s.sharing.inviteCode = document.getElementById('sett_inviteCode').value;
   s.export.exportPeriod = document.getElementById('sett_exportPeriod').value;
