@@ -24,11 +24,18 @@
 #property strict
 
 //--- User configurable inputs
-input string   BackendURL        = "https://poiwatcher-backend.onrender.com";
-input bool     EnableAutoBreakEven = true;
-input double   BreakEvenRR       = 1.5;
-input bool     EnableAutoLogging = true;
-input int      HeartbeatMinutes  = 5;
+input string   BackendURL           = "https://poiwatcher-backend.onrender.com";
+input bool     EnableAutoBreakEven  = true;
+input double   BreakEvenRR          = 1.5;
+input bool     EnableAutoLogging    = true;
+input int      HeartbeatMinutes     = 5;
+
+//--- Trade Execution Pipeline inputs
+input bool     EnableAutoExecution  = false;  // OFF by default — user must enable
+input string   ExecutionAPIKey      = "";     // Must match EXECUTION_API_KEY on backend
+input int      MaxSlippagePips      = 3;      // Max slippage in pips for execution
+input int      ExecutionCheckSeconds = 5;     // How often to poll for approved trades
+input double   MaxLotSize           = 1.0;    // Safety cap — never execute above this
 
 //--- Internal state
 int      knownTickets[];       // tickets we already know about
@@ -38,6 +45,10 @@ bool     beApplied[];          // whether BE was already applied
 datetime lastHeartbeat = 0;
 datetime lastCheck     = 0;
 
+//--- Execution pipeline state
+string   executedTradeIDs[];   // trade IDs already executed (prevent duplicates)
+datetime lastExecCheck = 0;    // last time we checked for pending trades
+
 //+------------------------------------------------------------------+
 //| Expert initialization                                             |
 //+------------------------------------------------------------------+
@@ -46,6 +57,11 @@ int OnInit()
    Print("POIWatcher EA initialized — Backend: ", BackendURL);
    Print("Auto Break Even: ", EnableAutoBreakEven ? "ON" : "OFF",
          " at 1:", DoubleToString(BreakEvenRR, 1), " RR");
+   Print("Auto Execution: ", EnableAutoExecution ? "ON" : "OFF",
+         " | Max lot: ", DoubleToString(MaxLotSize, 2),
+         " | Check every ", ExecutionCheckSeconds, "s");
+   if (EnableAutoExecution && StringLen(ExecutionAPIKey) == 0)
+      Print("WARNING: Auto Execution enabled but ExecutionAPIKey is empty!");
 
    // Scan existing trades on startup
    ScanOpenTrades();
@@ -85,6 +101,13 @@ void OnTimer()
 
       if (EnableAutoBreakEven)
          CheckBreakEven();
+   }
+
+   // Check for pending trade executions
+   if (EnableAutoExecution && now - lastExecCheck >= ExecutionCheckSeconds)
+   {
+      lastExecCheck = now;
+      CheckForPendingExecution();
    }
 
    // Heartbeat
@@ -294,6 +317,362 @@ void CheckBreakEven()
          }
       }
    }
+}
+
+//+------------------------------------------------------------------+
+//| TRADE EXECUTION PIPELINE                                         |
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| Check if a trade ID was already executed                         |
+//+------------------------------------------------------------------+
+bool IsExecutedTradeID(string tradeID)
+{
+   for (int i = 0; i < ArraySize(executedTradeIDs); i++)
+      if (executedTradeIDs[i] == tradeID) return true;
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| Mark a trade ID as executed                                       |
+//+------------------------------------------------------------------+
+void MarkTradeExecuted(string tradeID)
+{
+   int sz = ArraySize(executedTradeIDs);
+   ArrayResize(executedTradeIDs, sz + 1);
+   executedTradeIDs[sz] = tradeID;
+}
+
+//+------------------------------------------------------------------+
+//| Check if we already have an open trade on this symbol            |
+//+------------------------------------------------------------------+
+bool HasOpenTradeOnSymbol(string symbol)
+{
+   for (int i = OrdersTotal() - 1; i >= 0; i--)
+   {
+      if (!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
+      if (OrderType() > OP_SELL) continue;
+      if (OrderSymbol() == symbol) return true;
+   }
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| Simple JSON string value extractor                               |
+//+------------------------------------------------------------------+
+string JsonGetString(string json, string key)
+{
+   string search = "\"" + key + "\":\"";
+   int pos = StringFind(json, search);
+   if (pos < 0) return "";
+   pos += StringLen(search);
+   int end = StringFind(json, "\"", pos);
+   if (end < 0) return "";
+   return StringSubstr(json, pos, end - pos);
+}
+
+//+------------------------------------------------------------------+
+//| Simple JSON number value extractor                               |
+//+------------------------------------------------------------------+
+double JsonGetDouble(string json, string key)
+{
+   // Try "key":value (number without quotes)
+   string search = "\"" + key + "\":";
+   int pos = StringFind(json, search);
+   if (pos < 0) return 0;
+   pos += StringLen(search);
+   // Skip whitespace
+   while (pos < StringLen(json) && StringGetCharacter(json, pos) == ' ') pos++;
+   // Find end (comma, brace, or bracket)
+   int end = pos;
+   while (end < StringLen(json))
+   {
+      int ch = StringGetCharacter(json, end);
+      if (ch == ',' || ch == '}' || ch == ']') break;
+      end++;
+   }
+   string val = StringSubstr(json, pos, end - pos);
+   StringTrimRight(val);
+   StringTrimLeft(val);
+   // Remove quotes if present
+   if (StringGetCharacter(val, 0) == '"')
+      val = StringSubstr(val, 1, StringLen(val) - 2);
+   return StringToDouble(val);
+}
+
+//+------------------------------------------------------------------+
+//| HTTP GET with execution key header                               |
+//+------------------------------------------------------------------+
+string HttpGetWithKey(string endpoint)
+{
+   string url = BackendURL + endpoint;
+   string headers = "Content-Type: application/json\r\nX-Execution-Key: " + ExecutionAPIKey + "\r\n";
+   char   postData[];
+   char   result[];
+   string resultHeaders;
+
+   ArrayResize(postData, 0);
+
+   int res = WebRequest("GET", url, headers, 5000, postData, result, resultHeaders);
+
+   if (res == -1)
+   {
+      int err = GetLastError();
+      if (err == 4060)
+         Print("POIWatcher EXEC: WebRequest blocked — add ", BackendURL,
+               " to Tools → Options → Expert Advisors → Allow WebRequest");
+      else
+         Print("POIWatcher EXEC: HTTP error ", err, " on GET ", endpoint);
+      return "";
+   }
+
+   string response = CharArrayToString(result);
+
+   if (res >= 200 && res < 300)
+      return response;
+
+   Print("POIWatcher EXEC: HTTP ", res, " on GET ", endpoint, " — ", response);
+   return "";
+}
+
+//+------------------------------------------------------------------+
+//| HTTP POST with execution key header                              |
+//+------------------------------------------------------------------+
+void HttpPostWithKey(string endpoint, string jsonBody)
+{
+   string url = BackendURL + endpoint;
+   string headers = "Content-Type: application/json\r\nX-Execution-Key: " + ExecutionAPIKey + "\r\n";
+   char   postData[];
+   char   result[];
+   string resultHeaders;
+
+   StringToCharArray(jsonBody, postData, 0, WHOLE_ARRAY, CP_UTF8);
+   ArrayResize(postData, ArraySize(postData) - 1);
+
+   int res = WebRequest("POST", url, headers, 5000, postData, result, resultHeaders);
+
+   if (res == -1)
+   {
+      Print("POIWatcher EXEC: HTTP error ", GetLastError(), " on POST ", endpoint);
+   }
+   else if (res >= 200 && res < 300)
+   {
+      // Success
+   }
+   else
+   {
+      string response = CharArrayToString(result);
+      Print("POIWatcher EXEC: HTTP ", res, " on POST ", endpoint, " — ", response);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Check for pending trades and execute                             |
+//+------------------------------------------------------------------+
+void CheckForPendingExecution()
+{
+   if (!EnableAutoExecution) return;
+   if (StringLen(ExecutionAPIKey) == 0)
+   {
+      Print("POIWatcher EXEC: ExecutionAPIKey not set — skipping");
+      return;
+   }
+
+   // Safety: minimum equity floor
+   if (AccountEquity() < 100.0)
+   {
+      Print("POIWatcher EXEC: Account equity $", DoubleToString(AccountEquity(), 2),
+            " below $100 safety floor — skipping");
+      return;
+   }
+
+   // Fetch pending trade from backend
+   string response = HttpGetWithKey("/api/trade");
+   if (StringLen(response) == 0) return;
+
+   // Check status
+   string status = JsonGetString(response, "status");
+   if (status != "trade_ready") return; // no_trade or other
+
+   // Extract trade fields from nested "trade" object
+   // Find the trade object substring
+   int tradeStart = StringFind(response, "\"trade\":");
+   if (tradeStart < 0) return;
+   tradeStart += 8; // skip past "trade":
+   string tradeJson = StringSubstr(response, tradeStart);
+
+   string tradeID    = JsonGetString(tradeJson, "id");
+   string symbol     = JsonGetString(tradeJson, "symbol");
+   string direction  = JsonGetString(tradeJson, "direction");
+   double entry      = JsonGetDouble(tradeJson, "entry");
+   double sl         = JsonGetDouble(tradeJson, "sl");
+   double tp         = JsonGetDouble(tradeJson, "tp");
+   double riskPct    = JsonGetDouble(tradeJson, "risk_percent");
+   double lotSize    = JsonGetDouble(tradeJson, "lot_size");
+   double beTrigger  = JsonGetDouble(tradeJson, "be_trigger_rr");
+   string journalID  = JsonGetString(tradeJson, "journal_trade_id");
+
+   if (StringLen(tradeID) == 0 || StringLen(symbol) == 0)
+   {
+      Print("POIWatcher EXEC: Invalid trade data — missing ID or symbol");
+      return;
+   }
+
+   Print("POIWatcher EXEC: Trade ready — ", tradeID, " ", symbol, " ", direction,
+         " Entry:", DoubleToString(entry, 5), " SL:", DoubleToString(sl, 5),
+         " TP:", DoubleToString(tp, 5), " Lot:", DoubleToString(lotSize, 2));
+
+   // ── SAFETY CHECKS ──
+
+   // 1. Already executed?
+   if (IsExecutedTradeID(tradeID))
+   {
+      Print("POIWatcher EXEC: Trade ", tradeID, " already executed — skipping");
+      return;
+   }
+
+   // 2. Symbol available in MT4?
+   double testBid = MarketInfo(symbol, MODE_BID);
+   if (testBid <= 0)
+   {
+      Print("POIWatcher EXEC: Symbol ", symbol, " not available in MT4 — REJECTED");
+      SendExecutionResult(tradeID, 0, 0, "Symbol not available in MT4: " + symbol);
+      MarkTradeExecuted(tradeID);
+      return;
+   }
+
+   // 3. Market open?
+   int spread = (int)MarketInfo(symbol, MODE_SPREAD);
+   if (spread <= 0)
+   {
+      Print("POIWatcher EXEC: Market appears closed for ", symbol, " (spread=0) — skipping");
+      return; // Don't mark as executed — retry next cycle
+   }
+
+   // 4. Already have open trade on same symbol?
+   if (HasOpenTradeOnSymbol(symbol))
+   {
+      Print("POIWatcher EXEC: Already have open trade on ", symbol, " — REJECTED");
+      SendExecutionResult(tradeID, 0, 0, "Already have open trade on " + symbol);
+      MarkTradeExecuted(tradeID);
+      return;
+   }
+
+   // 5. Calculate lot size from risk percent if needed
+   double calcLot = lotSize;
+   if (riskPct > 0 && sl > 0 && entry > 0)
+   {
+      double riskAmount = AccountEquity() * (riskPct / 100.0);
+      double slDistPoints = MathAbs(entry - sl) / MarketInfo(symbol, MODE_POINT);
+      double tickValue = MarketInfo(symbol, MODE_TICKVALUE);
+      if (tickValue > 0 && slDistPoints > 0)
+      {
+         calcLot = riskAmount / (slDistPoints * tickValue);
+         calcLot = NormalizeDouble(calcLot, 2);
+      }
+   }
+
+   // Apply lot size constraints
+   double minLot = MarketInfo(symbol, MODE_MINLOT);
+   double maxLot = MarketInfo(symbol, MODE_MAXLOT);
+   double lotStep = MarketInfo(symbol, MODE_LOTSTEP);
+   if (calcLot < minLot) calcLot = minLot;
+   if (calcLot > maxLot) calcLot = maxLot;
+
+   // Round to lot step
+   if (lotStep > 0)
+      calcLot = MathFloor(calcLot / lotStep) * lotStep;
+   calcLot = NormalizeDouble(calcLot, 2);
+
+   // 6. Lot size safety cap
+   if (calcLot > MaxLotSize)
+   {
+      Print("POIWatcher EXEC: Calculated lot ", DoubleToString(calcLot, 2),
+            " exceeds MaxLotSize ", DoubleToString(MaxLotSize, 2), " — REJECTED");
+      SendExecutionResult(tradeID, 0, 0,
+            "Lot size " + DoubleToString(calcLot, 2) + " exceeds max " + DoubleToString(MaxLotSize, 2));
+      MarkTradeExecuted(tradeID);
+      return;
+   }
+
+   // ── EXECUTE TRADE ──
+   int cmd = -1;
+   if (direction == "BUY")  cmd = OP_BUY;
+   if (direction == "SELL") cmd = OP_SELL;
+   if (cmd < 0)
+   {
+      Print("POIWatcher EXEC: Invalid direction '", direction, "' — REJECTED");
+      SendExecutionResult(tradeID, 0, 0, "Invalid direction: " + direction);
+      MarkTradeExecuted(tradeID);
+      return;
+   }
+
+   int digits = (int)MarketInfo(symbol, MODE_DIGITS);
+   double price;
+   if (cmd == OP_BUY)
+      price = MarketInfo(symbol, MODE_ASK);
+   else
+      price = MarketInfo(symbol, MODE_BID);
+
+   // Slippage in points
+   int slippagePoints = MaxSlippagePips;
+   if (digits == 3 || digits == 5)
+      slippagePoints = MaxSlippagePips * 10;
+
+   string comment = "POIWatcher_" + tradeID;
+
+   double normSL = NormalizeDouble(sl, digits);
+   double normTP = NormalizeDouble(tp, digits);
+
+   Print("POIWatcher EXEC: Executing ", (cmd == OP_BUY ? "BUY" : "SELL"), " ",
+         symbol, " ", DoubleToString(calcLot, 2), " lots @ ",
+         DoubleToString(price, digits), " SL:", DoubleToString(normSL, digits),
+         " TP:", DoubleToString(normTP, digits), " slip:", slippagePoints);
+
+   int ticket = OrderSend(symbol, cmd, calcLot, price, slippagePoints,
+                          normSL, normTP, comment, 0, 0,
+                          cmd == OP_BUY ? clrLime : clrRed);
+
+   MarkTradeExecuted(tradeID); // Always mark to prevent retry loops
+
+   if (ticket > 0)
+   {
+      // Success!
+      if (OrderSelect(ticket, SELECT_BY_TICKET))
+      {
+         double actualEntry = OrderOpenPrice();
+         Print("POIWatcher EXEC: SUCCESS — Ticket #", ticket,
+               " ", symbol, " ", (cmd == OP_BUY ? "BUY" : "SELL"),
+               " @ ", DoubleToString(actualEntry, digits),
+               " Lot: ", DoubleToString(calcLot, 2));
+
+         SendExecutionResult(tradeID, ticket, actualEntry, "");
+      }
+   }
+   else
+   {
+      int err = GetLastError();
+      string errMsg = "OrderSend failed: error " + IntegerToString(err);
+      Print("POIWatcher EXEC: FAILED — ", errMsg, " for ", symbol);
+      SendExecutionResult(tradeID, 0, 0, errMsg);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Send execution result to backend                                 |
+//+------------------------------------------------------------------+
+void SendExecutionResult(string tradeID, int ticket, double actualEntry, string error)
+{
+   string json = "{";
+   json += "\"id\":\"" + tradeID + "\",";
+   json += "\"ticket\":" + IntegerToString(ticket) + ",";
+   json += "\"actual_entry\":" + DoubleToString(actualEntry, 5) + ",";
+   json += "\"timestamp\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\"";
+   if (StringLen(error) > 0)
+      json += ",\"error\":\"" + error + "\"";
+   json += "}";
+
+   HttpPostWithKey("/api/trade/executed", json);
 }
 
 //+------------------------------------------------------------------+

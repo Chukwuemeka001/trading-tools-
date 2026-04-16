@@ -10,6 +10,8 @@ Works with the [Trade Journal app](https://chukwuemeka001.github.io/trading-tool
 - **AI Level Suggestions** — Claude analyzes candle data using your exact trading system framework
 - **MT4 Auto-Logging** — Expert Advisor sends trade open/close/modify events to backend
 - **Break Even Automation** — EA auto-moves SL to entry at configurable RR
+- **Trade Execution Pipeline** — Approve trades from journal → backend risk-checks → MT4 EA auto-executes
+- **Risk Engine** — Hard blocks (risk%, daily/weekly/monthly drawdown) and soft warnings (DXY conflicts, low confidence, no entry confirm)
 - **Kraken Exchange Integration** — Auto-log trades, monitor positions, balance tracking
 - **Binance Exchange Integration** — Same auto-logging features as Kraken (parallel option)
 - **1:5 R:R Break Even Alerts** — Telegram notification when positions reach 1:5 R:R
@@ -78,8 +80,11 @@ Works with the [Trade Journal app](https://chukwuemeka001.github.io/trading-tool
    | `KRAKEN_API_SECRET` | Your Kraken private key from Step 3 |
    | `BINANCE_API_KEY` | Your Binance API key from Step 4 (optional) |
    | `BINANCE_API_SECRET` | Your Binance secret from Step 4 (optional) |
+   | `EXECUTION_API_KEY` | A long random secret (e.g. `openssl rand -hex 32`) — required for trade execution |
    | `GIST_ID` | `bc004e07ada6586fc4492590f80b182b` (already set) |
    | `ALLOWED_ORIGIN` | `https://chukwuemeka001.github.io` (already set) |
+
+   > **EXECUTION_API_KEY** — Generate a random 64-char hex string and put the SAME value in three places: (a) Render env var, (b) journal app Settings → Profile → Execution API Key, (c) MT4 EA `ExecutionAPIKey` input. Without this, the trade execution pipeline is disabled.
 
 5. Deploy — Render will auto-detect the `render.yaml` config
 
@@ -122,6 +127,11 @@ Works with the [Trade Journal app](https://chukwuemeka001.github.io/trading-tool
      - `BreakEvenRR` — 1.5 (move SL to entry at 1:1.5 RR)
      - `EnableAutoLogging` — true
      - `HeartbeatMinutes` — 5
+     - `EnableAutoExecution` — **false** by default (turn ON only when you've tested everything)
+     - `ExecutionAPIKey` — paste the same secret you set as `EXECUTION_API_KEY` on Render
+     - `MaxSlippagePips` — 3 (slippage tolerance for market orders)
+     - `ExecutionCheckSeconds` — 5 (poll backend every 5s for approved trades)
+     - `MaxLotSize` — 1.0 (hard cap — EA refuses anything above this regardless of risk%)
    - Click OK
 
 5. **Verify:**
@@ -151,13 +161,63 @@ Works with the [Trade Journal app](https://chukwuemeka001.github.io/trading-tool
 | `GET` | `/kraken/positions` | Kraken open positions with R:R |
 | `GET` | `/binance/account` | Binance balance and open orders |
 | `GET` | `/exchange/status` | Connection status for all exchanges |
+| `POST` | `/api/trade/approve` | Approve a journal trade for execution (risk-checked) |
+| `GET` | `/api/trade` | EA polls this — returns latest approved trade |
+| `POST` | `/api/trade/executed` | EA confirms execution back to backend |
+| `POST` | `/api/trade/cancelled` | Cancel a pending approved trade |
+| `GET` | `/api/trade/status/<id>` | Status of a specific trade in the queue |
+| `GET` | `/api/execution/queue` | Full pending execution queue |
+
+> **Execution endpoints** (`/api/trade/*`, `/api/execution/*`) require `X-Execution-Key` header matching `EXECUTION_API_KEY`.
+
+## Trade Execution Pipeline
+
+End-to-end flow:
+
+```
+Journal app → POST /api/trade/approve → Risk Engine → Execution Queue
+                                              │
+                                              ▼
+              ┌─── Telegram alert (approved/rejected) ───┐
+              │                                          │
+MT4 EA polls /api/trade every 5s ──→ Validates locally ──→ OrderSend()
+              │                                          │
+              └──→ POST /api/trade/executed ──→ Updates Gist + Telegram
+```
+
+**Risk Engine — Hard Blocks** (trade rejected):
+- Missing/invalid SL or TP
+- SL/TP on wrong side of entry for direction
+- Risk % above configured limit (default 2%)
+- Daily / weekly / monthly drawdown limit hit (configurable in journal Settings)
+
+**Risk Engine — Soft Warnings** (trade still approved, warnings sent to Telegram):
+- Risk above 1.5% but below hard limit
+- Approaching drawdown limits (within 80%)
+- Confidence score below 7
+- DXY direction conflicts with trade direction
+- No entry confirmation (MBOS / Trusted BOS) on the candle
+
+**Execution Safety (EA-side):**
+- `EnableAutoExecution = false` by default — must be opted in
+- Refuses to execute if account equity < $100
+- Refuses if `MaxLotSize` would be exceeded
+- Refuses duplicate symbol (one trade per symbol max)
+- Refuses if symbol unavailable on the broker
+- Skips when market closed (spread = 0)
+- Tracks executed trade IDs to prevent re-execution loops
 
 ## Architecture
 
 ```
 MT4 Terminal ──→ POIWatcher EA ──→ Flask Backend ──→ Telegram Bot
-                                       │                    │
-Kraken/CoinCap ──→ Price Monitor ──────┤                    └── Your phone
+       ▲           │                   │                    │
+       │           │                   │                    └── Your phone
+       │           ├── auto-log        │
+       │           ├── auto-BE         │
+       │           └── auto-EXECUTE ◄──┤◄── Risk Engine ◄──── Journal app
+       │                               │       (validates approved trades)
+Kraken/CoinCap ──→ Price Monitor ──────┤
                                        │
 Kraken Private ──→ Trade Auto-Logger ──┤
 Binance Private ─┘                     │
@@ -169,9 +229,10 @@ Binance Private ─┘                     │
 - Backend polls Kraken every 60 seconds for price alerts
 - Exchange sync loop checks Kraken/Binance every 60 seconds for new trades
 - MT4 EA sends trade events and heartbeats to backend
+- MT4 EA polls `/api/trade` every 5s when `EnableAutoExecution=true`
 - Open positions monitored for 1:5 R:R break even alerts
 - All data syncs to GitHub Gist for the journal app
-- Telegram notifications for alerts, trade opens, closes, and break even
+- Telegram notifications for alerts, trade opens, closes, break even, and execution events
 
 ## Security
 
@@ -185,3 +246,6 @@ Binance Private ─┘                     │
 - Kraken requests signed with HMAC-SHA512 per Kraken documentation
 - Binance requests signed with HMAC-SHA256 per Binance documentation
 - If API returns auth error, exchange sync is disabled automatically (no repeated bad requests)
+- Trade execution endpoints require `X-Execution-Key` header — compared with `hmac.compare_digest` (constant-time)
+- Execution is opt-in: `EnableAutoExecution=false` by default in EA, hard `MaxLotSize` cap, equity floor, duplicate-symbol guard
+- Risk engine enforces hard SL/TP validation, risk%, and drawdown limits before any trade is queued for execution
