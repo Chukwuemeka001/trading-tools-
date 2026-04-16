@@ -14,7 +14,7 @@ import hmac
 import base64
 import threading
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 
 import requests
@@ -33,6 +33,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 GITHUB_GIST_TOKEN = os.environ.get("GITHUB_GIST_TOKEN", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+EXECUTION_API_KEY = os.environ.get("EXECUTION_API_KEY", "")
 GIST_ID = os.environ.get("GIST_ID", "bc004e07ada6586fc4492590f80b182b")
 GIST_FILE = "trade-journal.json"
 
@@ -1594,6 +1595,441 @@ def binance_account():
         return jsonify({"error": "Binance geo-blocked"}), 403
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ═══════════════════════════════════════════════════════
+# TRADE EXECUTION PIPELINE
+# ═══════════════════════════════════════════════════════
+
+# In-memory execution queue (persists across requests, lost on restart)
+# Each entry: { id, symbol, direction, entry, sl, tp, risk_percent, lot_size,
+#               be_trigger_rr, timestamp, source, journal_trade_id, status,
+#               warnings, actual_entry, executed_at }
+_execution_queue = []
+
+
+def _require_execution_key():
+    """Validate X-Execution-Key header. Returns error response or None."""
+    if not EXECUTION_API_KEY:
+        return jsonify({"error": "EXECUTION_API_KEY not configured on server"}), 500
+    key = request.headers.get("X-Execution-Key", "")
+    if not hmac.compare_digest(key, EXECUTION_API_KEY):
+        return jsonify({"error": "Invalid or missing X-Execution-Key"}), 401
+    return None
+
+
+def _get_account_state_from_gist():
+    """Read closed trades from Gist to compute daily/weekly/monthly P&L."""
+    trades_list = get_trades()
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Week starts Monday
+    week_start = today_start - timedelta(days=now.weekday())
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    daily_pnl = 0.0
+    weekly_pnl = 0.0
+    monthly_pnl = 0.0
+    capital = 0.0
+
+    for t in trades_list:
+        if t.get("status") != "closed" or t.get("actualPnL") is None:
+            continue
+        pnl = float(t.get("actualPnL", 0))
+        close_date = t.get("dateClose")
+        if not close_date:
+            continue
+        try:
+            cd = datetime.fromisoformat(close_date.replace("Z", "+00:00"))
+            if cd.tzinfo is None:
+                cd = cd.replace(tzinfo=timezone.utc)
+        except (ValueError, AttributeError):
+            continue
+
+        if cd >= today_start:
+            daily_pnl += pnl
+        if cd >= week_start:
+            weekly_pnl += pnl
+        if cd >= month_start:
+            monthly_pnl += pnl
+
+    # Try to get capital from Gist settings or MT4 status
+    gist_data = gist_read()
+    if gist_data and isinstance(gist_data, dict):
+        settings = gist_data.get("settings", {})
+        capital = float(settings.get("profile", {}).get("capital", 0))
+        if not capital:
+            capital = float(_mt4_status.get("account_balance", 0))
+
+    return {
+        "capital": capital,
+        "daily_pnl": daily_pnl,
+        "weekly_pnl": weekly_pnl,
+        "monthly_pnl": monthly_pnl,
+    }
+
+
+def validate_trade(trade, account_state=None):
+    """Risk engine: validate a trade before approval.
+
+    Returns: { approved: bool, warnings: [], reason: str, adjusted_trade: trade }
+    """
+    if account_state is None:
+        account_state = _get_account_state_from_gist()
+
+    warnings = []
+    capital = account_state.get("capital", 0)
+    risk_pct = float(trade.get("risk_percent", 1.0))
+
+    # --- Configurable limits (passed from journal settings or use defaults) ---
+    limits = trade.get("risk_limits", {})
+    max_risk_per_trade = float(limits.get("riskPerTrade", 2))
+    max_daily_loss = float(limits.get("dailyLoss", 2))
+    max_weekly_loss = float(limits.get("weeklyLoss", 10))
+    max_monthly_loss = float(limits.get("monthlyLoss", 25))
+
+    entry = float(trade.get("entry", 0))
+    sl = float(trade.get("sl", 0))
+    tp = float(trade.get("tp", 0))
+    direction = trade.get("direction", "").upper()
+
+    # ── HARD BLOCKS ──
+    # Missing SL or TP
+    if not sl or not tp:
+        return {"approved": False, "warnings": [], "reason": "Missing SL or TP", "adjusted_trade": trade}
+
+    # SL on wrong side
+    if direction == "BUY" and sl >= entry:
+        return {"approved": False, "warnings": [], "reason": "SL must be below entry for BUY", "adjusted_trade": trade}
+    if direction == "SELL" and sl <= entry:
+        return {"approved": False, "warnings": [], "reason": "SL must be above entry for SELL", "adjusted_trade": trade}
+
+    # TP on wrong side
+    if direction == "BUY" and tp <= entry:
+        return {"approved": False, "warnings": [], "reason": "TP must be above entry for BUY", "adjusted_trade": trade}
+    if direction == "SELL" and tp >= entry:
+        return {"approved": False, "warnings": [], "reason": "TP must be below entry for SELL", "adjusted_trade": trade}
+
+    # Risk % too high
+    if risk_pct > max_risk_per_trade:
+        return {"approved": False, "warnings": [],
+                "reason": f"Risk {risk_pct}% exceeds max {max_risk_per_trade}% per trade", "adjusted_trade": trade}
+
+    # Drawdown limits (only check if capital is known)
+    if capital > 0:
+        daily_loss_pct = abs(min(account_state.get("daily_pnl", 0), 0)) / capital * 100
+        weekly_loss_pct = abs(min(account_state.get("weekly_pnl", 0), 0)) / capital * 100
+        monthly_loss_pct = abs(min(account_state.get("monthly_pnl", 0), 0)) / capital * 100
+
+        if daily_loss_pct >= max_daily_loss:
+            return {"approved": False, "warnings": [],
+                    "reason": f"Daily loss {daily_loss_pct:.1f}% already at limit ({max_daily_loss}%)", "adjusted_trade": trade}
+        if weekly_loss_pct >= max_weekly_loss:
+            return {"approved": False, "warnings": [],
+                    "reason": f"Weekly loss {weekly_loss_pct:.1f}% already at limit ({max_weekly_loss}%)", "adjusted_trade": trade}
+        if monthly_loss_pct >= max_monthly_loss:
+            return {"approved": False, "warnings": [],
+                    "reason": f"Monthly loss {monthly_loss_pct:.1f}% already at limit ({max_monthly_loss}%)", "adjusted_trade": trade}
+
+        # ── SOFT WARNINGS ──
+        if risk_pct > 1.5:
+            warnings.append(f"Risk {risk_pct}% is approaching the {max_risk_per_trade}% limit")
+        if daily_loss_pct > max_daily_loss * 0.75:
+            warnings.append(f"Daily loss {daily_loss_pct:.1f}% approaching {max_daily_loss}% limit")
+
+    # Confidence warning
+    confidence = int(trade.get("confidence", 0))
+    if confidence > 0 and confidence < 6:
+        warnings.append(f"Low confidence ({confidence}/10)")
+
+    # DXY conflict warning
+    dxy_confirms = trade.get("dxy_confirms", "")
+    if dxy_confirms and dxy_confirms.lower() in ("no", "conflicts"):
+        warnings.append("DXY conflicts with trade direction")
+
+    # No entry confirmation
+    entry_conf = trade.get("entry_confirmation", "")
+    if not entry_conf:
+        warnings.append("No entry confirmation recorded")
+
+    return {"approved": True, "warnings": warnings, "reason": "", "adjusted_trade": trade}
+
+
+# ── Execution Endpoints ────────────────────────────────
+
+@app.route("/api/trade", methods=["GET"])
+def get_pending_trade():
+    """GET /api/trade — Return latest approved trade waiting for MT4 execution."""
+    auth_err = _require_execution_key()
+    if auth_err:
+        return auth_err
+
+    for trade in _execution_queue:
+        if trade.get("status") == "approved":
+            # Mark as fetched so it doesn't execute twice
+            trade["status"] = "fetched"
+            trade["fetched_at"] = datetime.now(timezone.utc).isoformat()
+            return jsonify({
+                "status": "trade_ready",
+                "trade": {
+                    "id": trade["id"],
+                    "symbol": trade["symbol"],
+                    "direction": trade["direction"],
+                    "entry": trade["entry"],
+                    "sl": trade["sl"],
+                    "tp": trade["tp"],
+                    "risk_percent": trade["risk_percent"],
+                    "lot_size": trade["lot_size"],
+                    "be_trigger_rr": trade.get("be_trigger_rr", 1.5),
+                    "timestamp": trade["timestamp"],
+                    "source": "journal",
+                    "journal_trade_id": trade.get("journal_trade_id", ""),
+                }
+            })
+
+    return jsonify({"status": "no_trade"})
+
+
+@app.route("/api/trade/approve", methods=["POST"])
+def approve_trade():
+    """POST /api/trade/approve — Validate and queue a trade for MT4 execution."""
+    auth_err = _require_execution_key()
+    if auth_err:
+        return auth_err
+
+    body = request.json
+    if not body:
+        return jsonify({"error": "Request body required"}), 400
+
+    required = ["symbol", "direction", "entry", "sl", "tp"]
+    for field in required:
+        if field not in body:
+            return jsonify({"error": f"Missing required field: {field}"}), 400
+
+    # Build trade object
+    trade = {
+        "id": str(uuid.uuid4())[:12],
+        "symbol": body["symbol"].upper(),
+        "direction": body["direction"].upper(),
+        "entry": float(body["entry"]),
+        "sl": float(body["sl"]),
+        "tp": float(body["tp"]),
+        "risk_percent": float(body.get("risk_percent", 1.0)),
+        "lot_size": float(body.get("lot_size", 0.01)),
+        "be_trigger_rr": float(body.get("be_trigger_rr", 1.5)),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "source": "journal",
+        "journal_trade_id": body.get("journal_trade_id", ""),
+        "status": "pending",
+        "confidence": body.get("confidence", 0),
+        "dxy_confirms": body.get("dxy_confirms", ""),
+        "entry_confirmation": body.get("entry_confirmation", ""),
+        "risk_limits": body.get("risk_limits", {}),
+    }
+
+    # Get account state (from body or Gist)
+    account_state = body.get("account_state") or _get_account_state_from_gist()
+
+    # Run risk engine
+    result = validate_trade(trade, account_state)
+
+    if not result["approved"]:
+        # Rejected
+        trade["status"] = "rejected"
+        trade["reject_reason"] = result["reason"]
+        _execution_queue.append(trade)
+
+        msg = (
+            f"\u274c <b>Trade REJECTED by risk engine</b>\n\n"
+            f"<b>{trade['symbol']}</b> {trade['direction']}\n"
+            f"Entry: {trade['entry']} | SL: {trade['sl']} | TP: {trade['tp']}\n"
+            f"Risk: {trade['risk_percent']}%\n\n"
+            f"\U0001f6ab Reason: <b>{result['reason']}</b>\n\n"
+            f"\U0001f4dd <a href=\"{JOURNAL_URL}\">Open journal</a>"
+        )
+        send_telegram(msg)
+
+        return jsonify({
+            "approved": False,
+            "reason": result["reason"],
+            "warnings": result["warnings"],
+            "trade_id": trade["id"],
+        }), 200
+
+    # Approved
+    trade["status"] = "approved"
+    trade["warnings"] = result["warnings"]
+    _execution_queue.append(trade)
+
+    warning_text = ""
+    if result["warnings"]:
+        warning_text = "\n\u26a0\ufe0f Warnings:\n" + "\n".join(f"  \u2022 {w}" for w in result["warnings"]) + "\n"
+
+    msg = (
+        f"\u2705 <b>Trade approved and queued for MT4!</b>\n\n"
+        f"<b>{trade['symbol']}</b> {trade['direction']}\n"
+        f"\U0001f4cd Entry: {trade['entry']} | SL: {trade['sl']} | TP: {trade['tp']}\n"
+        f"\U0001f4b0 Risk: {trade['risk_percent']}% | Lot: {trade['lot_size']}\n"
+        f"{warning_text}\n"
+        f"Waiting for MT4 EA to fetch...\n\n"
+        f"\U0001f4dd <a href=\"{JOURNAL_URL}\">Open journal</a>"
+    )
+    send_telegram(msg)
+
+    logging.info("Trade approved: %s %s %s @ %s", trade["id"], trade["symbol"], trade["direction"], trade["entry"])
+    return jsonify({
+        "approved": True,
+        "warnings": result["warnings"],
+        "trade_id": trade["id"],
+        "trade": trade,
+    }), 201
+
+
+@app.route("/api/trade/executed", methods=["POST"])
+def trade_executed():
+    """POST /api/trade/executed — Called by MT4 EA when trade is placed."""
+    auth_err = _require_execution_key()
+    if auth_err:
+        return auth_err
+
+    body = request.json
+    if not body or not body.get("id"):
+        return jsonify({"error": "Trade id required"}), 400
+
+    trade_id = body["id"]
+    found = None
+    for t in _execution_queue:
+        if t["id"] == trade_id:
+            found = t
+            break
+
+    if not found:
+        return jsonify({"error": "Trade not found in execution queue"}), 404
+
+    actual_entry = float(body.get("actual_entry", found["entry"]))
+    found["status"] = "executed"
+    found["actual_entry"] = actual_entry
+    found["executed_at"] = datetime.now(timezone.utc).isoformat()
+    found["mt4_ticket"] = body.get("ticket")
+
+    # Update journal entry via Gist
+    journal_id = found.get("journal_trade_id")
+    if journal_id:
+        try:
+            trades_list = get_trades()
+            for t in trades_list:
+                if t.get("id") == journal_id:
+                    t["status"] = "open"
+                    t["source"] = "mt4"
+                    t["mt4Ticket"] = body.get("ticket")
+                    t["entry"] = actual_entry
+                    t["updatedAt"] = datetime.now(timezone.utc).isoformat()
+                    break
+            save_trades(trades_list)
+        except Exception as e:
+            logging.error("Failed to update journal via Gist: %s", e)
+
+    msg = (
+        f"\U0001f680 <b>Trade EXECUTED on MT4!</b>\n\n"
+        f"<b>{found['symbol']}</b> {found['direction']}\n"
+        f"\U0001f4cd Planned entry: {found['entry']}\n"
+        f"\U0001f4cd Actual entry: {actual_entry}\n"
+        f"\U0001f4e6 Lot: {found['lot_size']}\n"
+        f"\U0001f6d1 SL: {found['sl']} | \U0001f3af TP: {found['tp']}\n"
+        f"{'Ticket: #' + str(body.get('ticket', '')) if body.get('ticket') else ''}\n"
+        f"Journal updated automatically \u2705\n\n"
+        f"\U0001f4dd <a href=\"{JOURNAL_URL}\">Open journal</a>"
+    )
+    send_telegram(msg)
+
+    logging.info("Trade executed: %s %s actual_entry=%s", trade_id, found["symbol"], actual_entry)
+    return jsonify({"ok": True, "trade": found})
+
+
+@app.route("/api/trade/cancelled", methods=["POST"])
+def trade_cancelled():
+    """POST /api/trade/cancelled — Cancel a pending trade."""
+    auth_err = _require_execution_key()
+    if auth_err:
+        return auth_err
+
+    body = request.json
+    if not body or not body.get("id"):
+        return jsonify({"error": "Trade id required"}), 400
+
+    trade_id = body["id"]
+    found = None
+    for t in _execution_queue:
+        if t["id"] == trade_id:
+            found = t
+            break
+
+    if not found:
+        return jsonify({"error": "Trade not found in execution queue"}), 404
+
+    found["status"] = "cancelled"
+    found["cancelled_at"] = datetime.now(timezone.utc).isoformat()
+
+    msg = (
+        f"\u274c <b>Trade cancelled</b>\n\n"
+        f"<b>{found['symbol']}</b> {found['direction']}\n"
+        f"Entry: {found['entry']} | SL: {found['sl']} | TP: {found['tp']}\n\n"
+        f"\U0001f4dd <a href=\"{JOURNAL_URL}\">Open journal</a>"
+    )
+    send_telegram(msg)
+
+    logging.info("Trade cancelled: %s %s", trade_id, found["symbol"])
+    return jsonify({"ok": True})
+
+
+@app.route("/api/trade/status/<trade_id>", methods=["GET"])
+def trade_status(trade_id):
+    """GET /api/trade/status/:id — Return current status of a trade."""
+    auth_err = _require_execution_key()
+    if auth_err:
+        return auth_err
+
+    for t in _execution_queue:
+        if t["id"] == trade_id:
+            return jsonify({
+                "id": t["id"],
+                "status": t["status"],
+                "symbol": t["symbol"],
+                "direction": t["direction"],
+                "warnings": t.get("warnings", []),
+                "reject_reason": t.get("reject_reason"),
+                "executed_at": t.get("executed_at"),
+                "mt4_ticket": t.get("mt4_ticket"),
+            })
+
+    return jsonify({"error": "Trade not found"}), 404
+
+
+@app.route("/api/execution/queue", methods=["GET"])
+def execution_queue():
+    """GET /api/execution/queue — Return all trades in the execution queue."""
+    auth_err = _require_execution_key()
+    if auth_err:
+        return auth_err
+
+    pending = [t for t in _execution_queue if t.get("status") in ("approved", "pending", "fetched")]
+    return jsonify({
+        "queue": [{
+            "id": t["id"],
+            "symbol": t["symbol"],
+            "direction": t["direction"],
+            "entry": t["entry"],
+            "sl": t["sl"],
+            "tp": t["tp"],
+            "lot_size": t["lot_size"],
+            "risk_percent": t["risk_percent"],
+            "status": t["status"],
+            "timestamp": t["timestamp"],
+            "warnings": t.get("warnings", []),
+            "journal_trade_id": t.get("journal_trade_id", ""),
+        } for t in pending],
+        "total": len(pending),
+    })
 
 
 # ── Start ───────────────────────────────────────────────

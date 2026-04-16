@@ -2078,6 +2078,16 @@
             </div>
           </div>
         </div>
+        <div style="margin-top:12px; padding-top:12px; border-top:1px solid #21262d;">
+          <div style="font-size:0.78rem; font-weight:600; margin-bottom:8px; color:#8b949e;">MT4 Execution Pipeline</div>
+          <div class="settings-grid">
+            <div class="settings-field">
+              <label>Execution API Key</label>
+              <input type="password" id="sett_execKey" placeholder="Set in Render env vars" onchange="localStorage.setItem('tj_executionKey', this.value)">
+              <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">Required for Send to MT4. Must match EXECUTION_API_KEY on your backend.</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- DISPLAY -->
@@ -3144,7 +3154,9 @@ function openModal(id) {
     </div>
 
     <hr class="section-divider">
+    <div id="mt4ApproveStatus" style="display:none;margin-bottom:10px;padding:10px 14px;border-radius:8px;font-size:0.8rem;"></div>
     <div class="btn-row">
+      <button class="btn btn-primary" onclick="approveForMT4('${t.id}')" id="btnApproveMT4" style="background:#1f6feb;">Send to MT4</button>
       <button class="btn btn-ghost" onclick="editTrade('${t.id}')">Edit</button>
       <button class="btn btn-danger" onclick="deleteTrade('${t.id}')">Delete</button>
     </div>` : `
@@ -3811,6 +3823,101 @@ function deleteTrade(id) {
 
 function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
 function maybeCloseModal(e) { if (e.target === document.getElementById('modalOverlay')) closeModal(); }
+
+// ── MT4 Execution Pipeline ────────────────────────────
+async function approveForMT4(tradeId) {
+  const t = trades.find(x => x.id === tradeId);
+  if (!t) return;
+
+  const statusEl = document.getElementById('mt4ApproveStatus');
+  const btn = document.getElementById('btnApproveMT4');
+  if (!statusEl || !btn) return;
+
+  // Get execution key from localStorage
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  if (!execKey) {
+    statusEl.style.display = '';
+    statusEl.style.background = '#3a1216';
+    statusEl.style.border = '1px solid #f85149';
+    statusEl.style.color = '#ff7b72';
+    statusEl.innerHTML = 'Execution API key not set. Go to Settings → Profile → Execution API Key to configure it.';
+    return;
+  }
+
+  const backendUrl = localStorage.getItem('poiwatcher_backend') || 'https://poiwatcher-backend.onrender.com';
+  const sett = getSettings();
+
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  statusEl.style.display = '';
+  statusEl.style.background = '#1a2332';
+  statusEl.style.border = '1px solid #30363d';
+  statusEl.style.color = '#8b949e';
+  statusEl.textContent = 'Validating with risk engine...';
+
+  const direction = t.direction === 'long' ? 'BUY' : 'SELL';
+
+  try {
+    const resp = await fetch(backendUrl + '/api/trade/approve', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Execution-Key': execKey,
+      },
+      body: JSON.stringify({
+        symbol: t.pair,
+        direction: direction,
+        entry: t.entry,
+        sl: t.sl,
+        tp: t.tp,
+        risk_percent: sett.profile.riskPct || 1,
+        lot_size: parseFloat(t.size) || 0.01,
+        be_trigger_rr: sett.profile.beTriggerRR || 1.5,
+        journal_trade_id: t.id,
+        confidence: t.confidence || 0,
+        dxy_confirms: t.dxyConfirms || '',
+        entry_confirmation: t.entryConfirmation || '',
+        risk_limits: {
+          riskPerTrade: sett.profile.riskCapPct || 2,
+          dailyLoss: sett.profile.ddDaily || 2,
+          weeklyLoss: sett.profile.ddWeekly || 10,
+          monthlyLoss: sett.profile.ddMonthly || 25,
+        },
+      }),
+    });
+
+    const data = await resp.json();
+
+    if (data.approved) {
+      statusEl.style.background = '#0e3a1e';
+      statusEl.style.border = '1px solid #3fb950';
+      statusEl.style.color = '#56d364';
+      let html = '<strong>Trade approved and queued for MT4!</strong><br>Waiting for EA to fetch...';
+      if (data.warnings?.length) {
+        html += '<br><br><strong>Warnings:</strong><br>' + data.warnings.map(w => '• ' + w).join('<br>');
+      }
+      if (data.trade_id) html += `<br><br><span style="color:#8b949e;font-size:0.72rem;">Queue ID: ${data.trade_id}</span>`;
+      statusEl.innerHTML = html;
+      btn.textContent = 'Approved ✓';
+      btn.style.background = '#238636';
+    } else {
+      statusEl.style.background = '#3a1216';
+      statusEl.style.border = '1px solid #f85149';
+      statusEl.style.color = '#ff7b72';
+      statusEl.innerHTML = `<strong>Trade REJECTED</strong><br>${data.reason || 'Unknown reason'}`;
+      btn.textContent = 'Rejected';
+      btn.style.background = '#8b2028';
+      setTimeout(() => { btn.disabled = false; btn.textContent = 'Send to MT4'; btn.style.background = '#1f6feb'; }, 4000);
+    }
+  } catch (e) {
+    statusEl.style.background = '#3a1216';
+    statusEl.style.border = '1px solid #f85149';
+    statusEl.style.color = '#ff7b72';
+    statusEl.innerHTML = `<strong>Connection error:</strong> ${e.message}<br>Check that the backend is running.`;
+    btn.disabled = false;
+    btn.textContent = 'Send to MT4';
+  }
+}
 
 // ═══════════════════════════════════════════════════════
 // DASHBOARD
@@ -6322,6 +6429,7 @@ function populateSettingsForm() {
   document.getElementById('sett_ddDaily').value = s.profile.ddDaily || 2;
   document.getElementById('sett_ddWeekly').value = s.profile.ddWeekly || 10;
   document.getElementById('sett_ddMonthly').value = s.profile.ddMonthly || 25;
+  document.getElementById('sett_execKey').value = localStorage.getItem('tj_executionKey') || '';
   // Display toggles
   document.getElementById('sett_showSession').classList.toggle('on', s.display.showSession);
   document.getElementById('sett_showEquity').classList.toggle('on', s.display.showEquity);

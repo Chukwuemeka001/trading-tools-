@@ -26,3 +26,5 @@ services:
         sync: false
       - key: BINANCE_API_SECRET
         sync: false
+      - key: EXECUTION_API_KEY
+        sync: false
