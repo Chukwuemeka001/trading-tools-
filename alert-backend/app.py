@@ -2032,6 +2032,175 @@ def execution_queue():
     })
 
 
+# ── Daily Summary (5pm ET) ──────────────────────────────
+
+# ET is UTC-5 (EST) or UTC-4 (EDT). For simplicity treat 5pm ET as a fixed UTC
+# offset using the current US daylight rule via timezone-aware datetime.
+# We don't depend on pytz/zoneinfo to keep deployment lightweight; assume EDT
+# (UTC-4) Mar–Nov and EST (UTC-5) Nov–Mar. Good enough for a daily ping.
+def _is_us_dst(now_utc):
+    # US DST: 2nd Sunday of March → 1st Sunday of November
+    y = now_utc.year
+    march = datetime(y, 3, 8, tzinfo=timezone.utc)
+    dst_start = march + timedelta(days=(6 - march.weekday()) % 7)
+    nov = datetime(y, 11, 1, tzinfo=timezone.utc)
+    dst_end = nov + timedelta(days=(6 - nov.weekday()) % 7)
+    return dst_start <= now_utc < dst_end
+
+
+def _et_now():
+    now = datetime.now(timezone.utc)
+    offset = -4 if _is_us_dst(now) else -5
+    return now + timedelta(hours=offset), offset
+
+
+_last_summary_date = None
+
+
+def _build_daily_summary():
+    """Build the daily summary message from journal trades closed today (ET)."""
+    et_now, _ = _et_now()
+    today_et = et_now.date()
+    today_str = today_et.strftime("%a %b %d, %Y")
+
+    try:
+        all_trades = get_trades() or []
+    except Exception as e:
+        logging.error("Daily summary: get_trades failed: %s", e)
+        all_trades = []
+
+    closed_today = []
+    for t in all_trades:
+        if t.get("status") != "closed":
+            continue
+        d = t.get("dateClose") or t.get("dateOpen") or ""
+        try:
+            dt = datetime.fromisoformat(d.replace("Z", "+00:00"))
+            offset = -4 if _is_us_dst(dt.astimezone(timezone.utc)) else -5
+            dt_et = dt.astimezone(timezone.utc) + timedelta(hours=offset)
+            if dt_et.date() == today_et:
+                closed_today.append(t)
+        except Exception:
+            continue
+
+    n = len(closed_today)
+    wins = [t for t in closed_today if t.get("outcome") == "win"]
+    losses = [t for t in closed_today if t.get("outcome") == "loss"]
+    win_rate = (len(wins) / n * 100) if n else 0
+    total_pnl = sum(float(t.get("actualPnL") or 0) for t in closed_today)
+
+    best = max(closed_today, key=lambda t: float(t.get("actualPnL") or 0), default=None)
+    worst = min(closed_today, key=lambda t: float(t.get("actualPnL") or 0), default=None)
+
+    # Drawdown vs limits — read latest settings from gist if available
+    settings = {}
+    try:
+        gist_data = _get_gist_data()
+        if gist_data and isinstance(gist_data, dict):
+            settings = gist_data.get("settings", {}) or {}
+    except Exception:
+        pass
+
+    profile = (settings.get("profile") or {})
+    capital = float(profile.get("capital") or 0)
+    daily_limit = float(profile.get("ddDaily") or 2)
+    weekly_limit = float(profile.get("ddWeekly") or 10)
+
+    # Daily DD %
+    daily_pnl = total_pnl
+    daily_dd_pct = (-daily_pnl / capital * 100) if capital and daily_pnl < 0 else 0
+
+    # Weekly DD = sum P&L of trades closed in last 7 days
+    week_start = today_et - timedelta(days=6)
+    weekly_pnl = 0.0
+    for t in all_trades:
+        if t.get("status") != "closed":
+            continue
+        d = t.get("dateClose") or t.get("dateOpen") or ""
+        try:
+            dt = datetime.fromisoformat(d.replace("Z", "+00:00"))
+            offset = -4 if _is_us_dst(dt.astimezone(timezone.utc)) else -5
+            dt_et = dt.astimezone(timezone.utc) + timedelta(hours=offset)
+            if week_start <= dt_et.date() <= today_et:
+                weekly_pnl += float(t.get("actualPnL") or 0)
+        except Exception:
+            continue
+    weekly_dd_pct = (-weekly_pnl / capital * 100) if capital and weekly_pnl < 0 else 0
+
+    def dd_emoji(used_pct, limit_pct):
+        if limit_pct <= 0:
+            return "\u2705"
+        ratio = used_pct / limit_pct
+        if ratio >= 1:
+            return "\U0001f6a8"
+        if ratio >= 0.7:
+            return "\u26a0\ufe0f"
+        return "\u2705"
+
+    # Quality metrics
+    exec_ratings = [int(t.get("executionRating") or 0) for t in closed_today if t.get("executionRating")]
+    avg_exec = (sum(exec_ratings) / len(exec_ratings)) if exec_ratings else 0
+    confidences = [int(t.get("confidence") or 0) for t in closed_today if t.get("confidence")]
+    avg_align = (sum(confidences) / len(confidences)) if confidences else 0
+
+    pnl_sign = "+" if total_pnl >= 0 else ""
+    msg = f"\U0001f4ca <b>DAILY TRADING SUMMARY \u2014 {today_str}</b>\n\n"
+
+    if n == 0:
+        msg += "No trades closed today.\n\n"
+    else:
+        msg += f"Trades taken: <b>{n}</b>\n"
+        msg += f"Wins: <b>{len(wins)}</b> | Losses: <b>{len(losses)}</b> | Win Rate: <b>{win_rate:.0f}%</b>\n"
+        msg += f"Total P&amp;L: <b>{pnl_sign}${total_pnl:.2f}</b>\n\n"
+
+        if best and float(best.get("actualPnL") or 0) > 0:
+            br = best.get("actualRR") or 0
+            msg += f"Best trade: {best.get('pair', '?')} +${float(best.get('actualPnL') or 0):.2f} (+{float(br):.1f}R)\n"
+        if worst and float(worst.get("actualPnL") or 0) < 0:
+            wr = worst.get("actualRR") or 0
+            msg += f"Worst trade: {worst.get('pair', '?')} ${float(worst.get('actualPnL') or 0):.2f} ({float(wr):.1f}R)\n"
+        msg += "\n"
+
+    msg += "<b>Drawdown status:</b>\n"
+    msg += f"Daily: {daily_dd_pct:.1f}% / {daily_limit:.0f}% limit {dd_emoji(daily_dd_pct, daily_limit)}\n"
+    msg += f"Weekly: {weekly_dd_pct:.1f}% / {weekly_limit:.0f}% limit {dd_emoji(weekly_dd_pct, weekly_limit)}\n\n"
+
+    if avg_exec or avg_align:
+        msg += f"Execution quality: <b>{avg_exec:.1f}/10</b> avg\n"
+        msg += f"System alignment: <b>{avg_align:.1f}/10</b> avg\n\n"
+
+    msg += "Keep following your system! \U0001f4aa\n\n"
+    msg += f"\U0001f4dd <a href=\"{JOURNAL_URL}\">Open your journal</a>"
+    return msg
+
+
+def daily_summary_loop():
+    """Background loop — sends daily summary at 5:00 PM ET each day."""
+    global _last_summary_date
+    logging.info("Daily summary loop started (sends 5:00 PM ET)")
+    while True:
+        try:
+            et_now, _ = _et_now()
+            target_hour = 17  # 5 PM
+            if et_now.hour == target_hour and _last_summary_date != et_now.date():
+                msg = _build_daily_summary()
+                send_telegram(msg)
+                _last_summary_date = et_now.date()
+                logging.info("Daily summary sent for %s", et_now.date())
+        except Exception as e:
+            logging.error("Daily summary loop error: %s", e)
+        # Sleep ~60s; coarse enough for a once-a-day check
+        time.sleep(60)
+
+
+def _get_gist_data():
+    """Fetch the parsed gist JSON. Wrapper that returns dict (or None)."""
+    data = gist_read()
+    if isinstance(data, dict):
+        return data
+    return None
+
+
 # ── Start ───────────────────────────────────────────────
 
 def _start_background_threads():
@@ -2042,6 +2211,7 @@ def _start_background_threads():
         logging.info("Exchange sync started — Kraken: %s, Binance: %s",
                      "enabled" if KRAKEN_API_KEY else "disabled",
                      "enabled" if BINANCE_API_KEY else "disabled")
+    threading.Thread(target=daily_summary_loop, daemon=True).start()
 
 
 if __name__ == "__main__":
