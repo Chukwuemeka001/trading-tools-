@@ -34,6 +34,7 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 GITHUB_GIST_TOKEN = os.environ.get("GITHUB_GIST_TOKEN", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 EXECUTION_API_KEY = os.environ.get("EXECUTION_API_KEY", "")
+PAPER_TRADING_MODE = os.environ.get("PAPER_TRADING_MODE", "true").lower() != "false"
 GIST_ID = os.environ.get("GIST_ID", "bc004e07ada6586fc4492590f80b182b")
 GIST_FILE = "trade-journal.json"
 
@@ -1607,6 +1608,37 @@ def binance_account():
 #               warnings, actual_entry, executed_at }
 _execution_queue = []
 
+# Execution audit log (last N events). Each entry:
+# { ts, trade_id, symbol, direction, planned_entry, actual_entry, slippage,
+#   status, reason, mt4_ticket, paper, test }
+_execution_log = []
+_EXECUTION_LOG_MAX = 500
+
+# Emergency stop flag — set by /api/execution/emergency_stop, polled by EA
+_emergency_stop = {"active": False, "at": None, "by": None}
+
+
+def _log_execution_event(**kwargs):
+    """Append an event to the execution log (most-recent first cap at MAX)."""
+    entry = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "trade_id": kwargs.get("trade_id", ""),
+        "symbol": kwargs.get("symbol", ""),
+        "direction": kwargs.get("direction", ""),
+        "planned_entry": kwargs.get("planned_entry"),
+        "actual_entry": kwargs.get("actual_entry"),
+        "slippage": kwargs.get("slippage"),
+        "status": kwargs.get("status", ""),
+        "reason": kwargs.get("reason", ""),
+        "mt4_ticket": kwargs.get("mt4_ticket"),
+        "paper": bool(kwargs.get("paper", False)),
+        "test": bool(kwargs.get("test", False)),
+    }
+    _execution_log.append(entry)
+    if len(_execution_log) > _EXECUTION_LOG_MAX:
+        del _execution_log[: len(_execution_log) - _EXECUTION_LOG_MAX]
+    return entry
+
 
 def _require_execution_key():
     """Validate X-Execution-Key header. Returns error response or None."""
@@ -1769,6 +1801,12 @@ def get_pending_trade():
             # Mark as fetched so it doesn't execute twice
             trade["status"] = "fetched"
             trade["fetched_at"] = datetime.now(timezone.utc).isoformat()
+            _log_execution_event(
+                trade_id=trade["id"], symbol=trade["symbol"], direction=trade["direction"],
+                planned_entry=trade["entry"], status="fetched_by_ea",
+                paper=trade.get("paper", False), test=trade.get("test_only", False),
+                reason="EA polled and received trade",
+            )
             return jsonify({
                 "status": "trade_ready",
                 "trade": {
@@ -1784,10 +1822,12 @@ def get_pending_trade():
                     "timestamp": trade["timestamp"],
                     "source": "journal",
                     "journal_trade_id": trade.get("journal_trade_id", ""),
+                    "paper_trading": trade.get("paper", PAPER_TRADING_MODE),
+                    "test_only": trade.get("test_only", False),
                 }
             })
 
-    return jsonify({"status": "no_trade"})
+    return jsonify({"status": "no_trade", "paper_trading": PAPER_TRADING_MODE})
 
 
 @app.route("/api/trade/approve", methods=["POST"])
@@ -1825,6 +1865,8 @@ def approve_trade():
         "dxy_confirms": body.get("dxy_confirms", ""),
         "entry_confirmation": body.get("entry_confirmation", ""),
         "risk_limits": body.get("risk_limits", {}),
+        "paper": PAPER_TRADING_MODE,
+        "test_only": bool(body.get("test_only", False)),
     }
 
     # Get account state (from body or Gist)
@@ -1838,6 +1880,13 @@ def approve_trade():
         trade["status"] = "rejected"
         trade["reject_reason"] = result["reason"]
         _execution_queue.append(trade)
+
+        _log_execution_event(
+            trade_id=trade["id"], symbol=trade["symbol"], direction=trade["direction"],
+            planned_entry=trade["entry"], status="rejected",
+            paper=trade.get("paper", False), test=trade.get("test_only", False),
+            reason=result["reason"],
+        )
 
         msg = (
             f"\u274c <b>Trade REJECTED by risk engine</b>\n\n"
@@ -1860,6 +1909,13 @@ def approve_trade():
     trade["status"] = "approved"
     trade["warnings"] = result["warnings"]
     _execution_queue.append(trade)
+
+    _log_execution_event(
+        trade_id=trade["id"], symbol=trade["symbol"], direction=trade["direction"],
+        planned_entry=trade["entry"], status="approved",
+        paper=trade.get("paper", False), test=trade.get("test_only", False),
+        reason="Risk engine approved" + (" (with warnings)" if result["warnings"] else ""),
+    )
 
     warning_text = ""
     if result["warnings"]:
@@ -1907,14 +1963,41 @@ def trade_executed():
         return jsonify({"error": "Trade not found in execution queue"}), 404
 
     actual_entry = float(body.get("actual_entry", found["entry"]))
-    found["status"] = "executed"
+    is_paper = bool(body.get("paper", found.get("paper", False)))
+    is_test = bool(body.get("test", found.get("test_only", False)))
+    err_text = body.get("error", "")
+
+    if is_test:
+        new_status = "test_passed" if not err_text else "test_failed"
+    elif err_text:
+        new_status = "execution_failed"
+    elif is_paper:
+        new_status = "paper_executed"
+    else:
+        new_status = "executed"
+
+    found["status"] = new_status
     found["actual_entry"] = actual_entry
     found["executed_at"] = datetime.now(timezone.utc).isoformat()
     found["mt4_ticket"] = body.get("ticket")
+    found["paper"] = is_paper
+    found["test_only"] = is_test
+    if err_text:
+        found["error"] = err_text
 
-    # Update journal entry via Gist
+    # Slippage in raw price units
+    slippage = round(actual_entry - found["entry"], 6) if actual_entry and found.get("entry") else None
+
+    _log_execution_event(
+        trade_id=trade_id, symbol=found["symbol"], direction=found["direction"],
+        planned_entry=found["entry"], actual_entry=actual_entry, slippage=slippage,
+        status=new_status, mt4_ticket=body.get("ticket"),
+        paper=is_paper, test=is_test, reason=err_text or "OK",
+    )
+
+    # Update journal entry via Gist (skip for test trades and execution failures)
     journal_id = found.get("journal_trade_id")
-    if journal_id:
+    if journal_id and not is_test and not err_text:
         try:
             trades_list = get_trades()
             for t in trades_list:
@@ -1923,23 +2006,46 @@ def trade_executed():
                     t["source"] = "mt4"
                     t["mt4Ticket"] = body.get("ticket")
                     t["entry"] = actual_entry
+                    t["execStatus"] = new_status  # paper_executed or executed
+                    t["execTicket"] = body.get("ticket")
+                    t["execActualEntry"] = actual_entry
+                    t["execExecutedAt"] = found["executed_at"]
+                    t["execPaper"] = is_paper
                     t["updatedAt"] = datetime.now(timezone.utc).isoformat()
                     break
             save_trades(trades_list)
         except Exception as e:
             logging.error("Failed to update journal via Gist: %s", e)
 
-    msg = (
-        f"\U0001f680 <b>Trade EXECUTED on MT4!</b>\n\n"
-        f"<b>{found['symbol']}</b> {found['direction']}\n"
-        f"\U0001f4cd Planned entry: {found['entry']}\n"
-        f"\U0001f4cd Actual entry: {actual_entry}\n"
-        f"\U0001f4e6 Lot: {found['lot_size']}\n"
-        f"\U0001f6d1 SL: {found['sl']} | \U0001f3af TP: {found['tp']}\n"
-        f"{'Ticket: #' + str(body.get('ticket', '')) if body.get('ticket') else ''}\n"
-        f"Journal updated automatically \u2705\n\n"
-        f"\U0001f4dd <a href=\"{JOURNAL_URL}\">Open journal</a>"
-    )
+    if is_test:
+        msg = (
+            f"\U0001f9ea <b>TEST trade pipeline OK</b>\n\n"
+            f"Trade ID: <code>{trade_id}</code>\n"
+            f"Symbol: {found['symbol']} {found['direction']}\n"
+            f"Status: <b>{new_status}</b>\n"
+            f"{('Error: ' + err_text) if err_text else 'All steps passed \u2705'}"
+        )
+    elif err_text:
+        msg = (
+            f"\u26a0\ufe0f <b>Trade execution FAILED</b>\n\n"
+            f"<b>{found['symbol']}</b> {found['direction']}\n"
+            f"Planned entry: {found['entry']} | Lot: {found['lot_size']}\n"
+            f"Error: <b>{err_text}</b>\n\n"
+            f"\U0001f4dd <a href=\"{JOURNAL_URL}\">Open journal</a>"
+        )
+    else:
+        prefix = "\U0001f4c4 <b>PAPER TRADE executed (demo mode)</b>" if is_paper else "\U0001f680 <b>Trade EXECUTED on MT4!</b>"
+        msg = (
+            f"{prefix}\n\n"
+            f"<b>{found['symbol']}</b> {found['direction']}\n"
+            f"\U0001f4cd Planned entry: {found['entry']}\n"
+            f"\U0001f4cd Actual entry: {actual_entry}\n"
+            f"\U0001f4e6 Lot: {found['lot_size']}\n"
+            f"\U0001f6d1 SL: {found['sl']} | \U0001f3af TP: {found['tp']}\n"
+            f"{'Ticket: #' + str(body.get('ticket', '')) if body.get('ticket') else ''}\n"
+            f"Journal updated automatically \u2705\n\n"
+            f"\U0001f4dd <a href=\"{JOURNAL_URL}\">Open journal</a>"
+        )
     send_telegram(msg)
 
     logging.info("Trade executed: %s %s actual_entry=%s", trade_id, found["symbol"], actual_entry)
@@ -1969,6 +2075,13 @@ def trade_cancelled():
 
     found["status"] = "cancelled"
     found["cancelled_at"] = datetime.now(timezone.utc).isoformat()
+
+    _log_execution_event(
+        trade_id=trade_id, symbol=found["symbol"], direction=found["direction"],
+        planned_entry=found["entry"], status="cancelled",
+        paper=found.get("paper", False), test=found.get("test_only", False),
+        reason=body.get("reason") or "Manual cancel",
+    )
 
     msg = (
         f"\u274c <b>Trade cancelled</b>\n\n"
@@ -2030,6 +2143,238 @@ def execution_queue():
         } for t in pending],
         "total": len(pending),
     })
+
+
+@app.route("/api/execution/log", methods=["GET"])
+def execution_log():
+    """GET /api/execution/log?limit=50&status=executed — Filtered execution audit log (newest first)."""
+    auth_err = _require_execution_key()
+    if auth_err:
+        return auth_err
+
+    try:
+        limit = int(request.args.get("limit", 50))
+    except ValueError:
+        limit = 50
+    limit = max(1, min(limit, _EXECUTION_LOG_MAX))
+
+    status_filter = (request.args.get("status") or "").strip().lower()
+
+    entries = list(reversed(_execution_log))
+    if status_filter and status_filter != "all":
+        if status_filter == "success":
+            entries = [e for e in entries if e["status"] in ("executed", "paper_executed", "test_passed")]
+        elif status_filter == "failed":
+            entries = [e for e in entries if e["status"] in ("execution_failed", "test_failed", "rejected")]
+        elif status_filter == "paper":
+            entries = [e for e in entries if e.get("paper")]
+        else:
+            entries = [e for e in entries if e["status"] == status_filter]
+
+    return jsonify({
+        "log": entries[:limit],
+        "total": len(_execution_log),
+        "returned": min(limit, len(entries)),
+    })
+
+
+@app.route("/api/execution/test", methods=["POST"])
+def execution_test():
+    """POST /api/execution/test — Inject a synthetic test trade into the pipeline.
+
+    Test trades flow through the full pipeline (queue → EA fetch → executed callback)
+    but skip OrderSend() in the EA and never touch the journal Gist.
+    """
+    auth_err = _require_execution_key()
+    if auth_err:
+        return auth_err
+
+    body = request.json or {}
+
+    test_trade = {
+        "id": "test-" + str(uuid.uuid4())[:8],
+        "symbol": (body.get("symbol") or "EURUSD").upper(),
+        "direction": (body.get("direction") or "BUY").upper(),
+        "entry": float(body.get("entry", 1.10000)),
+        "sl": float(body.get("sl", 1.09500)),
+        "tp": float(body.get("tp", 1.11500)),
+        "risk_percent": 0.1,
+        "lot_size": 0.01,
+        "be_trigger_rr": 1.5,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "source": "execution_test",
+        "journal_trade_id": "",
+        "status": "approved",
+        "warnings": ["TEST TRADE — will not be executed on broker"],
+        "paper": True,
+        "test_only": True,
+    }
+    _execution_queue.append(test_trade)
+
+    _log_execution_event(
+        trade_id=test_trade["id"], symbol=test_trade["symbol"], direction=test_trade["direction"],
+        planned_entry=test_trade["entry"], status="approved",
+        paper=True, test=True, reason="Synthetic test trade injected",
+    )
+
+    return jsonify({
+        "ok": True,
+        "trade_id": test_trade["id"],
+        "message": "Test trade queued. EA will fetch within 5s. Poll /api/trade/status/<id> to track.",
+        "trade": test_trade,
+    }), 201
+
+
+@app.route("/api/execution/health", methods=["GET"])
+def execution_health():
+    """GET /api/execution/health — Aggregated status of all execution pipeline components."""
+    auth_err = _require_execution_key()
+    if auth_err:
+        return auth_err
+
+    now = datetime.now(timezone.utc)
+
+    # Backend — we are responding, so green
+    backend_ok = True
+
+    # MT4 — connected if heartbeat within last 2 minutes
+    mt4_ok = False
+    mt4_age_seconds = None
+    if _mt4_status.get("last_heartbeat"):
+        try:
+            last = datetime.fromisoformat(_mt4_status["last_heartbeat"])
+            mt4_age_seconds = (now - last).total_seconds()
+            mt4_ok = mt4_age_seconds < 120
+        except Exception:
+            mt4_ok = False
+
+    # Queue
+    pending = [t for t in _execution_queue if t.get("status") in ("approved", "pending", "fetched")]
+
+    # Risk engine — green if EXECUTION_API_KEY is set (means risk pipeline is actually wired)
+    risk_engine_ok = bool(EXECUTION_API_KEY)
+
+    # Telegram
+    telegram_ok = bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)
+
+    # Gist
+    gist_ok = bool(GITHUB_GIST_TOKEN)
+
+    return jsonify({
+        "backend": {"ok": backend_ok, "label": "Backend reachable"},
+        "mt4": {
+            "ok": mt4_ok,
+            "label": "MT4 EA connected" if mt4_ok else "MT4 EA offline",
+            "last_heartbeat": _mt4_status.get("last_heartbeat"),
+            "age_seconds": mt4_age_seconds,
+            "open_trades": _mt4_status.get("open_trades", 0),
+            "account_equity": _mt4_status.get("account_equity", 0),
+        },
+        "queue": {
+            "ok": True,
+            "label": f"{len(pending)} pending",
+            "pending_count": len(pending),
+            "total_logged": len(_execution_log),
+        },
+        "risk_engine": {
+            "ok": risk_engine_ok,
+            "label": "Risk engine armed" if risk_engine_ok else "EXECUTION_API_KEY missing",
+        },
+        "paper_mode": {
+            "ok": True,
+            "active": PAPER_TRADING_MODE,
+            "label": "PAPER MODE — demo only" if PAPER_TRADING_MODE else "LIVE mode",
+        },
+        "telegram": {"ok": telegram_ok, "label": "Telegram configured" if telegram_ok else "Telegram missing"},
+        "gist": {"ok": gist_ok, "label": "Gist token present" if gist_ok else "Gist token missing"},
+        "emergency_stop": {
+            "active": _emergency_stop["active"],
+            "at": _emergency_stop["at"],
+            "by": _emergency_stop["by"],
+        },
+        "checked_at": now.isoformat(),
+    })
+
+
+@app.route("/api/execution/emergency_stop", methods=["POST"])
+def execution_emergency_stop():
+    """POST /api/execution/emergency_stop — KILL SWITCH.
+
+    Cancels every pending/approved trade in the queue, sets the emergency_stop flag
+    so the EA picks it up and closes all POIWatcher_-prefixed positions, and fires
+    a high-priority Telegram alert.
+    """
+    auth_err = _require_execution_key()
+    if auth_err:
+        return auth_err
+
+    body = request.json or {}
+    by = body.get("by") or "journal"
+
+    cancelled = 0
+    for t in _execution_queue:
+        if t.get("status") in ("approved", "pending", "fetched"):
+            t["status"] = "cancelled"
+            t["cancelled_at"] = datetime.now(timezone.utc).isoformat()
+            t["cancel_reason"] = "Emergency stop"
+            cancelled += 1
+            _log_execution_event(
+                trade_id=t["id"], symbol=t["symbol"], direction=t["direction"],
+                planned_entry=t["entry"], status="cancelled",
+                paper=t.get("paper", False), test=t.get("test_only", False),
+                reason="EMERGENCY STOP",
+            )
+
+    _emergency_stop["active"] = True
+    _emergency_stop["at"] = datetime.now(timezone.utc).isoformat()
+    _emergency_stop["by"] = by
+
+    msg = (
+        f"\U0001f6d1 <b>EMERGENCY STOP ACTIVATED</b>\n\n"
+        f"\u2022 Cancelled <b>{cancelled}</b> pending trade(s)\n"
+        f"\u2022 EA instructed to close all POIWatcher positions\n"
+        f"\u2022 Triggered by: {by}\n\n"
+        f"\u26a0\ufe0f New approvals will still queue. Reset the kill switch in the journal when ready."
+    )
+    send_telegram(msg)
+
+    logging.warning("EMERGENCY STOP activated by %s — %d trades cancelled", by, cancelled)
+    return jsonify({
+        "ok": True,
+        "cancelled": cancelled,
+        "emergency_stop": _emergency_stop,
+    })
+
+
+@app.route("/api/mt4/emergency-stop", methods=["GET"])
+def mt4_emergency_stop_get():
+    """GET /api/mt4/emergency-stop — EA polls this every 10s. No auth (EA has no key for non-execution paths)."""
+    return jsonify(_emergency_stop)
+
+
+@app.route("/api/mt4/emergency-stop", methods=["DELETE"])
+def mt4_emergency_stop_clear():
+    """DELETE /api/mt4/emergency-stop — Called by EA after closing all POIWatcher trades, OR by journal to reset."""
+    auth_err = _require_execution_key()
+    if auth_err:
+        return auth_err
+
+    body = request.json or {}
+    closed_count = body.get("closed_count")
+
+    _emergency_stop["active"] = False
+    _emergency_stop["at"] = None
+    _emergency_stop["by"] = None
+
+    if closed_count is not None:
+        msg = (
+            f"\u2705 <b>Emergency stop cleared</b>\n\n"
+            f"EA closed {closed_count} POIWatcher position(s). Pipeline is armed again."
+        )
+        send_telegram(msg)
+
+    logging.info("Emergency stop cleared (closed_count=%s)", closed_count)
+    return jsonify({"ok": True, "emergency_stop": _emergency_stop})
 
 
 # ── Daily Summary (5pm ET) ──────────────────────────────

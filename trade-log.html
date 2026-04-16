@@ -1582,6 +1582,51 @@
     </div>
   </div>
 
+  <!-- Execution System Status (health dashboard) -->
+  <div style="margin-top:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
+      <div class="card-title" style="margin:0;">Execution System Status</div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-ghost" onclick="refreshExecutionHealth()" style="padding:3px 8px;font-size:0.7rem;">↻ Refresh</button>
+        <button class="btn btn-ghost" onclick="runExecutionTest()" style="padding:3px 8px;font-size:0.7rem;color:#58a6ff;border-color:#1f3a5f;">🧪 Test Pipeline</button>
+        <button class="btn btn-ghost" onclick="emergencyStopConfirm()" style="padding:3px 8px;font-size:0.7rem;color:#f85149;border-color:#5c1616;">🛑 EMERGENCY STOP</button>
+      </div>
+    </div>
+    <div style="font-size:0.72rem; color:#6e7681; margin-bottom:8px;">Live status of every link in the execution chain. The Test button runs a synthetic trade through the entire pipeline without sending to the broker.</div>
+    <div id="executionHealthPanel">
+      <div style="color:#6e7681;font-size:0.78rem;">Click Refresh to check.</div>
+    </div>
+    <div id="executionTestResult" style="margin-top:10px;"></div>
+  </div>
+
+  <!-- Execution Log (audit trail) -->
+  <div style="margin-top:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
+      <div class="card-title" style="margin:0;">Execution Log</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <select id="execLogFilter" onchange="refreshExecutionLog()" style="background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:5px;padding:4px 8px;font-size:0.72rem;">
+          <option value="all">All</option>
+          <option value="success">Success</option>
+          <option value="failed">Failed/Rejected</option>
+          <option value="paper">Paper only</option>
+          <option value="approved">Approved</option>
+          <option value="executed">Executed</option>
+          <option value="paper_executed">Paper executed</option>
+          <option value="execution_failed">Execution failed</option>
+          <option value="rejected">Rejected</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="test_passed">Test passed</option>
+          <option value="test_failed">Test failed</option>
+        </select>
+        <button class="btn btn-ghost" onclick="refreshExecutionLog()" style="padding:3px 8px;font-size:0.7rem;">↻ Refresh</button>
+      </div>
+    </div>
+    <div style="font-size:0.72rem; color:#6e7681; margin-bottom:8px;">Last 50 events from the backend audit trail. Use this to verify what the EA did and why anything was rejected.</div>
+    <div id="executionLogPanel">
+      <div style="color:#6e7681;font-size:0.78rem;">Click Refresh to load.</div>
+    </div>
+  </div>
+
   <!-- Auto-logged trades needing analysis -->
   <div style="margin-top:20px;">
     <div class="card-title">MT4 Auto-Logged Trades — Needs Your Analysis</div>
@@ -1615,6 +1660,28 @@
       <button class="modal-close" onclick="closeExecConfirm()">✕</button>
     </div>
     <div class="modal-body" id="execConfirmBody"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     GO-LIVE CHECKLIST MODAL
+════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="goLiveOverlay" onclick="if(event.target===this)closeGoLiveChecklist()">
+  <div class="modal" id="goLiveBox" style="max-width:560px;">
+    <div class="modal-header">
+      <h2>✓ Go-Live Checklist</h2>
+      <button class="modal-close" onclick="closeGoLiveChecklist()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:0.78rem; color:#8b949e; margin-bottom:12px; line-height:1.5;">
+        Confirm <strong style="color:#e6edf3;">every</strong> item before flipping <code>PAPER_TRADING_MODE=false</code> on Render. Your settings are saved locally so you can return to this list any time.
+      </div>
+      <div id="goLiveChecklist"></div>
+      <div id="goLiveProgress" style="margin-top:12px; font-size:0.78rem; color:#8b949e;"></div>
+      <div style="margin-top:14px; padding-top:12px; border-top:1px solid #21262d; font-size:0.7rem; color:#6e7681; line-height:1.6;">
+        When all 9 are checked, flip <code>PAPER_TRADING_MODE=false</code> in your Render dashboard and redeploy. The EA will start executing on a live account if the equity floor and lot caps allow it.
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2131,6 +2198,11 @@
             <div><div class="settings-row-label">Require pre-trade checklist</div><div class="settings-row-sub">Block approval if pre-trade analysis fields are missing</div></div>
             <button class="stoggle on" id="sett_execRequireChecklist" onclick="toggleSetting(this,'execRequireChecklist')"></button>
           </div>
+          <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="openGoLiveChecklist()" style="padding:6px 12px;font-size:0.74rem;color:#3fb950;border-color:#1a3a22;">✓ Go-Live Checklist</button>
+            <button class="btn btn-ghost" onclick="emergencyStopConfirm()" style="padding:6px 12px;font-size:0.74rem;color:#f85149;border-color:#5c1616;">🛑 Emergency Stop</button>
+          </div>
+          <div style="font-size:0.65rem; color:#6e7681; margin-top:6px;">Run through the 9-item checklist before flipping <code>PAPER_TRADING_MODE=false</code> on Render.</div>
         </div>
       </div>
 
@@ -2454,7 +2526,7 @@ function nav(view) {
   if (view === 'journal')   { restoreJournalFilters(); renderJournal(); }
   if (view === 'log')       initForm();
   if (view === 'alerts')    initAlerts();
-  if (view === 'live')      { refreshLiveTrades(); refreshExecutionQueue(); }
+  if (view === 'live')      { refreshLiveTrades(); refreshExecutionQueue(); refreshExecutionHealth(); refreshExecutionLog(); }
   window.scrollTo(0, 0);
 }
 
@@ -2754,13 +2826,19 @@ function onFilterChange() { journalPage = 0; renderJournal(); }
 function renderExecBadge(t) {
   if (!t.execStatus) return '';
   const map = {
-    pending:   { bg:'#3a2a16', col:'#ffa657', label:'🟡 Pending Exec' },
-    executed:  { bg:'#0e3a1e', col:'#56d364', label:'🚀 Executed' },
-    rejected:  { bg:'#3a1216', col:'#ff7b72', label:'❌ Rejected' },
-    cancelled: { bg:'#21262d', col:'#8b949e', label:'⊘ Cancelled' },
+    pending:          { bg:'#3a2a16', col:'#ffa657', label:'🟡 Pending Exec' },
+    executed:         { bg:'#0e3a1e', col:'#56d364', label:'🚀 Executed' },
+    paper_executed:   { bg:'#1a2a44', col:'#58a6ff', label:'📄 Paper Trade' },
+    execution_failed: { bg:'#3a1216', col:'#ff7b72', label:'⚠ Exec Failed' },
+    rejected:         { bg:'#3a1216', col:'#ff7b72', label:'❌ Rejected' },
+    cancelled:        { bg:'#21262d', col:'#8b949e', label:'⊘ Cancelled' },
   };
   const m = map[t.execStatus];
   if (!m) return '';
+  // If execPaper flag was set on a regular "executed" status (older records), still show the paper hint
+  if (t.execStatus === 'executed' && t.execPaper) {
+    return `<span style="background:#1a2a44;color:#58a6ff;padding:2px 7px;border-radius:4px;font-size:0.62rem;font-weight:600;margin-left:4px;letter-spacing:0.3px;">📄 Paper Trade</span>`;
+  }
   return `<span style="background:${m.bg};color:${m.col};padding:2px 7px;border-radius:4px;font-size:0.62rem;font-weight:600;margin-left:4px;letter-spacing:0.3px;">${m.label}</span>`;
 }
 
@@ -2773,7 +2851,15 @@ function renderExecActionButton(t) {
             <button class="btn btn-ghost" style="color:#f85149;border-color:#5c1616;" onclick="cancelExecution('${t.id}')">Cancel Pending</button>`;
   }
   if (t.execStatus === 'executed') {
-    return `<button class="btn" disabled style="background:#0e3a1e;color:#56d364;">🚀 Executed via MT4</button>`;
+    return `<button class="btn" disabled style="background:#0e3a1e;color:#56d364;">🚀 Executed via MT4${t.execPaper?' (Paper)':''}</button>`;
+  }
+  if (t.execStatus === 'paper_executed') {
+    return `<button class="btn" disabled style="background:#1a2a44;color:#58a6ff;">📄 Paper-executed (demo)</button>
+            <button class="btn btn-primary" onclick="approveForMT4('${t.id}')" id="btnApproveMT4" style="background:#1f6feb;">Re-approve</button>`;
+  }
+  if (t.execStatus === 'execution_failed') {
+    return `<button class="btn" disabled style="background:#3a1216;color:#ff7b72;">⚠ Execution failed</button>
+            <button class="btn btn-primary" onclick="approveForMT4('${t.id}')" id="btnApproveMT4" style="background:#1f6feb;">Retry</button>`;
   }
   // rejected or cancelled — allow re-approval
   return `<button class="btn btn-primary" onclick="approveForMT4('${t.id}')" id="btnApproveMT4" style="background:#1f6feb;">Re-approve for MT4</button>`;
@@ -2789,13 +2875,15 @@ function renderExecStatusBlock(t) {
   const pipSz = isJpyOrCrypto ? 0.01 : 0.0001;
 
   let mode = 'Manual';
-  if (t.execStatus === 'executed') mode = 'MT4 Auto';
+  if (t.execStatus === 'executed') mode = t.execPaper ? 'MT4 Auto (Paper)' : 'MT4 Auto';
+  else if (t.execStatus === 'paper_executed') mode = 'Paper executed (demo account)';
+  else if (t.execStatus === 'execution_failed') mode = 'Execution failed';
   else if (t.execStatus === 'pending') mode = 'Pending';
   else if (t.execStatus === 'rejected') mode = 'Rejected by risk engine';
   else if (t.execStatus === 'cancelled') mode = 'Cancelled before execution';
 
   let extras = '';
-  if (t.execStatus === 'executed') {
+  if (t.execStatus === 'executed' || t.execStatus === 'paper_executed') {
     const slip = t.execSlippagePips != null
       ? t.execSlippagePips
       : (t.execActualEntry != null && t.entry != null ? Math.round(((t.execActualEntry - t.entry) / pipSz) * 10) / 10 : null);
@@ -4221,10 +4309,11 @@ function pollExecutionStatus(journalId, queueId) {
       });
       if (!resp.ok) return;
       const data = await resp.json();
-      if (data.status === 'executed') {
+      if (data.status === 'executed' || data.status === 'paper_executed') {
         const t = trades.find(x => x.id === journalId);
         if (t) {
-          t.execStatus = 'executed';
+          t.execStatus = data.status;
+          t.execPaper = data.status === 'paper_executed';
           t.execTicket = data.mt4_ticket;
           t.execActualEntry = data.actual_entry;
           t.execExecutedAt = data.executed_at || new Date().toISOString();
@@ -4234,6 +4323,16 @@ function pollExecutionStatus(journalId, queueId) {
             const slip = (data.actual_entry - t.entry) / pipSz;
             t.execSlippagePips = Math.round(slip * 10) / 10;
           }
+          save();
+          renderJournal();
+        }
+        clearInterval(_execPollers[journalId]);
+        delete _execPollers[journalId];
+      } else if (data.status === 'execution_failed') {
+        const t = trades.find(x => x.id === journalId);
+        if (t) {
+          t.execStatus = 'execution_failed';
+          t.execRejectReason = data.reject_reason || 'Execution failed';
           save();
           renderJournal();
         }
@@ -4326,6 +4425,285 @@ async function cancelExecutionByQueueId(queueId, journalId) {
     }
     refreshExecutionQueue();
   } catch (e) { alert('Cancel failed: ' + e.message); }
+}
+
+// ── Execution System Status (health dashboard) ─────────
+async function refreshExecutionHealth() {
+  const panel = document.getElementById('executionHealthPanel');
+  if (!panel) return;
+  const backendUrl = getExecBackendUrl();
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  if (!backendUrl || !execKey) {
+    panel.innerHTML = '<div style="color:#6e7681;font-size:0.78rem;">Set Execution API Key in Settings to view health.</div>';
+    return;
+  }
+  try {
+    const resp = await fetch(backendUrl + '/api/execution/health', {
+      headers: { 'X-Execution-Key': execKey },
+    });
+    if (!resp.ok) {
+      panel.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">Health check failed (HTTP ' + resp.status + ')</div>';
+      return;
+    }
+    const h = await resp.json();
+    const dot = (ok) => `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ok?'#3fb950':'#f85149'};margin-right:8px;vertical-align:middle;"></span>`;
+    const sub = (s) => `<span style="font-size:0.7rem;color:#8b949e;">${escHtml(s||'')}</span>`;
+
+    const items = [
+      { label: 'Backend', ok: h.backend && h.backend.ok, sub: h.backend && h.backend.label },
+      { label: 'MT4 EA',  ok: h.mt4 && h.mt4.ok, sub: h.mt4 && (h.mt4.label + (h.mt4.account_equity ? ' · equity $' + Number(h.mt4.account_equity).toFixed(2) : '')) },
+      { label: 'Risk Engine', ok: h.risk_engine && h.risk_engine.ok, sub: h.risk_engine && h.risk_engine.label },
+      { label: 'Execution Queue', ok: h.queue && h.queue.ok, sub: h.queue && h.queue.label },
+      { label: 'Telegram', ok: h.telegram && h.telegram.ok, sub: h.telegram && h.telegram.label },
+      { label: 'Gist Storage', ok: h.gist && h.gist.ok, sub: h.gist && h.gist.label },
+    ];
+
+    const paperBadge = h.paper_mode && h.paper_mode.active
+      ? '<div style="background:#3a2a16;color:#ffa657;padding:6px 12px;border-radius:6px;font-size:0.74rem;margin-bottom:10px;border:1px solid #5c4416;">📄 <strong>PAPER MODE</strong> — backend will only execute on demo accounts. Set <code>PAPER_TRADING_MODE=false</code> on Render to go live.</div>'
+      : '<div style="background:#1a3a22;color:#3fb950;padding:6px 12px;border-radius:6px;font-size:0.74rem;margin-bottom:10px;border:1px solid #1f5430;">🟢 <strong>LIVE MODE</strong> — backend will execute on the connected account.</div>';
+
+    const emergencyBadge = h.emergency_stop && h.emergency_stop.active
+      ? '<div style="background:#3a1616;color:#f85149;padding:6px 12px;border-radius:6px;font-size:0.74rem;margin-bottom:10px;border:1px solid #5c1616;">🛑 <strong>EMERGENCY STOP ACTIVE</strong> since ' + escHtml(h.emergency_stop.at || '') + ' (by ' + escHtml(h.emergency_stop.by || '') + ')</div>'
+      : '';
+
+    let html = paperBadge + emergencyBadge + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;">';
+    items.forEach(it => {
+      html += `<div style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:8px 12px;">
+        <div style="font-size:0.78rem;color:#e6edf3;font-weight:600;">${dot(it.ok)}${escHtml(it.label)}</div>
+        <div style="margin-top:4px;margin-left:18px;">${sub(it.sub)}</div>
+      </div>`;
+    });
+    html += '</div>';
+    html += `<div style="margin-top:6px;font-size:0.65rem;color:#6e7681;">Checked at ${escHtml(h.checked_at || '')}</div>`;
+    panel.innerHTML = html;
+  } catch (e) {
+    panel.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">Health error: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+// ── Execution Test Pipeline ────────────────────────────
+async function runExecutionTest() {
+  const out = document.getElementById('executionTestResult');
+  const backendUrl = getExecBackendUrl();
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  if (!backendUrl || !execKey) {
+    out.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">Set Execution API Key in Settings first.</div>';
+    return;
+  }
+  const stages = [
+    { name: 'Health check (backend reachable)', state: 'pending' },
+    { name: 'POST /api/execution/test (queue test trade)', state: 'pending' },
+    { name: 'EA fetches via /api/trade', state: 'pending' },
+    { name: 'EA acknowledges via /api/trade/executed', state: 'pending' },
+    { name: 'Backend marks status = test_passed', state: 'pending' },
+  ];
+  const render = () => {
+    const dot = (s) => s === 'pass' ? '✅' : s === 'fail' ? '❌' : s === 'running' ? '⏳' : '⚪';
+    out.innerHTML = '<div style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:10px 14px;font-size:0.78rem;">'
+      + '<div style="font-weight:600;color:#e6edf3;margin-bottom:8px;">Pipeline test in progress…</div>'
+      + stages.map(s => `<div style="margin:3px 0;">${dot(s.state)} ${escHtml(s.name)}${s.detail ? ' — <span style="color:#8b949e;">' + escHtml(s.detail) + '</span>' : ''}</div>`).join('')
+      + '</div>';
+  };
+  render();
+
+  // Stage 1
+  stages[0].state = 'running'; render();
+  try {
+    const r1 = await fetch(backendUrl + '/api/execution/health', { headers: { 'X-Execution-Key': execKey } });
+    if (!r1.ok) throw new Error('HTTP ' + r1.status);
+    stages[0].state = 'pass';
+  } catch (e) { stages[0].state = 'fail'; stages[0].detail = e.message; render(); return; }
+
+  // Stage 2
+  stages[1].state = 'running'; render();
+  let testId = '';
+  try {
+    const r2 = await fetch(backendUrl + '/api/execution/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Execution-Key': execKey },
+      body: JSON.stringify({}),
+    });
+    const j2 = await r2.json();
+    if (!r2.ok || !j2.trade_id) throw new Error(j2.error || ('HTTP ' + r2.status));
+    testId = j2.trade_id;
+    stages[1].state = 'pass'; stages[1].detail = 'trade_id=' + testId;
+  } catch (e) { stages[1].state = 'fail'; stages[1].detail = e.message; render(); return; }
+
+  // Stages 3-5: poll status until terminal or 30s timeout
+  stages[2].state = 'running'; render();
+  const deadline = Date.now() + 30000;
+  let lastStatus = '';
+  while (Date.now() < deadline) {
+    try {
+      const r3 = await fetch(backendUrl + '/api/trade/status/' + encodeURIComponent(testId), {
+        headers: { 'X-Execution-Key': execKey },
+      });
+      if (r3.ok) {
+        const j3 = await r3.json();
+        lastStatus = j3.status || '';
+        if (lastStatus === 'fetched' && stages[2].state !== 'pass') {
+          stages[2].state = 'pass'; stages[3].state = 'running'; render();
+        }
+        if (lastStatus === 'test_passed') {
+          if (stages[2].state !== 'pass') stages[2].state = 'pass';
+          stages[3].state = 'pass';
+          stages[4].state = 'pass';
+          render();
+          out.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;color:#3fb950;font-size:0.78rem;">All stages passed — pipeline is wired correctly. ✅</div>');
+          return;
+        }
+        if (lastStatus === 'test_failed') {
+          stages[3].state = 'fail'; render();
+          out.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;color:#f85149;font-size:0.78rem;">EA reported failure. Check the Execution Log for the reason.</div>');
+          return;
+        }
+      }
+    } catch (_) {}
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  if (stages[2].state !== 'pass') {
+    stages[2].state = 'fail'; stages[2].detail = 'EA never fetched (last status: ' + lastStatus + ')';
+  } else {
+    stages[3].state = 'fail'; stages[3].detail = 'EA never acknowledged (last status: ' + lastStatus + ')';
+  }
+  render();
+  out.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;color:#ffa657;font-size:0.78rem;">Timed out after 30s. Check the EA is running, AutoTrading is on, and the backend URL is allow-listed in MT4.</div>');
+}
+
+// ── Execution Log viewer ───────────────────────────────
+async function refreshExecutionLog() {
+  const panel = document.getElementById('executionLogPanel');
+  if (!panel) return;
+  const backendUrl = getExecBackendUrl();
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  if (!backendUrl || !execKey) {
+    panel.innerHTML = '<div style="color:#6e7681;font-size:0.78rem;">Set Execution API Key in Settings to view log.</div>';
+    return;
+  }
+  const filter = (document.getElementById('execLogFilter') || {}).value || 'all';
+  try {
+    const url = backendUrl + '/api/execution/log?limit=50&status=' + encodeURIComponent(filter);
+    const resp = await fetch(url, { headers: { 'X-Execution-Key': execKey } });
+    if (!resp.ok) {
+      panel.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">Log fetch failed (HTTP ' + resp.status + ')</div>';
+      return;
+    }
+    const data = await resp.json();
+    const log = data.log || [];
+    if (!log.length) {
+      panel.innerHTML = '<div style="color:#6e7681;font-size:0.78rem;">No log entries match this filter.</div>';
+      return;
+    }
+    const colorFor = (s) => {
+      if (['executed','paper_executed','test_passed','approved'].includes(s)) return '#3fb950';
+      if (['execution_failed','test_failed','rejected'].includes(s))           return '#f85149';
+      if (['cancelled'].includes(s))                                            return '#8b949e';
+      return '#ffa657';
+    };
+    let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.72rem;">';
+    html += '<thead><tr style="color:#8b949e;border-bottom:1px solid #21262d;">'
+         + '<th style="text-align:left;padding:5px 8px;">Time</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Symbol</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Status</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Plan→Actual (slip)</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Ticket</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Reason</th>'
+         + '</tr></thead><tbody>';
+    log.forEach(e => {
+      const ts = e.ts ? new Date(e.ts).toLocaleString() : '';
+      const slip = e.slippage != null ? (e.slippage > 0 ? '+' : '') + e.slippage : '';
+      const planActual = e.actual_entry != null ? `${e.planned_entry||''} → ${e.actual_entry} (${slip})` : (e.planned_entry || '');
+      const tag = (e.paper ? '📄 ' : '') + (e.test ? '🧪 ' : '');
+      html += `<tr style="border-bottom:1px solid #161b22;">
+        <td style="padding:5px 8px;color:#8b949e;white-space:nowrap;">${escHtml(ts)}</td>
+        <td style="padding:5px 8px;color:#e6edf3;">${tag}${escHtml(e.symbol||'')} ${escHtml(e.direction||'')}</td>
+        <td style="padding:5px 8px;color:${colorFor(e.status)};font-weight:600;">${escHtml(e.status||'')}</td>
+        <td style="padding:5px 8px;color:#e6edf3;">${escHtml(planActual)}</td>
+        <td style="padding:5px 8px;color:#8b949e;">${e.mt4_ticket ? '#'+e.mt4_ticket : ''}</td>
+        <td style="padding:5px 8px;color:#8b949e;">${escHtml(e.reason||'')}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+    html += `<div style="margin-top:6px;font-size:0.65rem;color:#6e7681;">Showing ${data.returned||log.length} of ${data.total||log.length} total events.</div>`;
+    panel.innerHTML = html;
+  } catch (e) {
+    panel.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">Log error: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+// ── Emergency Stop ─────────────────────────────────────
+async function emergencyStopConfirm() {
+  if (!confirm('🛑 EMERGENCY STOP\n\nThis will:\n• Cancel every pending trade in the queue\n• Tell the MT4 EA to close every POIWatcher_ position\n• Send a Telegram alert\n\nProceed?')) return;
+  const backendUrl = getExecBackendUrl();
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  if (!backendUrl || !execKey) { alert('Set Execution API Key in Settings first.'); return; }
+  try {
+    const resp = await fetch(backendUrl + '/api/execution/emergency_stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Execution-Key': execKey },
+      body: JSON.stringify({ by: 'journal' }),
+    });
+    const j = await resp.json();
+    if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
+    alert('Emergency stop activated.\n\nCancelled ' + (j.cancelled||0) + ' pending trade(s).\nThe EA will close all POIWatcher positions on its next 10s poll.');
+    refreshExecutionHealth();
+    refreshExecutionQueue();
+    refreshExecutionLog();
+  } catch (e) { alert('Emergency stop failed: ' + e.message); }
+}
+
+// ── Go-Live Checklist ─────────────────────────────────
+const GO_LIVE_ITEMS = [
+  { id: 'demoTested',   label: 'Tested for at least 1 week on a demo account with PAPER_TRADING_MODE=true' },
+  { id: 'pipelineTest', label: 'Run the “🧪 Test Pipeline” button — all 5 stages pass' },
+  { id: 'riskLimits',   label: 'Risk limits configured (per-trade %, daily/weekly/monthly drawdown)' },
+  { id: 'maxLot',       label: 'MaxLotSize input on the EA reflects the largest position you would tolerate' },
+  { id: 'beTested',     label: 'Auto break-even tested on at least one demo trade' },
+  { id: 'emergencyKnown', label: 'You know where the 🛑 Emergency Stop button is and how to use it' },
+  { id: 'telegramOk',   label: 'Telegram alerts arriving for approve / executed / rejected events' },
+  { id: 'equityFloor',  label: 'Account has more than $100 equity (EA refuses below this)' },
+  { id: 'goLiveOk',     label: 'You accept the risk and want PAPER_TRADING_MODE=false on Render' },
+];
+
+function _loadGoLiveState() {
+  try { return JSON.parse(localStorage.getItem('tj_goLiveChecklist') || '{}'); }
+  catch { return {}; }
+}
+function _saveGoLiveState(state) {
+  localStorage.setItem('tj_goLiveChecklist', JSON.stringify(state));
+}
+
+function openGoLiveChecklist() {
+  const state = _loadGoLiveState();
+  const list = document.getElementById('goLiveChecklist');
+  list.innerHTML = GO_LIVE_ITEMS.map(it => `
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border:1px solid #21262d;border-radius:6px;margin-bottom:6px;cursor:pointer;background:${state[it.id]?'#0d1f12':'#0d1117'};">
+      <input type="checkbox" ${state[it.id]?'checked':''} onchange="toggleGoLiveItem('${it.id}', this.checked)" style="margin-top:2px;">
+      <span style="font-size:0.78rem;color:#e6edf3;line-height:1.4;">${escHtml(it.label)}</span>
+    </label>
+  `).join('');
+  updateGoLiveProgress();
+  document.getElementById('goLiveOverlay').classList.add('open');
+}
+function closeGoLiveChecklist() {
+  document.getElementById('goLiveOverlay').classList.remove('open');
+}
+function toggleGoLiveItem(id, checked) {
+  const state = _loadGoLiveState();
+  state[id] = !!checked;
+  _saveGoLiveState(state);
+  openGoLiveChecklist(); // re-render to update colors
+}
+function updateGoLiveProgress() {
+  const state = _loadGoLiveState();
+  const done = GO_LIVE_ITEMS.filter(it => state[it.id]).length;
+  const total = GO_LIVE_ITEMS.length;
+  const ready = done === total;
+  document.getElementById('goLiveProgress').innerHTML =
+    `<div style="display:flex;align-items:center;gap:10px;">`
+    + `<div style="flex:1;background:#21262d;border-radius:4px;height:8px;overflow:hidden;"><div style="width:${(done/total)*100}%;background:${ready?'#3fb950':'#58a6ff'};height:100%;"></div></div>`
+    + `<div style="color:${ready?'#3fb950':'#8b949e'};font-weight:600;">${done}/${total} ${ready?'— ready to go live ✓':''}</div>`
+    + `</div>`;
 }
 
 // ═══════════════════════════════════════════════════════

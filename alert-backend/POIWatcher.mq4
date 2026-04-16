@@ -36,6 +36,8 @@ input string   ExecutionAPIKey      = "";     // Must match EXECUTION_API_KEY on
 input int      MaxSlippagePips      = 3;      // Max slippage in pips for execution
 input int      ExecutionCheckSeconds = 5;     // How often to poll for approved trades
 input double   MaxLotSize           = 1.0;    // Safety cap — never execute above this
+input bool     AllowLiveExecution   = false;  // Must be true to execute on a LIVE account when backend is in PAPER mode? See README.
+input int      EmergencyCheckSeconds = 10;    // How often to poll the emergency stop endpoint
 
 //--- Internal state
 int      knownTickets[];       // tickets we already know about
@@ -48,6 +50,8 @@ datetime lastCheck     = 0;
 //--- Execution pipeline state
 string   executedTradeIDs[];   // trade IDs already executed (prevent duplicates)
 datetime lastExecCheck = 0;    // last time we checked for pending trades
+datetime lastEmergencyCheck = 0; // last time we polled emergency stop
+string   lastEmergencyAt = "";   // last emergency timestamp we acted on
 
 //+------------------------------------------------------------------+
 //| Expert initialization                                             |
@@ -62,6 +66,11 @@ int OnInit()
          " | Check every ", ExecutionCheckSeconds, "s");
    if (EnableAutoExecution && StringLen(ExecutionAPIKey) == 0)
       Print("WARNING: Auto Execution enabled but ExecutionAPIKey is empty!");
+
+   bool isDemoAcct = (AccountInfoInteger(ACCOUNT_TRADE_MODE) == ACCOUNT_TRADE_MODE_DEMO);
+   Print("Account mode: ", (isDemoAcct ? "DEMO" : "LIVE"),
+         " | AllowLiveExecution=", (AllowLiveExecution ? "true" : "false"),
+         " | Emergency poll: ", EmergencyCheckSeconds, "s");
 
    // Scan existing trades on startup
    ScanOpenTrades();
@@ -108,6 +117,13 @@ void OnTimer()
    {
       lastExecCheck = now;
       CheckForPendingExecution();
+   }
+
+   // Check emergency stop (always, even if execution disabled — safety first)
+   if (now - lastEmergencyCheck >= EmergencyCheckSeconds)
+   {
+      lastEmergencyCheck = now;
+      CheckForEmergencyStop();
    }
 
    // Heartbeat
@@ -511,6 +527,10 @@ void CheckForPendingExecution()
    double lotSize    = JsonGetDouble(tradeJson, "lot_size");
    double beTrigger  = JsonGetDouble(tradeJson, "be_trigger_rr");
    string journalID  = JsonGetString(tradeJson, "journal_trade_id");
+   string paperFlag  = JsonGetString(tradeJson, "paper_trading");
+   string testFlag   = JsonGetString(tradeJson, "test_only");
+   bool   isPaper    = (paperFlag == "true" || paperFlag == "True" || paperFlag == "1");
+   bool   isTest     = (testFlag == "true" || testFlag == "True" || testFlag == "1");
 
    if (StringLen(tradeID) == 0 || StringLen(symbol) == 0)
    {
@@ -520,9 +540,33 @@ void CheckForPendingExecution()
 
    Print("POIWatcher EXEC: Trade ready — ", tradeID, " ", symbol, " ", direction,
          " Entry:", DoubleToString(entry, 5), " SL:", DoubleToString(sl, 5),
-         " TP:", DoubleToString(tp, 5), " Lot:", DoubleToString(lotSize, 2));
+         " TP:", DoubleToString(tp, 5), " Lot:", DoubleToString(lotSize, 2),
+         (isPaper ? " [PAPER]" : ""), (isTest ? " [TEST]" : ""));
 
    // ── SAFETY CHECKS ──
+
+   // 0. TEST trade — never call OrderSend, just acknowledge end-to-end
+   if (isTest)
+   {
+      Print("POIWatcher EXEC: TEST TRADE received — pipeline OK, no OrderSend");
+      SendExecutionResultEx(tradeID, 999999, entry, "", true, true);
+      MarkTradeExecuted(tradeID);
+      return;
+   }
+
+   // 0b. PAPER mode + LIVE account guard. If backend says paper, EA must be on a demo account
+   //     (or the user has explicitly opted in via AllowLiveExecution).
+   if (isPaper)
+   {
+      bool isDemo = (AccountInfoInteger(ACCOUNT_TRADE_MODE) == ACCOUNT_TRADE_MODE_DEMO);
+      if (!isDemo && !AllowLiveExecution)
+      {
+         Print("POIWatcher EXEC: Backend in PAPER mode but account is LIVE and AllowLiveExecution=false — REJECTED");
+         SendExecutionResultEx(tradeID, 0, 0, "Paper trade refused on live account", true, false);
+         MarkTradeExecuted(tradeID);
+         return;
+      }
+   }
 
    // 1. Already executed?
    if (IsExecutedTradeID(tradeID))
@@ -644,9 +688,10 @@ void CheckForPendingExecution()
          Print("POIWatcher EXEC: SUCCESS — Ticket #", ticket,
                " ", symbol, " ", (cmd == OP_BUY ? "BUY" : "SELL"),
                " @ ", DoubleToString(actualEntry, digits),
-               " Lot: ", DoubleToString(calcLot, 2));
+               " Lot: ", DoubleToString(calcLot, 2),
+               (isPaper ? " [PAPER]" : ""));
 
-         SendExecutionResult(tradeID, ticket, actualEntry, "");
+         SendExecutionResultEx(tradeID, ticket, actualEntry, "", isPaper, false);
       }
    }
    else
@@ -654,25 +699,123 @@ void CheckForPendingExecution()
       int err = GetLastError();
       string errMsg = "OrderSend failed: error " + IntegerToString(err);
       Print("POIWatcher EXEC: FAILED — ", errMsg, " for ", symbol);
-      SendExecutionResult(tradeID, 0, 0, errMsg);
+      SendExecutionResultEx(tradeID, 0, 0, errMsg, isPaper, false);
    }
 }
 
 //+------------------------------------------------------------------+
-//| Send execution result to backend                                 |
+//| Send execution result to backend (legacy, no paper/test flags)   |
 //+------------------------------------------------------------------+
 void SendExecutionResult(string tradeID, int ticket, double actualEntry, string error)
+{
+   SendExecutionResultEx(tradeID, ticket, actualEntry, error, false, false);
+}
+
+//+------------------------------------------------------------------+
+//| Send execution result to backend with paper/test flags           |
+//+------------------------------------------------------------------+
+void SendExecutionResultEx(string tradeID, int ticket, double actualEntry, string error, bool paper, bool test)
 {
    string json = "{";
    json += "\"id\":\"" + tradeID + "\",";
    json += "\"ticket\":" + IntegerToString(ticket) + ",";
    json += "\"actual_entry\":" + DoubleToString(actualEntry, 5) + ",";
+   json += "\"paper\":" + (paper ? "true" : "false") + ",";
+   json += "\"test\":" + (test ? "true" : "false") + ",";
    json += "\"timestamp\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\"";
    if (StringLen(error) > 0)
       json += ",\"error\":\"" + error + "\"";
    json += "}";
 
    HttpPostWithKey("/api/trade/executed", json);
+}
+
+//+------------------------------------------------------------------+
+//| Emergency stop — poll backend; close all POIWatcher_ trades       |
+//+------------------------------------------------------------------+
+void CheckForEmergencyStop()
+{
+   // GET /api/mt4/emergency-stop (no auth required for read)
+   string url = BackendURL + "/api/mt4/emergency-stop";
+   string headers = "Content-Type: application/json\r\n";
+   char   postData[];
+   char   result[];
+   string resultHeaders;
+
+   ArrayResize(postData, 0);
+
+   int res = WebRequest("GET", url, headers, 5000, postData, result, resultHeaders);
+   if (res < 200 || res >= 300) return;
+
+   string response = CharArrayToString(result);
+   string activeStr = JsonGetString(response, "active");
+   bool active = (activeStr == "true" || activeStr == "True" || activeStr == "1");
+   if (!active) return;
+
+   string at = JsonGetString(response, "at");
+   if (at == lastEmergencyAt) return; // already handled this one
+
+   Print("POIWatcher: !!! EMERGENCY STOP received (at=", at, ") — closing all POIWatcher_ positions");
+   int closed = CloseAllPOIWatcherTrades();
+   lastEmergencyAt = at;
+
+   // Acknowledge to backend so it can clear the flag
+   string ackJson = "{\"closed_count\":" + IntegerToString(closed) +
+                    ",\"timestamp\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\"}";
+
+   string ackHeaders = "Content-Type: application/json\r\nX-Execution-Key: " + ExecutionAPIKey + "\r\n";
+   char   ackData[];
+   char   ackResult[];
+   string ackResultHeaders;
+   StringToCharArray(ackJson, ackData, 0, WHOLE_ARRAY, CP_UTF8);
+   ArrayResize(ackData, ArraySize(ackData) - 1);
+
+   int ackRes = WebRequest("DELETE", BackendURL + "/api/mt4/emergency-stop", ackHeaders, 5000,
+                           ackData, ackResult, ackResultHeaders);
+   if (ackRes < 200 || ackRes >= 300)
+      Print("POIWatcher: emergency-stop DELETE returned HTTP ", ackRes);
+   else
+      Print("POIWatcher: emergency-stop acknowledged (closed ", closed, ")");
+}
+
+//+------------------------------------------------------------------+
+//| Close every order whose comment starts with POIWatcher_           |
+//+------------------------------------------------------------------+
+int CloseAllPOIWatcherTrades()
+{
+   int closed = 0;
+   // Iterate from the end — closing changes the index
+   for (int i = OrdersTotal() - 1; i >= 0; i--)
+   {
+      if (!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
+      if (OrderType() > OP_SELL) continue; // skip pending orders
+
+      string cmt = OrderComment();
+      if (StringFind(cmt, "POIWatcher_") != 0) continue;
+
+      double price;
+      if (OrderType() == OP_BUY)
+         price = MarketInfo(OrderSymbol(), MODE_BID);
+      else
+         price = MarketInfo(OrderSymbol(), MODE_ASK);
+
+      int slip = MaxSlippagePips;
+      int digits = (int)MarketInfo(OrderSymbol(), MODE_DIGITS);
+      if (digits == 3 || digits == 5) slip = MaxSlippagePips * 10;
+
+      bool ok = OrderClose(OrderTicket(), OrderLots(), price, slip, clrYellow);
+      if (ok)
+      {
+         closed++;
+         Print("POIWatcher: emergency-closed ticket #", OrderTicket(), " ", OrderSymbol());
+      }
+      else
+      {
+         Print("POIWatcher: emergency-close FAILED ticket #", OrderTicket(),
+               " err=", GetLastError());
+      }
+   }
+   return closed;
 }
 
 //+------------------------------------------------------------------+
