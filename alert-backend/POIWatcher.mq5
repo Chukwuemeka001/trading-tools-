@@ -57,11 +57,11 @@ input bool     EnableAutoLogging      = true;
 input int      HeartbeatMinutes       = 5;
 
 //--- Trade Execution Pipeline
-input bool     EnableAutoExecution    = false; // OFF by default — must be manually enabled
+input bool     EnableAutoExecution    = false; // OFF by default - must be manually enabled
 input string   ExecutionAPIKey        = "";    // Must match EXECUTION_API_KEY on backend
 input int      MaxSlippagePips        = 3;     // Max acceptable slippage in pips
 input int      ExecutionCheckSeconds  = 5;     // How often to poll backend for approved trades
-input double   MaxLotSize             = 1.0;   // Hard safety cap — never execute above this
+input double   MaxLotSize             = 1.0;   // Hard safety cap - never execute above this
 input bool     AllowLiveExecution     = false; // Allow execution on LIVE when backend is PAPER mode
 input int      EmergencyCheckSeconds  = 10;    // How often to poll the emergency stop endpoint
 
