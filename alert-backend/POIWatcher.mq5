@@ -842,7 +842,9 @@ void CheckForEmergencyStop()
 {
    if (StringLen(ExecutionAPIKey) == 0) return; // can't auth without key
 
-   string response = HttpGetWithKey("/api/mt4/emergency-stop");
+   // Hits /api/mt5/... on MT5-aware backends, which is a route alias of the
+   // legacy /api/mt4/... path. Backend accepts both for compatibility.
+   string response = HttpGetWithKey("/api/mt5/emergency-stop");
    if (StringLen(response) == 0) return; // network error or not deployed yet
 
    string emergencyStr = JsonGetString(response, "emergency");
@@ -928,10 +930,11 @@ void SendPositionOpen(ulong ticket)
    json += "\"lot_size\":"        + DoubleToString(lots, 2)                   + ",";
    json += "\"timestamp\":\""     + TimeToString(TimeCurrent(), TIME_DATE | TIME_SECONDS) + "\",";
    json += "\"account_balance\":" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + ",";
-   json += "\"account_equity\":"  + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY),  2);
+   json += "\"account_equity\":"  + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY),  2) + ",";
+   json += "\"platform\":\"mt5\"";
    json += "}";
 
-   HttpPost("/mt4/trade-open", json);
+   HttpPost("/mt5/trade-open", json);
 }
 
 //+------------------------------------------------------------------+
@@ -1033,10 +1036,11 @@ void SendPositionClose(ulong ticket)
    json += "\"profit_loss\":"       + DoubleToString(totalProfit, 2)           + ",";
    json += "\"pips\":"              + DoubleToString(pips, 1)                  + ",";
    json += "\"duration_minutes\":"  + IntegerToString(durationMin)             + ",";
-   json += "\"close_reason\":\"Manual close\"";
+   json += "\"close_reason\":\"Manual close\",";
+   json += "\"platform\":\"mt5\"";
    json += "}";
 
-   HttpPost("/mt4/trade-close", json);
+   HttpPost("/mt5/trade-close", json);
 }
 
 //+------------------------------------------------------------------+
@@ -1054,10 +1058,11 @@ void SendPositionModify(ulong ticket, string modification)
    json += "\"symbol\":\""     + sym                                          + "\",";
    json += "\"new_sl\":"       + DoubleToString(PositionGetDouble(POSITION_SL), digits) + ",";
    json += "\"new_tp\":"       + DoubleToString(PositionGetDouble(POSITION_TP), digits) + ",";
-   json += "\"modification\":\"" + modification                               + "\"";
+   json += "\"modification\":\"" + modification                               + "\",";
+   json += "\"platform\":\"mt5\"";
    json += "}";
 
-   HttpPost("/mt4/trade-modify", json);
+   HttpPost("/mt5/trade-modify", json);
 }
 
 //+------------------------------------------------------------------+
@@ -1072,10 +1077,11 @@ void SendHeartbeat()
    json += "\"open_trades\":"     + IntegerToString(openCount)                           + ",";
    json += "\"account_balance\":" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + ",";
    json += "\"account_equity\":"  + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY),  2) + ",";
-   json += "\"timestamp\":\""     + TimeToString(TimeCurrent(), TIME_DATE | TIME_SECONDS)  + "\"";
+   json += "\"timestamp\":\""     + TimeToString(TimeCurrent(), TIME_DATE | TIME_SECONDS)  + "\",";
+   json += "\"platform\":\"mt5\"";
    json += "}";
 
-   HttpPost("/mt4/status", json);
+   HttpPost("/mt5/status", json);
 }
 
 

@@ -834,7 +834,7 @@
     </div>
   </span>
   <span id="exchangeDot" class="exchange-dot" title="Exchange Connection"><span class="dot grey" id="exchangeDotIcon"></span> <span id="exchangeDotText">Exchange</span></span>
-  <span id="mt4Dot" class="mt4-dot off" title="MT4 Connection">&#9899; MT4</span>
+  <span id="mt4Dot" class="mt4-dot off" title="MT5 Connection">&#9899; MT5</span>
   <span id="syncDot" style="font-size:0.71rem;color:#8b949e;white-space:nowrap;padding:0 4px;"></span>
   <button class="cloud-btn" onclick="openSettingsModal()" style="font-size:0.75rem;">&#9881;</button>
   <button class="cloud-btn" onclick="openBrokerModal()" style="font-size:0.75rem;">Broker</button>
@@ -1555,11 +1555,11 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
-     LIVE TRADES (MT4)
+     LIVE TRADES (MT5)
 ════════════════════════════════════════════════════════ -->
 <div id="page-live" class="page">
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
-    <h1 style="font-size:1.1rem; font-weight:700;">Live MT4 Trades</h1>
+    <h1 style="font-size:1.1rem; font-weight:700;">Live MT5 Trades</h1>
     <div style="display:flex; gap:8px; align-items:center;">
       <span id="mt4ConnStatus" style="font-size:0.75rem; color:#8b949e;"></span>
       <button class="btn btn-ghost" onclick="refreshLiveTrades()" style="padding:5px 10px; font-size:0.72rem;">Refresh</button>
@@ -1567,18 +1567,18 @@
   </div>
 
   <div id="mt4LivePanel">
-    <div style="color:#6e7681; font-size:0.82rem;">Connect your backend and attach the POIWatcher EA to MT4 to see live trades here.</div>
+    <div style="color:#6e7681; font-size:0.82rem;">Connect your backend and attach the POIWatcher EA to MT5 to see live trades here.</div>
   </div>
 
-  <!-- Execution Queue (pending trades waiting for MT4) -->
+  <!-- Execution Queue (pending trades waiting for the MT5 EA) -->
   <div style="margin-top:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
       <div class="card-title" style="margin:0;">Execution Queue</div>
       <button class="btn btn-ghost" onclick="refreshExecutionQueue()" style="padding:3px 8px;font-size:0.7rem;">↻ Refresh</button>
     </div>
-    <div style="font-size:0.72rem; color:#6e7681; margin-bottom:8px;">Trades approved and waiting for the MT4 EA to execute. Once executed they move to the live monitor above.</div>
+    <div style="font-size:0.72rem; color:#6e7681; margin-bottom:8px;">Trades approved and waiting for the MT5 EA to execute. Once executed they move to the live monitor above.</div>
     <div id="executionQueuePanel">
-      <div style="color:#6e7681;font-size:0.78rem;">No trades waiting for MT4 execution.</div>
+      <div style="color:#6e7681;font-size:0.78rem;">No trades waiting for MT5 execution.</div>
     </div>
   </div>
 
@@ -1629,10 +1629,10 @@
 
   <!-- Auto-logged trades needing analysis -->
   <div style="margin-top:20px;">
-    <div class="card-title">MT4 Auto-Logged Trades — Needs Your Analysis</div>
-    <div style="font-size:0.72rem; color:#6e7681; margin-bottom:12px;">These trades were logged automatically from MT4. Click to add your HTF bias, setup type, confidence, and rationale.</div>
+    <div class="card-title">MT5 Auto-Logged Trades — Needs Your Analysis</div>
+    <div style="font-size:0.72rem; color:#6e7681; margin-bottom:12px;">These trades were logged automatically from MT5. Click to add your HTF bias, setup type, confidence, and rationale.</div>
     <div id="mt4NeedsAnalysis">
-      <div style="color:#6e7681; font-size:0.82rem;">No MT4 trades needing analysis.</div>
+      <div style="color:#6e7681; font-size:0.82rem;">No MT5 trades needing analysis.</div>
     </div>
   </div>
 </div>
@@ -1656,7 +1656,7 @@
 <div class="modal-overlay" id="execConfirmOverlay" onclick="if(event.target===this)closeExecConfirm()">
   <div class="modal" id="execConfirmBox" style="max-width:480px;">
     <div class="modal-header">
-      <h2 id="execConfirmTitle">Send Trade to MT4</h2>
+      <h2 id="execConfirmTitle">Send Trade to MT5</h2>
       <button class="modal-close" onclick="closeExecConfirm()">✕</button>
     </div>
     <div class="modal-body" id="execConfirmBody"></div>
@@ -2171,12 +2171,12 @@
           </div>
         </div>
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid #21262d;">
-          <div style="font-size:0.78rem; font-weight:600; margin-bottom:8px; color:#8b949e;">MT4 Execution Pipeline</div>
+          <div style="font-size:0.78rem; font-weight:600; margin-bottom:8px; color:#8b949e;">MT5 Execution Pipeline</div>
           <div class="settings-grid">
             <div class="settings-field">
               <label>Execution API Key</label>
               <input type="password" id="sett_execKey" placeholder="Set in Render env vars" onchange="localStorage.setItem('tj_executionKey', this.value)">
-              <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">Required for Send to MT4. Must match EXECUTION_API_KEY on your backend. Stored locally only — never synced to Gist.</div>
+              <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">Required for Send to MT5. Must match EXECUTION_API_KEY on your backend. Stored locally only — never synced to Gist.</div>
             </div>
           </div>
           <div class="settings-grid" style="margin-top:8px;">
@@ -2844,14 +2844,14 @@ function renderExecBadge(t) {
 
 function renderExecActionButton(t) {
   if (!t.execStatus) {
-    return `<button class="btn btn-primary" onclick="approveForMT4('${t.id}')" id="btnApproveMT4" style="background:#1f6feb;">✅ Approve for MT4 Execution</button>`;
+    return `<button class="btn btn-primary" onclick="approveForMT4('${t.id}')" id="btnApproveMT4" style="background:#1f6feb;">✅ Approve for MT5 Execution</button>`;
   }
   if (t.execStatus === 'pending') {
     return `<button class="btn" id="btnApproveMT4" disabled style="background:#bb8009;color:#fff;">🟡 Pending Execution…</button>
             <button class="btn btn-ghost" style="color:#f85149;border-color:#5c1616;" onclick="cancelExecution('${t.id}')">Cancel Pending</button>`;
   }
   if (t.execStatus === 'executed') {
-    return `<button class="btn" disabled style="background:#0e3a1e;color:#56d364;">🚀 Executed via MT4${t.execPaper?' (Paper)':''}</button>`;
+    return `<button class="btn" disabled style="background:#0e3a1e;color:#56d364;">🚀 Executed via MT5${t.execPaper?' (Paper)':''}</button>`;
   }
   if (t.execStatus === 'paper_executed') {
     return `<button class="btn" disabled style="background:#1a2a44;color:#58a6ff;">📄 Paper-executed (demo)</button>
@@ -2862,7 +2862,7 @@ function renderExecActionButton(t) {
             <button class="btn btn-primary" onclick="approveForMT4('${t.id}')" id="btnApproveMT4" style="background:#1f6feb;">Retry</button>`;
   }
   // rejected or cancelled — allow re-approval
-  return `<button class="btn btn-primary" onclick="approveForMT4('${t.id}')" id="btnApproveMT4" style="background:#1f6feb;">Re-approve for MT4</button>`;
+  return `<button class="btn btn-primary" onclick="approveForMT4('${t.id}')" id="btnApproveMT4" style="background:#1f6feb;">Re-approve for MT5</button>`;
 }
 
 function renderExecStatusBlock(t) {
@@ -2875,7 +2875,7 @@ function renderExecStatusBlock(t) {
   const pipSz = isJpyOrCrypto ? 0.01 : 0.0001;
 
   let mode = 'Manual';
-  if (t.execStatus === 'executed') mode = t.execPaper ? 'MT4 Auto (Paper)' : 'MT4 Auto';
+  if (t.execStatus === 'executed') mode = t.execPaper ? 'MT5 Auto (Paper)' : 'MT5 Auto';
   else if (t.execStatus === 'paper_executed') mode = 'Paper executed (demo account)';
   else if (t.execStatus === 'execution_failed') mode = 'Execution failed';
   else if (t.execStatus === 'pending') mode = 'Pending';
@@ -2894,7 +2894,7 @@ function renderExecStatusBlock(t) {
         <div><div class="info-cell-label">Planned Entry</div><div style="font-weight:600;">${t.entry ?? '—'}</div></div>
         <div><div class="info-cell-label">Actual Entry</div><div style="font-weight:600;">${t.execActualEntry ?? '—'}</div></div>
         <div><div class="info-cell-label">Slippage</div><div style="font-weight:700;color:${slipCol};">${slipStr}</div></div>
-        <div><div class="info-cell-label">MT4 Ticket</div><div style="font-weight:600;">${t.execTicket ? '#' + t.execTicket : '—'}</div></div>
+        <div><div class="info-cell-label">MT5 Ticket</div><div style="font-weight:600;">${t.execTicket ? '#' + t.execTicket : '—'}</div></div>
       </div>`;
   } else if (t.execStatus === 'rejected' && t.execRejectReason) {
     extras = `<div style="margin-top:6px;color:#ff7b72;font-size:0.78rem;">Reason: ${escHtml(t.execRejectReason)}</div>`;
@@ -2961,7 +2961,7 @@ function renderJournal() {
         <div class="trade-dir ${t.direction}">${t.direction}</div>
       </div>
       <div class="trade-main">
-        <div class="trade-pair">${t.pair} ${badge}${execBadge}${t.source === 'mt4' ? '<span class="mt4-badge">MT4</span>' : t.source === 'kraken' ? '<span class="exchange-badge kraken">Kraken</span>' : t.source === 'binance' ? '<span class="exchange-badge binance">Binance</span>' : ''}</div>
+        <div class="trade-pair">${t.pair} ${badge}${execBadge}${t.source === 'mt5' ? '<span class="mt4-badge">MT5</span>' : t.source === 'mt4' ? '<span class="mt4-badge">MT4</span>' : t.source === 'kraken' ? '<span class="exchange-badge kraken">Kraken</span>' : t.source === 'binance' ? '<span class="exchange-badge binance">Binance</span>' : ''}</div>
         <div class="trade-meta">${dateStr} · ${t.timeframe} · ${t.setup} · ${t.market}</div>
       </div>
       <div class="trade-right">
@@ -4035,7 +4035,8 @@ function deleteTrade(id) {
 function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
 function maybeCloseModal(e) { if (e.target === document.getElementById('modalOverlay')) closeModal(); }
 
-// ── MT4 Execution Pipeline ────────────────────────────
+// ── MT5 Execution Pipeline ────────────────────────────
+// (function/id names keep the "MT4" prefix for DOM-stability; user-facing text says MT5)
 function getExecBackendUrl() {
   return localStorage.getItem('tl_backend_url')
       || localStorage.getItem('poiwatcher_backend')
@@ -4075,7 +4076,7 @@ function approveForMT4(tradeId) {
 
   const execKey = localStorage.getItem('tj_executionKey') || '';
   if (!execKey) {
-    alert('Execution API key not set.\n\nGo to Settings → Profile → MT4 Execution Pipeline to configure it.');
+    alert('Execution API key not set.\n\nGo to Settings → Profile → MT5 Execution Pipeline to configure it.');
     return;
   }
 
@@ -4123,7 +4124,7 @@ function approveForMT4(tradeId) {
   }
 
   const overlay = document.getElementById('execConfirmOverlay');
-  document.getElementById('execConfirmTitle').textContent = 'Send Trade to MT4 for Execution';
+  document.getElementById('execConfirmTitle').textContent = 'Send Trade to MT5 for Execution';
   document.getElementById('execConfirmBody').innerHTML = `
     <div style="font-size:0.85rem; line-height:1.6; color:#c9d1d9;">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 18px; padding:12px 14px; background:#0d1117; border:1px solid #30363d; border-radius:8px; margin-bottom:10px;">
@@ -4140,12 +4141,12 @@ function approveForMT4(tradeId) {
       </div>
       ${scoreWarning}
       <div style="margin-top:10px;padding:10px 12px;background:#1a2332;border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:0.76rem;">
-        ⚠ This will send the trade to your MT4 EA for automatic execution. The risk engine will validate it on the backend before queuing.
+        ⚠ This will send the trade to your MT5 EA for automatic execution. The risk engine will validate it on the backend before queuing.
       </div>
       <div id="execConfirmStatus" style="display:none;margin-top:10px;padding:10px 12px;border-radius:6px;font-size:0.8rem;"></div>
       <div class="btn-row" style="margin-top:14px;">
         <button class="btn btn-ghost" onclick="closeExecConfirm()">Cancel</button>
-        <button class="btn btn-primary" id="execConfirmBtn" onclick="submitTradeApproval('${tradeId}')" style="background:#1f6feb;">Confirm — Send to MT4</button>
+        <button class="btn btn-primary" id="execConfirmBtn" onclick="submitTradeApproval('${tradeId}')" style="background:#1f6feb;">Confirm — Send to MT5</button>
       </div>
     </div>`;
   overlay.classList.add('open');
@@ -4216,7 +4217,7 @@ async function submitTradeApproval(tradeId) {
       t.execStatus = 'pending';
       t.execApprovedAt = new Date().toISOString();
       t.execQueueId = data.trade_id || data.id || '';
-      t.execMode = 'mt4_auto';
+      t.execMode = 'mt5_auto';
       t.execWarnings = data.warnings || [];
       save();
       renderJournal();
@@ -4225,7 +4226,7 @@ async function submitTradeApproval(tradeId) {
         statusEl.style.background = '#0e3a1e';
         statusEl.style.border = '1px solid #3fb950';
         statusEl.style.color = '#56d364';
-        let html = '<strong>✅ Trade approved! MT4 EA will execute within 5 seconds.</strong>';
+        let html = '<strong>✅ Trade approved! MT5 EA will execute within 5 seconds.</strong>';
         if (data.warnings?.length) {
           html += '<br><br><strong>⚠ Warnings:</strong><br>' + data.warnings.map(w => '• ' + escHtml(w)).join('<br>');
         }
@@ -4249,7 +4250,7 @@ async function submitTradeApproval(tradeId) {
         statusEl.style.color = '#ff7b72';
         statusEl.innerHTML = `<strong>❌ Trade rejected:</strong> ${escHtml(data.reason || 'Unknown reason')}`;
       }
-      if (btn) { btn.disabled = false; btn.textContent = 'Confirm — Send to MT4'; btn.style.background = '#1f6feb'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Confirm — Send to MT5'; btn.style.background = '#1f6feb'; }
     }
   } catch (e) {
     if (statusEl) {
@@ -4258,14 +4259,14 @@ async function submitTradeApproval(tradeId) {
       statusEl.style.color = '#ff7b72';
       statusEl.innerHTML = `<strong>Connection error:</strong> ${escHtml(e.message)}<br>Check that the backend is running.`;
     }
-    if (btn) { btn.disabled = false; btn.textContent = 'Confirm — Send to MT4'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm — Send to MT5'; }
   }
 }
 
 async function cancelExecution(tradeId) {
   const t = trades.find(x => x.id === tradeId);
   if (!t || !t.execQueueId) return;
-  if (!confirm('Cancel this pending MT4 execution?')) return;
+  if (!confirm('Cancel this pending MT5 execution?')) return;
 
   const backendUrl = getExecBackendUrl();
   const execKey = localStorage.getItem('tj_executionKey') || '';
@@ -4376,7 +4377,7 @@ async function refreshExecutionQueue() {
     const data = await resp.json();
     const queue = data.queue || [];
     if (!queue.length) {
-      panel.innerHTML = '<div style="color:#6e7681;font-size:0.78rem;">No trades waiting for MT4 execution.</div>';
+      panel.innerHTML = '<div style="color:#6e7681;font-size:0.78rem;">No trades waiting for MT5 execution.</div>';
       return;
     }
     let html = '';
@@ -4410,7 +4411,7 @@ async function refreshExecutionQueue() {
 }
 
 async function cancelExecutionByQueueId(queueId, journalId) {
-  if (!confirm('Cancel this pending MT4 execution?')) return;
+  if (!confirm('Cancel this pending MT5 execution?')) return;
   const backendUrl = getExecBackendUrl();
   const execKey = localStorage.getItem('tj_executionKey') || '';
   try {
@@ -4451,7 +4452,7 @@ async function refreshExecutionHealth() {
 
     const items = [
       { label: 'Backend', ok: h.backend && h.backend.ok, sub: h.backend && h.backend.label },
-      { label: 'MT4 EA',  ok: h.mt4 && h.mt4.ok, sub: h.mt4 && (h.mt4.label + (h.mt4.account_equity ? ' · equity $' + Number(h.mt4.account_equity).toFixed(2) : '')) },
+      { label: 'MT5 EA',  ok: h.mt4 && h.mt4.ok, sub: h.mt4 && (h.mt4.label + (h.mt4.account_equity ? ' · equity $' + Number(h.mt4.account_equity).toFixed(2) : '')) },
       { label: 'Risk Engine', ok: h.risk_engine && h.risk_engine.ok, sub: h.risk_engine && h.risk_engine.label },
       { label: 'Execution Queue', ok: h.queue && h.queue.ok, sub: h.queue && h.queue.label },
       { label: 'Telegram', ok: h.telegram && h.telegram.ok, sub: h.telegram && h.telegram.label },
@@ -4567,7 +4568,7 @@ async function runExecutionTest() {
     stages[3].state = 'fail'; stages[3].detail = 'EA never acknowledged (last status: ' + lastStatus + ')';
   }
   render();
-  out.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;color:#ffa657;font-size:0.78rem;">Timed out after 30s. Check the EA is running, AutoTrading is on, and the backend URL is allow-listed in MT4.</div>');
+  out.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;color:#ffa657;font-size:0.78rem;">Timed out after 30s. Check the EA is running, AutoTrading is on, and the backend URL is allow-listed in MT5 (Tools → Options → Expert Advisors → Allow WebRequest).</div>');
 }
 
 // ── Execution Log viewer ───────────────────────────────
@@ -4633,7 +4634,7 @@ async function refreshExecutionLog() {
 
 // ── Emergency Stop ─────────────────────────────────────
 async function emergencyStopConfirm() {
-  if (!confirm('🛑 EMERGENCY STOP\n\nThis will:\n• Cancel every pending trade in the queue\n• Tell the MT4 EA to close every POIWatcher_ position\n• Send a Telegram alert\n\nProceed?')) return;
+  if (!confirm('🛑 EMERGENCY STOP\n\nThis will:\n• Cancel every pending trade in the queue\n• Tell the MT5 EA to close every POIWatcher_ position\n• Send a Telegram alert\n\nProceed?')) return;
   const backendUrl = getExecBackendUrl();
   const execKey = localStorage.getItem('tj_executionKey') || '';
   if (!backendUrl || !execKey) { alert('Set Execution API Key in Settings first.'); return; }
@@ -5508,6 +5509,7 @@ function renderRecent(list) {
     const dateStr  = new Date(t.dateOpen).toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
     const srcBadge = t.source === 'kraken' ? '<span class="exchange-badge kraken">Kraken</span>'
                    : t.source === 'binance' ? '<span class="exchange-badge binance">Binance</span>'
+                   : t.source === 'mt5' ? '<span class="mt4-badge">MT5</span>'
                    : t.source === 'mt4' ? '<span class="mt4-badge">MT4</span>' : '';
     return `<div class="trade-row ${rowClass}" onclick="openModal('${t.id}')">
       <div><div class="trade-dir ${t.direction}">${t.direction}</div></div>
@@ -5948,7 +5950,7 @@ function generateAnalysisExport(period) {
   sorted.forEach((t, i) => {
     if (t.status === 'closed' && t.actualPnL) equity += t.actualPnL;
     out += `---\n`;
-    const srcTag = t.source === 'mt4' ? ' [MT4 Auto-logged]' : t.source === 'kraken' ? ' [Kraken Auto-logged]' : t.source === 'binance' ? ' [Binance Auto-logged]' : '';
+    const srcTag = t.source === 'mt5' ? ' [MT5 Auto-logged]' : t.source === 'mt4' ? ' [MT4 Auto-logged]' : t.source === 'kraken' ? ' [Kraken Auto-logged]' : t.source === 'binance' ? ' [Binance Auto-logged]' : '';
     out += `ID: ${String(i+1).padStart(3,'0')} | Date: ${dateStr(t.dateOpen)} | Symbol: ${t.pair}${srcTag}\n`;
     const tradeSession = detectSession(new Date(t.dateOpen));
     const isOverlap = t.conditions?.includes('London Session') && t.conditions?.includes('NY Session') || tradeSession === 'London/NY Overlap';
@@ -6112,24 +6114,27 @@ function downloadAnalysis() {
 }
 
 // ═══════════════════════════════════════════════════════
-// MT4 LIVE TRADES & CONNECTION
+// MT5 LIVE TRADES & CONNECTION
 // ═══════════════════════════════════════════════════════
+// Uses /mt5/... backend endpoints (route aliases of the legacy /mt4/... paths).
+// `_mt4Interval` / `mt4Dot` / `mt4-dot` identifiers kept to avoid a DOM refactor —
+// the UI labels below say MT5 because the active EA is POIWatcher.mq5.
 let _mt4Interval = null;
 
 function updateMT4Dot() {
   const url = getBackendUrl();
   if (!url) return;
-  fetch(url + '/mt4/connection').then(r => r.json()).then(d => {
+  fetch(url + '/mt5/connection').then(r => r.json()).then(d => {
     const dot = document.getElementById('mt4Dot');
     if (d.connected) {
       dot.className = 'mt4-dot on';
       const ago = d.seconds_ago < 60 ? d.seconds_ago + 's' : Math.floor(d.seconds_ago / 60) + 'm';
-      dot.innerHTML = '\uD83D\uDFE2 MT4 <span style="font-size:0.6rem;opacity:0.7;">' + ago + '</span>';
-      dot.title = 'MT4 Connected — last ping ' + ago + ' ago';
+      dot.innerHTML = '\uD83D\uDFE2 MT5 <span style="font-size:0.6rem;opacity:0.7;">' + ago + '</span>';
+      dot.title = 'MT5 Connected — last ping ' + ago + ' ago';
     } else {
       dot.className = 'mt4-dot off';
-      dot.innerHTML = '\uD83D\uDD34 MT4';
-      dot.title = 'MT4 Disconnected';
+      dot.innerHTML = '\uD83D\uDD34 MT5';
+      dot.title = 'MT5 Disconnected';
     }
   }).catch(() => {});
 }
@@ -6153,7 +6158,7 @@ async function refreshLiveTrades() {
 
   // Connection status
   try {
-    const status = await (await fetch(url + '/mt4/connection')).json();
+    const status = await (await fetch(url + '/mt5/connection')).json();
     if (status.connected) {
       const ago = status.seconds_ago < 60 ? status.seconds_ago + 's' : Math.floor(status.seconds_ago / 60) + 'm';
       conn.innerHTML = '\uD83D\uDFE2 Connected \u00b7 ' + ago + ' ago \u00b7 Balance: $' + Number(status.account_balance || 0).toLocaleString(undefined, {minimumFractionDigits:2});
@@ -6166,9 +6171,9 @@ async function refreshLiveTrades() {
 
   // Open trades
   try {
-    const openTrades = await (await fetch(url + '/mt4/open-trades')).json();
+    const openTrades = await (await fetch(url + '/mt5/open-trades')).json();
     if (!openTrades.length) {
-      panel.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">No open MT4 trades right now.</div>';
+      panel.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">No open MT5 trades right now.</div>';
     } else {
       let html = '';
       for (const t of openTrades) {
@@ -6237,10 +6242,10 @@ async function refreshLiveTrades() {
     panel.innerHTML = '<div style="color:#f85149; font-size:0.82rem;">Failed to load: ' + escHtml(e.message) + '</div>';
   }
 
-  // Auto-logged trades needing analysis (MT4, Kraken, Binance)
+  // Auto-logged trades needing analysis (MT4/MT5, Kraken, Binance)
   try {
     const allTrades = trades;
-    const autoTrades = allTrades.filter(t => (t.source === 'mt4' || t.source === 'kraken' || t.source === 'binance') && !t.htfBias && !t.setup);
+    const autoTrades = allTrades.filter(t => (t.source === 'mt4' || t.source === 'mt5' || t.source === 'kraken' || t.source === 'binance') && !t.htfBias && !t.setup);
     if (!autoTrades.length) {
       needs.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">All auto-logged trades have been analysed.</div>';
     } else {
@@ -6248,7 +6253,11 @@ async function refreshLiveTrades() {
       autoTrades.forEach(t => {
         const outcome = t.status === 'closed' ? (t.outcome === 'win' ? ' \u2705 Win' : t.outcome === 'loss' ? ' \uD83D\uDD34 Loss' : ' \u2796 BE') : ' \uD83D\uDFE2 Open';
         const badgeClass = t.source === 'kraken' ? 'exchange-badge kraken' : t.source === 'binance' ? 'exchange-badge binance' : 'mt4-badge';
-        const badgeLabel = t.source === 'kraken' ? 'Kraken Auto-logged' : t.source === 'binance' ? 'Binance Auto-logged' : 'MT4 Auto-logged';
+        // Badge label reflects the actual platform; mt5 is the current EA, mt4 kept for historical rows.
+        const badgeLabel = t.source === 'kraken' ? 'Kraken Auto-logged'
+                          : t.source === 'binance' ? 'Binance Auto-logged'
+                          : t.source === 'mt5' ? 'MT5 Auto-logged'
+                          : 'MT4 Auto-logged';
         html += '<div class="live-trade" style="cursor:pointer;" onclick="editMT4Trade(\'' + t.id + '\')">';
         html += '<div class="live-trade-header">';
         html += '<div><span class="live-trade-pair">' + escHtml(t.pair || '') + '</span><span class="' + badgeClass + '">' + badgeLabel + '</span>' + outcome + '</div>';

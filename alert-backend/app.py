@@ -679,9 +679,11 @@ Do not identify noise — only what matters."""
         return jsonify({"error": f"AI analysis failed: {e}"}), 502
 
 
-# ── MT4 Integration ─────────────────────────────────────
+# ── MT4/MT5 Integration ─────────────────────────────────
+# Backend accepts both /mt4/... and /mt5/... paths as aliases so legacy MQL4
+# EAs and the current MQL5 EA (POIWatcher.mq5) can both poll the same handlers.
 
-# In-memory MT4 connection state
+# In-memory MT4/MT5 connection state
 _mt4_status = {
     "connected": False,
     "last_heartbeat": None,
@@ -719,7 +721,12 @@ def save_trades(trades_list):
 
 
 def mt4_trade_to_journal(body):
-    """Convert MT4 trade-open payload to journal trade format."""
+    """Convert MT4/MT5 trade-open payload to journal trade format.
+
+    The payload shape is identical for both MQL4 and MQL5 EAs. The ``source``
+    field on the resulting journal row records whichever platform sent it so
+    the frontend can badge the trade correctly.
+    """
     now = datetime.now(timezone.utc).isoformat()
     entry = float(body.get("entry_price", 0))
     sl = float(body.get("stop_loss", 0))
@@ -728,7 +735,16 @@ def mt4_trade_to_journal(body):
     tp_dist = abs(tp - entry) if tp else 0
     planned_rr = (tp_dist / sl_dist) if sl_dist > 0 else 0
 
+    # EA sends an optional "platform" field ("mt4" or "mt5"). Default to "mt5"
+    # since the active EA is POIWatcher.mq5; fall back to "mt4" only if the EA
+    # explicitly identifies as MQL4.
+    platform = (body.get("platform") or "mt5").lower()
+    if platform not in ("mt4", "mt5"):
+        platform = "mt5"
+
     return {
+        # Ticket id prefix stays "mt4_" for backward-compat with historical
+        # rows already in the Gist — source field distinguishes the platform.
         "id": "mt4_" + str(body.get("ticket", "")),
         "market": "BTC/USDT" if "BTC" in body.get("symbol", "").upper() else "Forex",
         "pair": body.get("symbol", ""),
@@ -759,8 +775,10 @@ def mt4_trade_to_journal(body):
         "scRespected": None, "mbmsPlayedOut": None, "htfAligned": None,
         "liqProperlyTaken": None, "expectedVsActual": "",
         "whatDifferently": "", "lessonLearned": "", "executionRating": 0,
-        # MT4 metadata
-        "source": "mt4",
+        # MT4/MT5 metadata. Field names stay "mt4Xxx" for backward compat with
+        # the frontend — the "source" and "platform" fields drive badge rendering.
+        "source": platform,
+        "platform": platform,
         "mt4Ticket": body.get("ticket"),
         "mt4Balance": body.get("account_balance"),
         "mt4Equity": body.get("account_equity"),
@@ -771,6 +789,7 @@ def mt4_trade_to_journal(body):
 
 
 @app.route("/mt4/trade-open", methods=["POST"])
+@app.route("/mt5/trade-open", methods=["POST"])
 def mt4_trade_open():
     body = request.json
     if not body or not body.get("ticket"):
@@ -794,8 +813,9 @@ def mt4_trade_open():
     tp = body.get("take_profit", 0)
     lot = body.get("lot_size", 0)
 
+    platform_label = trade.get("platform", "mt5").upper()
     msg = (
-        f"\U0001f4ca <b>Trade opened on MT4!</b>\n\n"
+        f"\U0001f4ca <b>Trade opened on {platform_label}!</b>\n\n"
         f"<b>{symbol}</b> — {direction}\n"
         f"\U0001f4cd Entry: <b>${entry}</b>\n"
         f"\U0001f6d1 SL: ${sl} | \U0001f3af TP: ${tp}\n"
@@ -804,11 +824,12 @@ def mt4_trade_open():
     )
     send_telegram(msg)
 
-    logging.info("MT4 trade opened: #%s %s %s @ %s", body.get("ticket"), symbol, direction, entry)
+    logging.info("%s trade opened: #%s %s %s @ %s", platform_label, body.get("ticket"), symbol, direction, entry)
     return jsonify({"ok": True, "trade_id": trade["id"]}), 201
 
 
 @app.route("/mt4/trade-close", methods=["POST"])
+@app.route("/mt5/trade-close", methods=["POST"])
 def mt4_trade_close():
     body = request.json
     if not body or not body.get("ticket"):
@@ -874,11 +895,13 @@ def mt4_trade_close():
     )
     send_telegram(msg)
 
-    logging.info("MT4 trade closed: #%s %s P&L=%s", body.get("ticket"), symbol, pnl_str)
+    platform_label = (found.get("platform") or found.get("source") or "mt5").upper()
+    logging.info("%s trade closed: #%s %s P&L=%s", platform_label, body.get("ticket"), symbol, pnl_str)
     return jsonify({"ok": True})
 
 
 @app.route("/mt4/trade-modify", methods=["POST"])
+@app.route("/mt5/trade-modify", methods=["POST"])
 def mt4_trade_modify():
     body = request.json
     if not body or not body.get("ticket"):
@@ -926,11 +949,13 @@ def mt4_trade_modify():
         )
         send_telegram(msg)
 
-    logging.info("MT4 trade modified: #%s %s — %s", body.get("ticket"), symbol, modification)
+    platform_label = (found.get("platform") or found.get("source") or "mt5").upper()
+    logging.info("%s trade modified: #%s %s — %s", platform_label, body.get("ticket"), symbol, modification)
     return jsonify({"ok": True})
 
 
 @app.route("/mt4/status", methods=["POST", "GET"])
+@app.route("/mt5/status", methods=["POST", "GET"])
 def mt4_status():
     if request.method == "POST":
         body = request.json or {}
@@ -953,8 +978,9 @@ def mt4_status():
 
 
 @app.route("/mt4/connection", methods=["GET"])
+@app.route("/mt5/connection", methods=["GET"])
 def mt4_connection():
-    """Return MT4 connection status with staleness check."""
+    """Return MT4/MT5 EA connection status with staleness check."""
     status = dict(_mt4_status)
     if status["last_heartbeat"]:
         last = datetime.fromisoformat(status["last_heartbeat"])
@@ -968,10 +994,18 @@ def mt4_connection():
 
 
 @app.route("/mt4/open-trades", methods=["GET"])
+@app.route("/mt5/open-trades", methods=["GET"])
 def mt4_open_trades():
-    """Return all currently open MT4 trades from Gist."""
+    """Return all currently open MT4/MT5 trades from Gist.
+
+    Accepts both legacy ``source == "mt4"`` rows and new ``"mt5"`` rows so the
+    live panel never goes blank after the platform migration.
+    """
     trades_list = get_trades()
-    open_trades = [t for t in trades_list if t.get("status") == "open" and t.get("source") == "mt4"]
+    open_trades = [
+        t for t in trades_list
+        if t.get("status") == "open" and t.get("source") in ("mt4", "mt5")
+    ]
     return jsonify(open_trades)
 
 
@@ -1836,7 +1870,7 @@ def get_pending_trade():
 
 @app.route("/api/trade/approve", methods=["POST"])
 def approve_trade():
-    """POST /api/trade/approve — Validate and queue a trade for MT4 execution."""
+    """POST /api/trade/approve — Validate and queue a trade for MT5 execution."""
     auth_err = _require_execution_key()
     if auth_err:
         return auth_err
@@ -1926,12 +1960,12 @@ def approve_trade():
         warning_text = "\n\u26a0\ufe0f Warnings:\n" + "\n".join(f"  \u2022 {w}" for w in result["warnings"]) + "\n"
 
     msg = (
-        f"\u2705 <b>Trade approved and queued for MT4!</b>\n\n"
+        f"\u2705 <b>Trade approved and queued for MT5!</b>\n\n"
         f"<b>{trade['symbol']}</b> {trade['direction']}\n"
         f"\U0001f4cd Entry: {trade['entry']} | SL: {trade['sl']} | TP: {trade['tp']}\n"
         f"\U0001f4b0 Risk: {trade['risk_percent']}% | Lot: {trade['lot_size']}\n"
         f"{warning_text}\n"
-        f"Waiting for MT4 EA to fetch...\n\n"
+        f"Waiting for MT5 EA to fetch...\n\n"
         f"\U0001f4dd <a href=\"{JOURNAL_URL}\">Open journal</a>"
     )
     send_telegram(msg)
@@ -1947,7 +1981,7 @@ def approve_trade():
 
 @app.route("/api/trade/executed", methods=["POST"])
 def trade_executed():
-    """POST /api/trade/executed — Called by MT4 EA when trade is placed."""
+    """POST /api/trade/executed — Called by the MT5 EA when a trade is placed."""
     auth_err = _require_execution_key()
     if auth_err:
         return auth_err
@@ -2007,7 +2041,9 @@ def trade_executed():
             for t in trades_list:
                 if t.get("id") == journal_id:
                     t["status"] = "open"
-                    t["source"] = "mt4"
+                    # Newly executed trades tagged as mt5; legacy mt4 rows stay tagged mt4.
+                    t["source"] = (body.get("platform") or "mt5").lower()
+                    t["platform"] = t["source"]
                     t["mt4Ticket"] = body.get("ticket")
                     t["entry"] = actual_entry
                     t["execStatus"] = new_status  # paper_executed or executed
@@ -2038,7 +2074,7 @@ def trade_executed():
             f"\U0001f4dd <a href=\"{JOURNAL_URL}\">Open journal</a>"
         )
     else:
-        prefix = "\U0001f4c4 <b>PAPER TRADE executed (demo mode)</b>" if is_paper else "\U0001f680 <b>Trade EXECUTED on MT4!</b>"
+        prefix = "\U0001f4c4 <b>PAPER TRADE executed (demo mode)</b>" if is_paper else "\U0001f680 <b>Trade EXECUTED on MT5!</b>"
         msg = (
             f"{prefix}\n\n"
             f"<b>{found['symbol']}</b> {found['direction']}\n"
@@ -2241,7 +2277,8 @@ def execution_health():
     # Backend — we are responding, so green
     backend_ok = True
 
-    # MT4 — connected if heartbeat within last 2 minutes
+    # MT4/MT5 EA — connected if heartbeat within last 2 minutes.
+    # Dict key stays "mt4" so existing frontend consumers keep working.
     mt4_ok = False
     mt4_age_seconds = None
     if _mt4_status.get("last_heartbeat"):
@@ -2268,7 +2305,7 @@ def execution_health():
         "backend": {"ok": backend_ok, "label": "Backend reachable"},
         "mt4": {
             "ok": mt4_ok,
-            "label": "MT4 EA connected" if mt4_ok else "MT4 EA offline",
+            "label": "MT5 EA connected" if mt4_ok else "MT5 EA offline",
             "last_heartbeat": _mt4_status.get("last_heartbeat"),
             "age_seconds": mt4_age_seconds,
             "open_trades": _mt4_status.get("open_trades", 0),
@@ -2351,12 +2388,14 @@ def execution_emergency_stop():
 
 
 @app.route("/api/mt4/emergency-stop", methods=["GET"])
+@app.route("/api/mt5/emergency-stop", methods=["GET"])
 def mt4_emergency_stop_get():
-    """GET /api/mt4/emergency-stop — EA polls every 10s to check for remote pause.
+    """GET /api/mt[4|5]/emergency-stop — EA polls every 10s to check for remote pause.
 
     Requires X-Execution-Key.  Returns the simple remote-pause flag (_mt4_emergency_stop)
     so the EA can stop opening new trades without closing existing ones.
-    Also exposes the legacy 'active' field so MQL4 EAs remain compatible.
+    Both /mt4/ and /mt5/ paths resolve here so legacy MQL4 and current MQL5 EAs
+    both work. The response exposes the legacy 'active' field for MQL4 compat.
     """
     auth_err = _require_execution_key()
     if auth_err:
@@ -2374,8 +2413,9 @@ def mt4_emergency_stop_get():
 
 
 @app.route("/api/mt4/emergency-stop", methods=["POST"])
+@app.route("/api/mt5/emergency-stop", methods=["POST"])
 def mt4_emergency_stop_post():
-    """POST /api/mt4/emergency-stop — Activate or deactivate the EA remote pause flag.
+    """POST /api/mt[4|5]/emergency-stop — Activate or deactivate the EA remote pause flag.
 
     Body: {"emergency": true | false}
     When activated the EA will stop opening new trades on its next 10s poll.
@@ -2397,13 +2437,13 @@ def mt4_emergency_stop_post():
             "All EA trading halted remotely.\n"
             "To resume: deactivate emergency stop in your journal app."
         )
-        logging.warning("MT4 emergency stop ACTIVATED via API")
+        logging.warning("MT5 emergency stop ACTIVATED via API")
     else:
         msg = (
             "\u2705 <b>Emergency stop DEACTIVATED.</b>\n\n"
             "EA trading resumed."
         )
-        logging.info("MT4 emergency stop deactivated via API")
+        logging.info("MT5 emergency stop deactivated via API")
 
     send_telegram(msg)
 
@@ -2417,10 +2457,12 @@ def mt4_emergency_stop_post():
 
 
 @app.route("/api/mt4/emergency-stop", methods=["DELETE"])
+@app.route("/api/mt5/emergency-stop", methods=["DELETE"])
 def mt4_emergency_stop_clear():
-    """DELETE /api/mt4/emergency-stop — MQL4 EA ack after closing POIWatcher trades, or journal reset.
+    """DELETE /api/mt[4|5]/emergency-stop — EA ack after closing POIWatcher trades, or journal reset.
 
-    Clears BOTH the simple remote-pause flag and the legacy kill-switch state.
+    Clears BOTH the simple remote-pause flag and the kill-switch state. Both
+    /mt4/ and /mt5/ paths resolve here for MQL4/MQL5 EA compatibility.
     """
     global _mt4_emergency_stop
 
