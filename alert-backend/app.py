@@ -1614,8 +1614,12 @@ _execution_queue = []
 _execution_log = []
 _EXECUTION_LOG_MAX = 500
 
-# Emergency stop flag — set by /api/execution/emergency_stop, polled by EA
+# Emergency stop flag — set by /api/execution/emergency_stop (kill-switch), polled by EA
 _emergency_stop = {"active": False, "at": None, "by": None}
+
+# Simple remote-pause flag — set via POST /api/mt4/emergency-stop, polled by EA via GET.
+# When True the EA stops opening new trades but does NOT close existing positions.
+_mt4_emergency_stop = False
 
 
 def _log_execution_event(**kwargs):
@@ -2348,23 +2352,90 @@ def execution_emergency_stop():
 
 @app.route("/api/mt4/emergency-stop", methods=["GET"])
 def mt4_emergency_stop_get():
-    """GET /api/mt4/emergency-stop — EA polls this every 10s. No auth (EA has no key for non-execution paths)."""
-    return jsonify(_emergency_stop)
+    """GET /api/mt4/emergency-stop — EA polls every 10s to check for remote pause.
 
-
-@app.route("/api/mt4/emergency-stop", methods=["DELETE"])
-def mt4_emergency_stop_clear():
-    """DELETE /api/mt4/emergency-stop — Called by EA after closing all POIWatcher trades, OR by journal to reset."""
+    Requires X-Execution-Key.  Returns the simple remote-pause flag (_mt4_emergency_stop)
+    so the EA can stop opening new trades without closing existing ones.
+    Also exposes the legacy 'active' field so MQL4 EAs remain compatible.
+    """
     auth_err = _require_execution_key()
     if auth_err:
         return auth_err
 
-    body = request.json or {}
+    return jsonify({
+        "emergency": _mt4_emergency_stop,
+        "active":    _mt4_emergency_stop,          # backward compat with MQL4 EA
+        "message":   (
+            "EMERGENCY STOP — EA trading paused remotely. "
+            "Deactivate in journal to resume."
+        ) if _mt4_emergency_stop else "All clear — continue trading",
+        "kill_switch": _emergency_stop,            # separate kill-switch state for reference
+    })
+
+
+@app.route("/api/mt4/emergency-stop", methods=["POST"])
+def mt4_emergency_stop_post():
+    """POST /api/mt4/emergency-stop — Activate or deactivate the EA remote pause flag.
+
+    Body: {"emergency": true | false}
+    When activated the EA will stop opening new trades on its next 10s poll.
+    Existing open positions are NOT closed — use /api/execution/emergency_stop for that.
+    """
+    global _mt4_emergency_stop
+
+    auth_err = _require_execution_key()
+    if auth_err:
+        return auth_err
+
+    body    = request.json or {}
+    activate = bool(body.get("emergency", False))
+    _mt4_emergency_stop = activate
+
+    if activate:
+        msg = (
+            "\U0001f6a8 <b>EMERGENCY STOP ACTIVATED!</b>\n\n"
+            "All EA trading halted remotely.\n"
+            "To resume: deactivate emergency stop in your journal app."
+        )
+        logging.warning("MT4 emergency stop ACTIVATED via API")
+    else:
+        msg = (
+            "\u2705 <b>Emergency stop DEACTIVATED.</b>\n\n"
+            "EA trading resumed."
+        )
+        logging.info("MT4 emergency stop deactivated via API")
+
+    send_telegram(msg)
+
+    return jsonify({
+        "ok":      True,
+        "emergency": _mt4_emergency_stop,
+        "message": (
+            "EMERGENCY STOP — EA trading paused remotely."
+        ) if _mt4_emergency_stop else "All clear — continue trading",
+    })
+
+
+@app.route("/api/mt4/emergency-stop", methods=["DELETE"])
+def mt4_emergency_stop_clear():
+    """DELETE /api/mt4/emergency-stop — MQL4 EA ack after closing POIWatcher trades, or journal reset.
+
+    Clears BOTH the simple remote-pause flag and the legacy kill-switch state.
+    """
+    global _mt4_emergency_stop
+
+    auth_err = _require_execution_key()
+    if auth_err:
+        return auth_err
+
+    body         = request.json or {}
     closed_count = body.get("closed_count")
 
+    # Clear both flags
+    _mt4_emergency_stop       = False
     _emergency_stop["active"] = False
-    _emergency_stop["at"] = None
-    _emergency_stop["by"] = None
+    _emergency_stop["at"]     = None
+    _emergency_stop["by"]     = None
 
     if closed_count is not None:
         msg = (
@@ -2374,7 +2445,7 @@ def mt4_emergency_stop_clear():
         send_telegram(msg)
 
     logging.info("Emergency stop cleared (closed_count=%s)", closed_count)
-    return jsonify({"ok": True, "emergency_stop": _emergency_stop})
+    return jsonify({"ok": True, "emergency": False, "emergency_stop": _emergency_stop})
 
 
 # ── Daily Summary (5pm ET) ──────────────────────────────

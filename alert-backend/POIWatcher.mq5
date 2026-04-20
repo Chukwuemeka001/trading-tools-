@@ -78,7 +78,8 @@ datetime lastCheck      = 0;
 string   executedTradeIDs[];
 datetime lastExecCheck      = 0;
 datetime lastEmergencyCheck = 0;
-string   lastEmergencyAt    = "";
+string   lastEmergencyAt    = "";  // unused — kept for future kill-switch use
+bool     g_emergencyActive  = false; // true = backend said pause, skip new executions
 
 //--- CTrade instance (MQL5 replacement for OrderSend / OrderModify)
 CTrade trade;
@@ -149,10 +150,16 @@ void OnTimer()
    }
 
    // ── Execution pipeline poll ──
-   if (EnableAutoExecution && now - lastExecCheck >= ExecutionCheckSeconds)
+   // Skipped entirely when g_emergencyActive is true (backend remote-pause)
+   if (EnableAutoExecution && !g_emergencyActive && now - lastExecCheck >= ExecutionCheckSeconds)
    {
       lastExecCheck = now;
       CheckForPendingExecution();
+   }
+   else if (EnableAutoExecution && g_emergencyActive && now - lastExecCheck >= ExecutionCheckSeconds)
+   {
+      lastExecCheck = now;
+      Print("POIWatcher: Emergency stop ACTIVE — skipping execution poll");
    }
 
    // ── Emergency stop poll (always active — safety first) ──
@@ -820,55 +827,43 @@ void SendExecutionResultEx(string tradeID, int ticket, double actualEntry,
 }
 
 //+------------------------------------------------------------------+
-//| Poll backend for emergency stop flag; close all POIWatcher_      |
-//| positions if active, then acknowledge                            |
+//| Poll backend for remote-pause flag every EmergencyCheckSeconds  |
+//|                                                                  |
+//| Uses HttpGetWithKey (requires X-Execution-Key) and reads the    |
+//| "emergency" field.  When true, sets g_emergencyActive so that   |
+//| OnTimer() skips CheckForPendingExecution.                       |
+//|                                                                  |
+//| Existing open positions are NOT touched — this is a "pause new  |
+//| trades" signal, not a "close everything" kill-switch.           |
+//| For the kill-switch (close all positions) use the journal's     |
+//| Emergency Stop button which POSTs to /api/execution/emergency_stop
 //+------------------------------------------------------------------+
 void CheckForEmergencyStop()
 {
-   // Public endpoint — no execution key required for read
-   string url     = BackendURL + "/api/mt4/emergency-stop";
-   string headers = "Content-Type: application/json\r\n";
-   char   postData[];
-   char   result[];
-   string resultHeaders;
+   if (StringLen(ExecutionAPIKey) == 0) return; // can't auth without key
 
-   ArrayResize(postData, 0);
-   int res = WebRequest("GET", url, headers, 5000, postData, result, resultHeaders);
-   if (res < 200 || res >= 300) return;
+   string response = HttpGetWithKey("/api/mt4/emergency-stop");
+   if (StringLen(response) == 0) return; // network error or not deployed yet
 
-   string response  = CharArrayToString(result);
-   string activeStr = JsonGetString(response, "active");
-   bool   active    = (activeStr == "true" || activeStr == "True" || activeStr == "1");
-   if (!active) return;
+   string emergencyStr = JsonGetString(response, "emergency");
+   bool   nowActive    = (emergencyStr == "true" || emergencyStr == "True" || emergencyStr == "1");
 
-   string at = JsonGetString(response, "at");
-   if (at == lastEmergencyAt) return; // already acted on this activation
+   if (nowActive == g_emergencyActive) return; // no state change — nothing to log
 
-   Print("POIWatcher: !!! EMERGENCY STOP activated (at=", at,
-         ") — closing all POIWatcher_ positions");
-   int closed  = CloseAllPOIWatcherPositions();
-   lastEmergencyAt = at;
+   g_emergencyActive = nowActive;
 
-   // Acknowledge to backend (sends DELETE — clears the flag server-side)
-   string ackJson = "{\"closed_count\":" + IntegerToString(closed) +
-                    ",\"timestamp\":\"" +
-                    TimeToString(TimeCurrent(), TIME_DATE | TIME_SECONDS) + "\"}";
-   string ackHeaders = "Content-Type: application/json\r\n"
-                       "X-Execution-Key: " + ExecutionAPIKey + "\r\n";
-   char   ackData[];
-   char   ackResult[];
-   string ackResultHeaders;
-   StringToCharArray(ackJson, ackData, 0, WHOLE_ARRAY, CP_UTF8);
-   ArrayResize(ackData, ArraySize(ackData) - 1);
-
-   int ackRes = WebRequest("DELETE",
-                           BackendURL + "/api/mt4/emergency-stop",
-                           ackHeaders, 5000,
-                           ackData, ackResult, ackResultHeaders);
-   if (ackRes < 200 || ackRes >= 300)
-      Print("POIWatcher: emergency-stop DELETE returned HTTP ", ackRes);
+   if (nowActive)
+   {
+      string msg = JsonGetString(response, "message");
+      Print("POIWatcher: !!! REMOTE PAUSE ACTIVATED — ",
+            (StringLen(msg) > 0 ? msg : "EA will stop opening new trades"));
+      Print("POIWatcher: Existing positions are UNAFFECTED. "
+            "Deactivate via journal Emergency Stop to resume.");
+   }
    else
-      Print("POIWatcher: emergency-stop acknowledged (closed ", closed, " position(s))");
+   {
+      Print("POIWatcher: Remote pause CLEARED — execution pipeline resumed");
+   }
 }
 
 //+------------------------------------------------------------------+
