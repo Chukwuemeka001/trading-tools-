@@ -4530,9 +4530,10 @@ async function runExecutionTest() {
     stages[1].state = 'pass'; stages[1].detail = 'trade_id=' + testId;
   } catch (e) { stages[1].state = 'fail'; stages[1].detail = e.message; render(); return; }
 
-  // Stages 3-5: poll status until terminal or 30s timeout
+  // Stages 3-5: poll status until terminal or 60s timeout
+  // (EA polls every 5s; give the full pipeline enough headroom to complete)
   stages[2].state = 'running'; render();
-  const deadline = Date.now() + 30000;
+  const deadline = Date.now() + 60000;
   let lastStatus = '';
   while (Date.now() < deadline) {
     try {
@@ -4568,7 +4569,7 @@ async function runExecutionTest() {
     stages[3].state = 'fail'; stages[3].detail = 'EA never acknowledged (last status: ' + lastStatus + ')';
   }
   render();
-  out.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;color:#ffa657;font-size:0.78rem;">Timed out after 30s. Check the EA is running, AutoTrading is on, and the backend URL is allow-listed in MT5 (Tools → Options → Expert Advisors → Allow WebRequest).</div>');
+  out.insertAdjacentHTML('beforeend', '<div style="margin-top:8px;color:#ffa657;font-size:0.78rem;">Timed out after 60s. Check the EA is running, AutoTrading is on, and the backend URL is allow-listed in MT5 (Tools → Options → Expert Advisors → Allow WebRequest).</div>');
 }
 
 // ── Execution Log viewer ───────────────────────────────
