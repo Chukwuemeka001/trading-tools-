@@ -1570,6 +1570,18 @@
     <div style="color:#6e7681; font-size:0.82rem;">Connect your backend and attach the POIWatcher EA to MT5 to see live trades here.</div>
   </div>
 
+  <!-- Pending Limit Orders -->
+  <div style="margin-top:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <div class="card-title" style="margin:0;">⏳ Pending Limit Orders</div>
+      <button class="btn btn-ghost" onclick="refreshPendingLimitOrders()" style="padding:3px 8px;font-size:0.7rem;">↻ Refresh</button>
+    </div>
+    <div style="font-size:0.72rem; color:#6e7681; margin-bottom:8px;">BuyLimit / SellLimit orders placed on MT5 waiting to be filled. When price reaches the entry they move to Live MT5 Trades automatically.</div>
+    <div id="pendingLimitOrdersPanel">
+      <div style="color:#6e7681;font-size:0.78rem;">No pending limit orders.</div>
+    </div>
+  </div>
+
   <!-- Execution Queue (pending trades waiting for the MT5 EA) -->
   <div style="margin-top:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
@@ -1609,12 +1621,17 @@
           <option value="success">Success</option>
           <option value="failed">Failed/Rejected</option>
           <option value="paper">Paper only</option>
+          <option value="limit">Limit orders</option>
           <option value="approved">Approved</option>
           <option value="executed">Executed</option>
           <option value="paper_executed">Paper executed</option>
           <option value="execution_failed">Execution failed</option>
           <option value="rejected">Rejected</option>
           <option value="cancelled">Cancelled</option>
+          <option value="limit_order_placed">Limit placed</option>
+          <option value="limit_order_filled">Limit filled</option>
+          <option value="limit_order_expired">Limit expired</option>
+          <option value="limit_order_cancelled">Limit cancelled</option>
           <option value="test_passed">Test passed</option>
           <option value="test_failed">Test failed</option>
         </select>
@@ -2526,7 +2543,7 @@ function nav(view) {
   if (view === 'journal')   { restoreJournalFilters(); renderJournal(); }
   if (view === 'log')       initForm();
   if (view === 'alerts')    initAlerts();
-  if (view === 'live')      { refreshLiveTrades(); refreshExecutionQueue(); refreshExecutionHealth(); refreshExecutionLog(); }
+  if (view === 'live')      { refreshLiveTrades(); refreshPendingLimitOrders(); refreshExecutionQueue(); refreshExecutionHealth(); refreshExecutionLog(); }
   window.scrollTo(0, 0);
 }
 
@@ -4597,9 +4614,11 @@ async function refreshExecutionLog() {
       return;
     }
     const colorFor = (s) => {
-      if (['executed','paper_executed','test_passed','approved'].includes(s)) return '#3fb950';
-      if (['execution_failed','test_failed','rejected'].includes(s))           return '#f85149';
-      if (['cancelled'].includes(s))                                            return '#8b949e';
+      if (['executed','paper_executed','test_passed','approved','limit_order_filled'].includes(s)) return '#3fb950';
+      if (['execution_failed','test_failed','rejected'].includes(s))                               return '#f85149';
+      if (['cancelled','limit_order_cancelled'].includes(s))                                       return '#8b949e';
+      if (['limit_order_expired'].includes(s))                                                     return '#d29922'; // amber
+      if (['limit_order_placed'].includes(s))                                                      return '#58a6ff'; // blue
       return '#ffa657';
     };
     let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.72rem;">';
@@ -4631,6 +4650,92 @@ async function refreshExecutionLog() {
   } catch (e) {
     panel.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">Log error: ' + escHtml(e.message) + '</div>';
   }
+}
+
+// ── Pending Limit Orders ───────────────────────────────
+async function refreshPendingLimitOrders() {
+  const panel = document.getElementById('pendingLimitOrdersPanel');
+  if (!panel) return;
+  const backendUrl = getExecBackendUrl();
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  if (!backendUrl || !execKey) {
+    panel.innerHTML = '<div style="color:#6e7681;font-size:0.78rem;">Set Execution API Key in Settings to view pending orders.</div>';
+    return;
+  }
+  try {
+    const resp = await fetch(backendUrl + '/api/pending-orders', {
+      headers: { 'X-Execution-Key': execKey }
+    });
+    if (!resp.ok) {
+      panel.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">Fetch failed (HTTP ' + resp.status + ')</div>';
+      return;
+    }
+    const data = await resp.json();
+    const orders = data.orders || [];
+    if (!orders.length) {
+      panel.innerHTML = '<div style="color:#6e7681;font-size:0.78rem;">No pending limit orders.</div>';
+      return;
+    }
+
+    let html = '';
+    orders.forEach(o => {
+      const dirCol  = o.direction === 'BUY' ? '#3fb950' : '#f85149';
+      const dirLbl  = o.direction === 'BUY' ? 'BUY' : 'SELL';
+      const hoursIn = typeof o.hours_placed === 'number' ? o.hours_placed.toFixed(1) : '?';
+      const hoursEx = typeof o.hours_left  === 'number' ? o.hours_left.toFixed(1)  : '?';
+      const ticketStr = o.order_ticket ? ' · #' + o.order_ticket : '';
+      const paperTag  = o.paper ? ' <span style="font-size:0.62rem;color:#58a6ff;">📄 PAPER</span>' : '';
+
+      // Distance from current price (shown as placeholder — EA has live prices)
+      html += `
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+            <div>
+              <span style="font-weight:700;font-size:0.88rem;color:#e6edf3;">${escHtml(o.symbol)}</span>
+              <span style="color:${dirCol};font-weight:700;font-size:0.78rem;margin-left:6px;">${dirLbl}</span>
+              ${paperTag}
+              <span style="font-size:0.68rem;color:#6e7681;margin-left:6px;">${ticketStr}</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <span style="background:#1a2332;color:#58a6ff;padding:2px 8px;border-radius:4px;font-size:0.68rem;font-weight:600;">⏳ Limit at ${o.entry}</span>
+            </div>
+          </div>
+          <div style="font-size:0.72rem;color:#8b949e;display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
+            <span>🛑 SL: ${o.sl != null ? o.sl : '—'}</span>
+            <span>🎯 TP: ${o.tp != null ? o.tp : '—'}</span>
+            <span>Placed ${hoursIn}h ago</span>
+            <span style="color:${parseFloat(hoursEx) < 2 ? '#f85149' : '#ffa657'};">Expires in ${hoursEx}h</span>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button onclick="cancelLimitOrder('${escHtml(o.id)}')"
+              style="padding:4px 10px;font-size:0.72rem;border-radius:5px;border:1px solid #5c1616;color:#f85149;background:none;cursor:pointer;">
+              Cancel Order
+            </button>
+          </div>
+        </div>`;
+    });
+
+    panel.innerHTML = html;
+  } catch (e) {
+    panel.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">Error: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+async function cancelLimitOrder(tradeId) {
+  if (!confirm('Cancel this pending limit order?\n\nThis will notify the backend. The EA will cancel the MT5 order on its next 60s check.')) return;
+  const backendUrl = getExecBackendUrl();
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  if (!backendUrl || !execKey) { alert('Set Execution API Key in Settings first.'); return; }
+  try {
+    const resp = await fetch(backendUrl + '/api/trade/cancelled', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Execution-Key': execKey },
+      body: JSON.stringify({ id: tradeId, reason: 'limit_order_cancelled' }),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    await refreshPendingLimitOrders();
+    await refreshExecutionLog();
+  } catch (e) { alert('Cancel failed: ' + e.message); }
 }
 
 // ── Emergency Stop ─────────────────────────────────────
@@ -7015,31 +7120,39 @@ function formatClock(date, tz) {
   return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: tz, hour12: false });
 }
 
-function updateSessionBar() {
+// Clocks need to tick every second so the user sees live UTC/ET/local time.
+// Session status (pills, countdowns, overlap banner) only needs to move every
+// ~10s — sessions shift in minute-granularity, not second-granularity.
+function updateSessionClocks() {
   const now = new Date();
+  const utc   = document.getElementById('clockUTC');
+  const et    = document.getElementById('clockET');
+  const local = document.getElementById('clockLocal');
+  if (utc)   utc.textContent   = formatClock(now, 'UTC');
+  // America/New_York is DST-aware: UTC-5 in winter, UTC-4 in summer (handled by Intl).
+  if (et)    et.textContent    = formatClock(now, 'America/New_York');
+  if (local) local.textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
 
-  // Clocks
-  document.getElementById('clockUTC').textContent = formatClock(now, 'UTC');
-  document.getElementById('clockET').textContent = formatClock(now, 'America/New_York');
-  document.getElementById('clockLocal').textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-
+function updateSessionStatus() {
   const s = getSessionStatus();
 
   // Pills
-  const pillLondon = document.getElementById('pillLondon');
-  const pillNY = document.getElementById('pillNY');
+  const pillLondon  = document.getElementById('pillLondon');
+  const pillNY      = document.getElementById('pillNY');
   const pillOverlap = document.getElementById('pillOverlap');
-  const pillAsian = document.getElementById('pillAsian');
+  const pillAsian   = document.getElementById('pillAsian');
+  if (!pillLondon) return;
 
-  pillLondon.className = 'session-pill' + (s.london.active ? ' active-london' : '');
-  pillNY.className = 'session-pill' + (s.ny.active ? ' active-ny' : '');
+  pillLondon.className  = 'session-pill' + (s.london.active ? ' active-london' : '');
+  pillNY.className      = 'session-pill' + (s.ny.active ? ' active-ny' : '');
   pillOverlap.className = 'session-pill' + (s.overlap.active ? ' active-overlap' : '');
-  pillAsian.className = 'session-pill' + (s.asian.active ? ' active-asian' : '');
+  pillAsian.className   = 'session-pill' + (s.asian.active ? ' active-asian' : '');
 
-  document.getElementById('pillLondonSub').textContent = s.london.countdown;
-  document.getElementById('pillNYSub').textContent = s.ny.countdown;
+  document.getElementById('pillLondonSub').textContent  = s.london.countdown;
+  document.getElementById('pillNYSub').textContent      = s.ny.countdown;
   document.getElementById('pillOverlapSub').textContent = s.overlap.countdown;
-  document.getElementById('pillAsianSub').textContent = s.asian.countdown;
+  document.getElementById('pillAsianSub').textContent   = s.asian.countdown;
 
   // Overlap banner
   const banner = document.getElementById('overlapBanner');
@@ -7053,6 +7166,13 @@ function updateSessionBar() {
     banner.className = 'overlap-banner';
     banner.innerHTML = '';
   }
+}
+
+// Back-compat wrapper: anywhere that used to call updateSessionBar() gets
+// both clocks and status refreshed in one pass (e.g. on page show).
+function updateSessionBar() {
+  updateSessionClocks();
+  updateSessionStatus();
 }
 
 // Detect which session(s) are active right now — returns array of chip labels
@@ -7563,13 +7683,18 @@ function checkCalcAutoFill() {
 // ═══════════════════════════════════════════════════════
 // PAGE VISIBILITY API — pause background work when hidden
 // ═══════════════════════════════════════════════════════
-let _sessionInterval = null;
+let _clockInterval = null;       // 1s — ticks the UTC/ET/Local clocks
+let _sessionInterval = null;     // 10s — refreshes pill active state, countdowns, overlap banner
 let _exchangeInterval = null;
 
 function startBackgroundTimers() {
+  if (!_clockInterval) {
+    updateSessionClocks();
+    _clockInterval = setInterval(updateSessionClocks, 1000);
+  }
   if (!_sessionInterval) {
-    updateSessionBar();
-    _sessionInterval = setInterval(updateSessionBar, 10000);
+    updateSessionStatus();
+    _sessionInterval = setInterval(updateSessionStatus, 10000);
   }
   if (!_exchangeInterval) {
     _exchangeInterval = setInterval(syncExchangeStatus, 60000);
@@ -7578,9 +7703,10 @@ function startBackgroundTimers() {
 }
 
 function stopBackgroundTimers() {
+  if (_clockInterval)   { clearInterval(_clockInterval);   _clockInterval = null; }
   if (_sessionInterval) { clearInterval(_sessionInterval); _sessionInterval = null; }
-  if (_exchangeInterval) { clearInterval(_exchangeInterval); _exchangeInterval = null; }
-  if (_mt4Interval) { clearInterval(_mt4Interval); _mt4Interval = null; }
+  if (_exchangeInterval){ clearInterval(_exchangeInterval);_exchangeInterval = null; }
+  if (_mt4Interval)     { clearInterval(_mt4Interval);     _mt4Interval = null; }
   clearTimeout(gistPushTimer);
 }
 
