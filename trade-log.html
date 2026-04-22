@@ -5,6 +5,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trade Journal</title>
   <style>
+    /* ================================================================
+       POIWatcher v3 design system — tokens
+       Layers: base #0d0f11 / cards #111418 / borders&hover #1e2126
+       Semantic: green #4ade80 · red #ef4444 · amber #f59e0b · blue #3b82f6
+       ================================================================ */
+    :root {
+      --bg-base: #0d0f11;
+      --bg-card: #111418;
+      --bg-inset: #0d0f11;
+      --bg-hover: #1e2126;
+      --border: #1e2126;
+      --border-strong: #2a2d31;
+      --text: #e8eaed;
+      --text-2: #8b9099;
+      --text-muted: #5a6070;
+      --green: #4ade80;
+      --green-bg: #0d1f0d;
+      --green-border: #1a3d1a;
+      --red: #ef4444;
+      --red-bg: #1f0d0d;
+      --red-border: #3d1a1a;
+      --amber: #f59e0b;
+      --amber-bg: #1f1200;
+      --amber-border: #3d2600;
+      --blue: #3b82f6;
+      --blue-bg: #0f1f3d;
+      --blue-border: #1a3d6d;
+      --btc: #f7931a;
+      --radius-card: 10px;
+      --radius-item: 8px;
+      --radius-input: 6px;
+      --radius-pill: 20px;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', system-ui, sans-serif;
@@ -808,6 +844,173 @@
     .cmp-row .cmp-label { color: #8b949e; }
     .cmp-insight { background: #1a1f2e; border: 1px solid #30365d; border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 0.78rem; color: #79c0ff; }
     .cmp-insight strong { color: #58a6ff; }
+
+    /* ================================================================
+       POIWatcher v3 design system — theme overlay
+       Re-skins existing classes without changing IDs or markup.
+       Higher cascade order = wins against earlier hardcoded values.
+       ================================================================ */
+    body { font-family: var(--font-sans); background: var(--bg-base); color: var(--text); -webkit-font-smoothing: antialiased; }
+
+    /* Nav */
+    .nav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 16px; height: 48px; gap: 0; }
+    .nav-logo { font-weight: 500; font-size: 0.9rem; color: var(--text); padding: 0 12px 0 0; margin-right: 12px; border-right: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+    .nav-logo::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; }
+    .nav-logo span { color: var(--green); }
+    .nav-link { padding: 6px 12px; font-size: 0.80rem; color: var(--text-muted); border-radius: 6px; border-bottom: none; font-weight: 500; margin: 0 2px; }
+    .nav-link:hover { color: var(--text); background: var(--bg-hover); }
+    .nav-link.active { color: var(--text); background: var(--bg-hover); border-bottom: none; }
+    .nav-ext, .cloud-btn, .nav button, .nav select { font-size: 0.76rem; color: var(--text-2); border: 1px solid var(--border-strong); border-radius: 6px; background: transparent; padding: 5px 11px; transition: all 0.15s; }
+    .nav-ext:hover, .cloud-btn:hover { color: var(--text); border-color: var(--border-strong); background: var(--bg-hover); }
+    .cloud-btn.connected { color: var(--green); border-color: var(--green-border); }
+    .cloud-btn.syncing   { color: var(--blue); border-color: var(--blue-border); }
+    .cloud-btn.error     { color: var(--red); border-color: var(--red-border); }
+
+    /* Page & cards */
+    .page { max-width: 1200px; padding: 20px 16px; }
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 16px; margin-bottom: 12px; }
+    .card-title { font-size: 0.66rem; font-weight: 500; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; }
+
+    /* Stats row — restyle to match hero metrics */
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+    @media (min-width: 720px) { .stats-row { grid-template-columns: repeat(6, 1fr); } }
+    .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-item); padding: 12px 14px; }
+    .stat-label { font-size: 0.64rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; }
+    .stat-value { font-size: 1.25rem; font-weight: 500; color: var(--text); margin-top: 3px; font-family: var(--font-mono); letter-spacing: -0.01em; }
+    .stat-value.green { color: var(--green); }
+    .stat-value.red   { color: var(--red); }
+    .stat-value.blue  { color: var(--blue); }
+    .stat-value.amber { color: var(--amber); }
+
+    /* Period tabs */
+    .period-tabs { gap: 4px; margin-bottom: 16px; }
+    .period-tab { padding: 5px 12px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-weight: 500; }
+    .period-tab:hover { color: var(--text); }
+    .period-tab.active { background: var(--bg-hover); border-color: var(--border-strong); color: var(--text); }
+
+    /* Inputs, selects, textareas */
+    input[type="text"], input[type="number"], input[type="password"], input[type="date"],
+    input[type="time"], input[type="datetime-local"], input[type="email"], input[type="url"],
+    select, textarea {
+      background: var(--bg-inset); border: 1px solid var(--border); color: var(--text);
+      border-radius: var(--radius-input); font-family: var(--font-sans); font-size: 0.86rem;
+    }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue); }
+    input[type="number"] { font-family: var(--font-mono); }
+    label { color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; }
+
+    /* Buttons — generic */
+    button { font-family: var(--font-sans); }
+    .btn, button.btn, .btn-primary, button.btn-primary,
+    .btn-secondary, button.btn-secondary { border-radius: 6px; font-weight: 500; transition: all 0.15s; border: 1px solid var(--border-strong); }
+    .btn-primary { background: var(--green); color: #0d1f0d; border: none; }
+    .btn-primary:hover { filter: brightness(1.05); }
+    .btn-secondary { background: var(--bg-card); color: var(--text); }
+    .btn-secondary:hover { background: var(--bg-hover); }
+    .btn-danger { background: var(--red-bg); color: var(--red); border-color: var(--red-border); }
+
+    /* Tables / trade list rows */
+    .trade-row, .journal-row, .trade-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-item); }
+    .trade-row:hover, .journal-row:hover, .trade-item:hover { border-color: var(--border-strong); }
+
+    /* Session bar */
+    #sessionBar { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 6px 16px; }
+    #sessionBar .session-clock, #sessionBar .clock, .session-clock { font-size: 0.70rem; color: var(--text-muted); font-family: var(--font-mono); letter-spacing: 0.02em; }
+    .session-pill, .sess-pill, #sessionBar .pill { font-size: 0.70rem; padding: 3px 10px; border-radius: var(--radius-pill); border: 1px solid var(--border-strong); color: var(--text-muted); background: transparent; }
+    .session-pill.active, .sess-pill.active, .session-pill.london-active { border-color: var(--blue); color: var(--blue); background: var(--blue-bg); }
+    .session-pill.ny-active, .session-pill.newyork-active { border-color: var(--green); color: var(--green); background: var(--green-bg); }
+    .session-pill.overlap-active { border-color: var(--amber); color: var(--amber); background: var(--amber-bg); }
+    .session-pill.asian-active { border-color: #a78bfa; color: #a78bfa; background: #1a1030; }
+    #overlapBanner { background: var(--amber-bg); border: 1px solid var(--amber-border); color: var(--amber); border-radius: var(--radius-item); }
+
+    /* Filter chips (journal) */
+    .chip, .filter-chip { font-size: 0.72rem; padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
+    .chip:hover, .filter-chip:hover { color: var(--text); }
+    .chip.active, .filter-chip.active { border-color: var(--blue); color: var(--blue); background: var(--blue-bg); }
+
+    /* Badges for direction/outcome in journal rows */
+    .badge-long, .badge.long, .tag-long { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 500; }
+    .badge-short, .badge.short, .tag-short { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 500; }
+    .badge-win { background: var(--green-bg); color: var(--green); padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 500; }
+    .badge-loss { background: var(--red-bg); color: var(--red); padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 500; }
+    .badge-be, .badge-breakeven { background: var(--amber-bg); color: var(--amber); padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 500; }
+    .badge-paper, .paper-badge { background: var(--blue-bg); color: var(--blue); padding: 2px 6px; border-radius: 3px; font-size: 0.63rem; font-weight: 500; }
+    .badge-live, .live-badge { background: var(--green-bg); color: var(--green); padding: 2px 6px; border-radius: 3px; font-size: 0.63rem; font-weight: 500; }
+
+    /* Modals */
+    .modal-overlay, .cloud-modal-overlay, .overlay, .checklist-modal-overlay,
+    #modalOverlay, #execConfirmOverlay, #goLiveOverlay, #cloudModalOverlay,
+    #analysisOverlay, #checklistOverlay, #settingsOverlay { background: rgba(0,0,0,0.7); }
+    .modal, .cloud-modal, .modal-box, .settings-modal, .checklist-modal,
+    #modalBox, #execConfirmBox, #goLiveBox, #cloudModalBox, #analysisBox, #checklistBox, #settingsBox {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-card);
+    }
+
+    /* Form sections (collapsibles in Log Trade) */
+    .form-section-header { background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius-item); }
+    .form-section-header.open { border-color: var(--border-strong); }
+    .form-section-body { background: var(--bg-card); border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius-item) var(--radius-item); }
+
+    /* Comparison card insight tint */
+    .cmp-insight { background: var(--blue-bg); border-color: var(--blue-border); color: var(--blue); }
+    .cmp-insight strong { color: var(--blue); }
+
+    /* Status dots — unify sizes and colors */
+    .dot, .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+    .dot-green, .status-dot.green, .mt4-dot.connected { background: var(--green); }
+    .dot-red, .status-dot.red, .mt4-dot.disconnected { background: var(--red); }
+    .dot-amber, .status-dot.amber, .mt4-dot.warn { background: var(--amber); }
+    .dot-blue, .status-dot.blue, .mt4-dot.syncing { background: var(--blue); }
+
+    /* Equity bars — preserve pos/neg semantics with new palette */
+    .eq-bar.pos { background: var(--green-border); }
+    .eq-bar.neg { background: var(--red-border); }
+    .eq-bar.pos.hi { background: var(--green); }
+    .eq-bar.neg.hi { background: var(--red); }
+
+    /* Calendar / dow stats colors */
+    .cal-dow-stat .dow-label { color: var(--text-muted); }
+
+    /* Drawdown bars */
+    .dd-fill.safe   { background: var(--green); }
+    .dd-fill.warn   { background: var(--amber); }
+    .dd-fill.danger { background: var(--red); }
+
+    /* Setup-performance horizontal bars */
+    .setup-bar-fill, .bar-fill { background: var(--green); }
+    .setup-bar-fill.warn, .bar-fill.warn { background: var(--amber); }
+    .setup-bar-fill.danger, .bar-fill.danger { background: var(--red); }
+
+    /* Generic text helper classes (seen across JS-injected markup) */
+    .muted, .text-muted { color: var(--text-muted); }
+    .text-green, .pos, .profit { color: var(--green); }
+    .text-red, .neg, .loss { color: var(--red); }
+    .text-amber { color: var(--amber); }
+    .text-blue { color: var(--blue); }
+
+    /* Draft / sync banners */
+    #draftBanner, #syncBar { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-2); border-radius: var(--radius-item); }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: var(--bg-base); }
+    ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a3e45; }
+
+    /* Section headings and helpers inside cards */
+    h1, h2, h3, h4 { color: var(--text); font-weight: 500; letter-spacing: -0.01em; }
+    h2 { font-size: 1rem; } h3 { font-size: 0.9rem; } h4 { font-size: 0.82rem; }
+
+    /* EV hero card (rendered by renderEV) */
+    #evHeadline { background: var(--bg-card); border: 1px solid var(--green); border-radius: var(--radius-card); padding: 14px 16px; }
+
+    /* Live tab — system-status pill grid */
+    .live-grid, .positions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 10px; }
+
+    /* Ensure any inline style="background:#161b22" legacy markup is visually consistent */
+    [style*="#161b22"] { background-color: var(--bg-card) !important; }
+    [style*="#0d1117"] { background-color: var(--bg-inset) !important; }
+    [style*="#30363d"] { border-color: var(--border-strong) !important; }
   </style>
 </head>
 <body>
@@ -881,10 +1084,10 @@
     </button>
   </div>
 
-  <div class="stats-row" id="statsRow"></div>
-
-  <!-- EV Headline -->
+  <!-- EV Headline (hero card above metrics, per v3 design) -->
   <div class="ev-headline" id="evHeadline" style="display:none;"></div>
+
+  <div class="stats-row" id="statsRow"></div>
 
   <!-- Drawdown Tracking -->
   <div class="card" id="drawdownCard" style="display:none;">
