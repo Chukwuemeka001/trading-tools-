@@ -978,22 +978,36 @@ def mt4_trade_close():
     entry = found.get("entry", 0)
     sl = found.get("sl", 0)
     sl_dist = abs(entry - sl) if sl else 0
-    exit_dist = abs(exit_price - entry)
-    actual_rr = (exit_dist / sl_dist) if sl_dist > 0 else 0
+
+    # Determine outcome first so RR can be signed accordingly
+    if pnl > 0:
+        outcome = "win"
+    elif pnl < 0:
+        outcome = "loss"
+    else:
+        outcome = "be"
+
+    # Signed RR: positive on win (exit in favor), negative on loss (exit hit/past SL),
+    # zero on BE. Uses directional profit, not abs distance.
+    direction = (body.get("direction") or found.get("direction") or "").lower()
+    if direction in ("long", "buy"):
+        signed_profit = exit_price - entry
+    elif direction in ("short", "sell"):
+        signed_profit = entry - exit_price
+    else:
+        # Fallback — infer sign from P&L when direction is missing
+        signed_profit = abs(exit_price - entry) * (1 if pnl > 0 else -1 if pnl < 0 else 0)
+    if outcome == "be":
+        actual_rr = 0.0
+    else:
+        actual_rr = (signed_profit / sl_dist) if sl_dist > 0 else 0.0
 
     found["status"] = "closed"
     found["exitPrice"] = exit_price
     found["actualPnL"] = pnl
     found["dateClose"] = body.get("timestamp", datetime.now(timezone.utc).isoformat())
     found["actualRR"] = round(actual_rr, 2)
-
-    # Determine outcome
-    if pnl > 0:
-        found["outcome"] = "win"
-    elif pnl < 0:
-        found["outcome"] = "loss"
-    else:
-        found["outcome"] = "be"
+    found["outcome"] = outcome
 
     found["updatedAt"] = datetime.now(timezone.utc).isoformat()
     found["mt4CloseReason"] = body.get("close_reason", "Manual close")
@@ -1014,7 +1028,7 @@ def mt4_trade_close():
         f"<b>{symbol}</b> — {direction}\n"
         f"\U0001f4cd Entry: ${entry} \u2192 Exit: ${exit_price}\n"
         f"\U0001f4b0 P&L: <b>{pnl_str}</b>\n"
-        f"\U0001f4ca Actual RR: 1:{actual_rr:.1f}\n"
+        f"\U0001f4ca Actual RR: {actual_rr:+.2f}R\n"
         f"\u23f1 Duration: {body.get('duration_minutes', 0)} min\n"
         f"\U0001f4a1 Reason: {body.get('close_reason', 'Manual')}\n\n"
         f"\U0001f4dd <a href=\"{JOURNAL_URL}\">Open journal to add post-trade review!</a>"

@@ -929,6 +929,7 @@
     .trade-row .trade-rr { font-size: 0.80rem; font-weight: 500; min-width: 52px; text-align: right; font-family: var(--font-mono); }
     .trade-row .trade-rr.pos, .trade-row .trade-rr.green { color: var(--green); }
     .trade-row .trade-rr.neg, .trade-row .trade-rr.red   { color: var(--red); }
+    .trade-row .trade-rr.amber { color: var(--amber); }
     .trade-row .trade-rr.neutral { color: var(--text-muted); }
     .trade-row .trade-pnl { font-size: 0.82rem; font-weight: 500; min-width: 72px; text-align: right; font-family: var(--font-mono); }
     .trade-row .trade-pnl.pos { color: var(--green); }
@@ -1088,6 +1089,9 @@
     .live-trade-pnl-big.neg { color: var(--red); }
     .live-trade-pnl-big.neutral { color: var(--text); }
     .live-trade-rr-big { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; font-family: var(--font-mono); }
+    .live-trade-rr-big.pos   { color: var(--green); }
+    .live-trade-rr-big.neg   { color: var(--red); }
+    .live-trade-rr-big.amber { color: var(--amber); }
     /* Grid cells become inset mini-cards */
     .live-trade-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 0.78rem; }
     @media (max-width: 520px) { .live-trade-grid { grid-template-columns: 1fr 1fr; } }
@@ -2770,8 +2774,31 @@ function load() {
       fixed++;
     }
   });
-  if (fixed > 0) {
-    console.warn(`P&L integrity: corrected ${fixed} trade(s) with mismatched outcome/P&L sign`);
+  // Data integrity: auto-correct actualRR sign mismatches
+  // (Legacy MT4/MT5 close endpoint stored RR as abs() — trades closed as losses
+  // may carry a positive RR. Flip sign to match outcome.)
+  let rrFixed = 0;
+  trades.forEach(t => {
+    if (t.actualRR == null) return;
+    const rr = Number(t.actualRR);
+    if (!isFinite(rr)) return;
+    if (t.outcome === 'loss' && rr > 0)       { t.actualRR = -rr;             rrFixed++; }
+    else if (t.outcome === 'win'  && rr < 0)  { t.actualRR = Math.abs(rr);    rrFixed++; }
+    else if (t.outcome === 'be'   && rr !== 0){ t.actualRR = 0;               rrFixed++; }
+    // Also fix close event rrAtClose if present
+    (t.closeEvents || []).forEach(ev => {
+      if (ev.rrAtClose == null) return;
+      const e = Number(ev.rrAtClose);
+      if (!isFinite(e)) return;
+      const evPnl = Number(ev.pnl || 0);
+      if (evPnl < 0 && e > 0) { ev.rrAtClose = -e;           rrFixed++; }
+      else if (evPnl > 0 && e < 0) { ev.rrAtClose = Math.abs(e); rrFixed++; }
+      else if (evPnl === 0 && e !== 0) { ev.rrAtClose = 0;   rrFixed++; }
+    });
+  });
+  if (fixed > 0 || rrFixed > 0) {
+    if (fixed > 0)   console.warn(`P&L integrity: corrected ${fixed} trade(s) with mismatched outcome/P&L sign`);
+    if (rrFixed > 0) console.warn(`R:R integrity: corrected ${rrFixed} value(s) with mismatched outcome/RR sign`);
     save();
   }
 }
@@ -2791,6 +2818,48 @@ function fmt(n, d=2) {
 function fmtPnL(n) {
   if (n == null || isNaN(n)) return '—';
   return (n >= 0 ? '+$' : '-$') + fmt(Math.abs(n));
+}
+
+// ── Signed R:R helpers ──────────────────────────────────
+// Returns the correctly-signed actual RR for a trade. Auto-corrects legacy
+// trades whose stored RR is positive on losses (pre-2026-04-24 backend bug).
+// For BE trades always returns 0. Returns null when no actual RR yet.
+function signedRR(t) {
+  if (!t || t.actualRR == null) return null;
+  let rr = Number(t.actualRR);
+  if (!isFinite(rr)) return null;
+  if (t.outcome === 'be') return 0;
+  if (t.outcome === 'loss' && rr > 0) return -rr;
+  if (t.outcome === 'win'  && rr < 0) return  Math.abs(rr);
+  return rr;
+}
+
+// Formats a signed RR value as "+1.23R" / "-1.00R" / "0.00R".
+function fmtRR(rr, d) {
+  if (rr == null || !isFinite(rr)) return '—';
+  const dec = d == null ? 2 : d;
+  const n = Number(rr);
+  if (n > 0) return '+' + n.toFixed(dec) + 'R';
+  if (n < 0) return n.toFixed(dec) + 'R';  // toFixed keeps the minus sign
+  return (0).toFixed(dec) + 'R';
+}
+
+// Hex color for a signed RR: green positive, red negative, amber BE/zero.
+function rrColor(rr) {
+  if (rr == null || !isFinite(rr)) return '#8b949e';
+  const n = Number(rr);
+  if (n > 0) return '#4ade80';
+  if (n < 0) return '#ef4444';
+  return '#f59e0b';
+}
+
+// CSS class for a signed RR: pos / neg / amber / neutral.
+function rrClass(rr) {
+  if (rr == null || !isFinite(rr)) return 'neutral';
+  const n = Number(rr);
+  if (n > 0) return 'pos';
+  if (n < 0) return 'neg';
+  return 'amber';
 }
 
 // Is this a crypto market? (BTC, crypto, etc.)
@@ -3277,10 +3346,11 @@ function renderJournal() {
     const paperBadge = (t.execPaper && !execCoversPaper) ? '<span class="trade-paper-badge">Paper</span>' : '';
 
     const pnlStr   = t.status === 'partial' ? fmtPnL(t.actualPnL||0) + ' (partial)' : t.actualPnL != null && t.status === 'closed' ? fmtPnL(t.actualPnL) : 'Open';
-    const rrNum    = t.actualRR != null && t.status !== 'open' ? t.actualRR : null;
-    const rrStr    = rrNum != null ? (rrNum >= 0 ? '+' : '') + fmt(rrNum,2) + 'R'
+    // Signed R:R — uses signedRR() helper which auto-flips legacy unsigned values
+    const rrNum    = t.status !== 'open' ? signedRR(t) : null;
+    const rrStr    = rrNum != null ? fmtRR(rrNum)
                    : t.plannedRR ? fmt(t.plannedRR,2) + 'R' : '';
-    const rrClass  = rrNum == null ? 'neutral' : rrNum >= 0 ? 'pos' : 'neg';
+    const rrCls    = rrNum == null ? 'neutral' : rrClass(rrNum);
     const dateStr  = new Date(t.dateOpen).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
     const dirLabel = (t.direction || '').toUpperCase();
 
@@ -3299,7 +3369,7 @@ function renderJournal() {
       ${paperBadge}
       ${srcBadge}
       ${execBadge}
-      <span class="trade-rr ${rrClass}">${rrStr}</span>
+      <span class="trade-rr ${rrCls}">${rrStr}</span>
       <span class="trade-pnl ${pnlClass}">${pnlStr}</span>
       <span class="trade-date">${dateStr}</span>
     </div>`;
@@ -3425,7 +3495,7 @@ function openModal(id) {
             <div><div class="close-event-cell-label">% Closed</div><div class="close-event-cell-val">${ev.percentClosed || 0}%</div></div>
             <div><div class="close-event-cell-label">Exit Price</div><div class="close-event-cell-val">${fmt(ev.price, 5)}</div></div>
             <div><div class="close-event-cell-label">P&L</div><div class="close-event-cell-val" style="color:${pnlCol}">${fmtPnL(ev.pnl)}</div></div>
-            <div><div class="close-event-cell-label">R:R</div><div class="close-event-cell-val" style="color:${(ev.rrAtClose||0)>=0?'#3fb950':'#f85149'}">${ev.rrAtClose != null ? (ev.rrAtClose>=0?'+':'') + fmt(ev.rrAtClose,2) + 'R' : '—'}</div></div>
+            <div><div class="close-event-cell-label">R:R</div><div class="close-event-cell-val" style="color:${rrColor(ev.rrAtClose)}">${fmtRR(ev.rrAtClose)}</div></div>
           </div>
           ${ev.reason ? '<div style="margin-top:4px;color:#8b949e;font-size:0.72rem;">Reason: '+escHtml(ev.reason)+'</div>' : ''}
           ${ev.notes ? '<div style="margin-top:2px;color:#8b949e;font-size:0.72rem;font-style:italic;">'+escHtml(ev.notes)+'</div>' : ''}
@@ -3503,7 +3573,7 @@ function openModal(id) {
       <div style="font-size:0.68rem;color:#8b949e;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:6px;">Blended Metrics</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
         <div><div class="close-event-cell-label">Weighted Avg Exit</div><div class="close-event-cell-val">${fmt(wAvgExit,5)}</div></div>
-        <div><div class="close-event-cell-label">Blended R:R</div><div class="close-event-cell-val" style="color:${blendedRR>=0?'#3fb950':'#f85149'}">${blendedRR>=0?'+':''}${fmt(blendedRR,2)}R</div></div>
+        <div><div class="close-event-cell-label">Blended R:R</div><div class="close-event-cell-val" style="color:${rrColor(blendedRR)}">${fmtRR(blendedRR)}</div></div>
         <div><div class="close-event-cell-label">Total Realized</div><div class="close-event-cell-val" style="color:${realizedPnL>=0?'#3fb950':'#f85149'}">${fmtPnL(realizedPnL)}</div></div>
       </div>
       ${capturedPct > 0 ? `<div style="margin-top:6px;font-size:0.72rem;color:#8b949e;">Potential captured: <strong style="color:#58a6ff">${fmt(capturedPct,1)}%</strong> of max move to TP</div>` : ''}
@@ -3780,7 +3850,9 @@ function openModal(id) {
     }
   }
 
-  const actualRR = t.actualRR != null ? (t.actualRR >= 0 ? '+' : '') + fmt(t.actualRR,2) + 'R' : '—';
+  const sRR        = signedRR(t);
+  const actualRR   = fmtRR(sRR);
+  const actualRRcol= rrColor(sRR);
   const dateClose = t.dateClose ? new Date(t.dateClose).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
 
   body.innerHTML = `
@@ -3803,7 +3875,7 @@ function openModal(id) {
     <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:12px 14px; margin-bottom:14px; display:grid; grid-template-columns:repeat(${t.exitType ? 5 : 4},1fr); gap:10px;">
       <div><div class="info-cell-label">Exit Price</div><div class="info-cell-val">${fmt(t.exitPrice,5)}</div></div>
       <div><div class="info-cell-label">Actual P&L</div><div class="info-cell-val" style="color:${t.actualPnL>=0?'#3fb950':'#f85149'}">${fmtPnL(t.actualPnL)}</div></div>
-      <div><div class="info-cell-label">Actual R:R</div><div class="info-cell-val" style="color:${t.actualRR>=0?'#3fb950':'#f85149'}">${actualRR}</div></div>
+      <div><div class="info-cell-label">Actual R:R</div><div class="info-cell-val" style="color:${actualRRcol}">${actualRR}</div></div>
       ${t.exitType ? `<div><div class="info-cell-label">Exit Type</div><div class="info-cell-val" style="font-size:0.78rem">${{tp:'TP Hit',sl:'SL Hit',be:'Break Even',manual:'Manual Close',partial:'Partial Close'}[t.exitType] || t.exitType}</div></div>` : ''}
       <div><div class="info-cell-label">Closed</div><div class="info-cell-val" style="font-size:0.75rem">${dateClose}</div></div>
     </div>` : ''}
@@ -5382,7 +5454,8 @@ function renderComparison(allTrades) {
     groups[val].pnl += (t.actualPnL || 0);
     if (t.outcome === 'win') groups[val].wins++;
     else if (t.outcome === 'loss') groups[val].losses++;
-    if (t.actualRR != null) groups[val].rr.push(t.actualRR);
+    const _sr = signedRR(t);
+    if (_sr != null) groups[val].rr.push(_sr);
   });
 
   const sorted = Object.entries(groups).sort((a,b) => b[1].pnl - a[1].pnl);
@@ -5396,7 +5469,7 @@ function renderComparison(allTrades) {
   sorted.slice(0, 2).forEach(([name, g]) => {
     const total = g.wins + g.losses;
     const wr = total ? ((g.wins / total) * 100).toFixed(1) : 0;
-    const avgRR = g.rr.length ? (g.rr.reduce((s,r)=>s+r,0) / g.rr.length).toFixed(2) : '—';
+    const avgRRnum = g.rr.length ? (g.rr.reduce((s,r)=>s+r,0) / g.rr.length) : null;
     const avgPnL = total ? (g.pnl / total) : 0;
     html += `<div class="cmp-col">
       <div class="cmp-col-title">${name}</div>
@@ -5404,7 +5477,7 @@ function renderComparison(allTrades) {
       <div class="cmp-row"><span class="cmp-label">Win Rate</span><span style="color:${wr>=50?'#3fb950':'#f85149'}">${wr}%</span></div>
       <div class="cmp-row"><span class="cmp-label">Total P&L</span><span style="color:${g.pnl>=0?'#3fb950':'#f85149'}">${g.pnl>=0?'+':''}$${fmt(Math.abs(g.pnl))}</span></div>
       <div class="cmp-row"><span class="cmp-label">Avg P&L/Trade</span><span style="color:${avgPnL>=0?'#3fb950':'#f85149'}">${avgPnL>=0?'+':''}$${fmt(Math.abs(avgPnL))}</span></div>
-      <div class="cmp-row"><span class="cmp-label">Avg R:R</span><span>${avgRR}R</span></div>
+      <div class="cmp-row"><span class="cmp-label">Avg R:R</span><span style="color:${avgRRnum!=null?rrColor(avgRRnum):'var(--text-muted)'}">${avgRRnum!=null?fmtRR(avgRRnum):'—'}</span></div>
     </div>`;
   });
   html += `</div>`;
@@ -5502,7 +5575,13 @@ function renderDashboard() {
   const losses   = closed.filter(t => t.outcome === 'loss');
   const totalPnL = closed.reduce((s,t) => s + (t.actualPnL||0), 0);
   const winRate  = closed.length ? (wins.length / closed.length * 100) : 0;
-  const avgRR    = closed.filter(t=>t.actualRR).reduce((s,t,_,a)=>s+t.actualRR/a.length,0);
+  // TRUE average of signed Actual R — includes BE trades (0R) and losses (negative).
+  // Legacy unsigned values are auto-corrected via signedRR().
+  const rrSamples = closed
+    .map(t => signedRR(t))
+    .filter(v => v != null);
+  const avgRR = rrSamples.length ? rrSamples.reduce((s, v) => s + v, 0) / rrSamples.length : 0;
+  const hasRRSamples = rrSamples.length > 0;
   const grossW   = wins.reduce((s,t)=>s+(t.actualPnL||0),0);
   const grossL   = Math.abs(losses.reduce((s,t)=>s+(t.actualPnL||0),0));
   const pf       = grossL > 0 ? grossW / grossL : (grossW > 0 ? Infinity : 0);
@@ -5522,7 +5601,8 @@ function renderDashboard() {
     { label: 'Win Rate',      val: closed.length ? fmt(winRate,1)+'%' : '—', cls: winRate>=50?'green':winRate>0?'red':'' },
     { label: 'Total Trades',  val: filtered.length,  cls: 'blue' },
     { label: 'Open / Partial',val: openCount + (partialCount ? ' / ' + partialCount : ''), cls: partialCount ? 'blue' : '' },
-    { label: 'Avg Actual R',  val: avgRR ? fmt(avgRR,2)+'R' : '—', cls: avgRR>=1?'green':avgRR>0?'red':'' },
+    { label: 'Avg Actual R',  val: hasRRSamples ? fmtRR(avgRR) : '—',
+       cls: !hasRRSamples ? '' : avgRR > 0 ? 'green' : avgRR < 0 ? 'red' : 'amber' },
     { label: 'Profit Factor', val: isFinite(pf) ? fmt(pf,2) : pf===Infinity ? '∞' : '—', cls: pf>=1.5?'green':pf>=1?'':pf>0?'red':'' },
   ];
 
@@ -5681,7 +5761,9 @@ function renderSetupPerformance(list) {
     map[key].trades++;
     if (t.outcome === 'win') map[key].wins++;
     if (t.outcome === 'loss') map[key].losses++;
-    if (t.actualRR) { map[key].rrSum += t.actualRR; map[key].rrCount++; }
+    // Signed RR aggregation — include BE (0) and losses (negative) in the true avg
+    const sr = signedRR(t);
+    if (sr != null) { map[key].rrSum += sr; map[key].rrCount++; }
   });
 
   const rows = Object.entries(map).sort((a, b) => {
@@ -5705,7 +5787,9 @@ function renderSetupPerformance(list) {
   rows.forEach(([k, v]) => {
     const wrNum = v.trades ? (v.wins / v.trades * 100) : 0;
     const wr    = wrNum.toFixed(0);
-    const avgRR = v.rrCount ? (v.rrSum / v.rrCount).toFixed(2) + 'R' : '—';
+    const avgRRnum = v.rrCount ? (v.rrSum / v.rrCount) : null;
+    const avgRR    = avgRRnum != null ? fmtRR(avgRRnum) : '—';
+    const avgRRcol = avgRRnum != null ? rrColor(avgRRnum) : 'var(--text-muted)';
     const statClass = wrNum >= 55 ? '' : wrNum >= 40 ? 'warn' : 'danger';
     const barClass  = wrNum >= 55 ? '' : wrNum >= 40 ? 'warn' : 'danger';
     const rowClass  = k === bestKey ? ' best' : '';
@@ -5713,7 +5797,7 @@ function renderSetupPerformance(list) {
     html += `<div class="setup-row${rowClass}">
       <span class="setup-name">${escHtml(k)}${flag}</span>
       <div class="setup-bar-wrap"><div class="setup-bar-fill ${barClass}" style="width:${Math.min(100, wrNum)}%"></div></div>
-      <span class="setup-meta">${v.trades} tr · ${avgRR}</span>
+      <span class="setup-meta">${v.trades} tr · <span style="color:${avgRRcol}">${avgRR}</span></span>
       <span class="setup-stat ${statClass}">${wr}%</span>
     </div>`;
   });
@@ -5941,7 +6025,7 @@ function renderRecent(list) {
       </div>
       <div class="trade-right">
         <div class="trade-pnl ${pnlClass}">${pnlStr}</div>
-        <div class="trade-rr">${t.actualRR!=null?(t.actualRR>=0?'+':'')+fmt(t.actualRR,2)+'R':t.plannedRR?fmt(t.plannedRR,2)+'R':''}</div>
+        <div class="trade-rr ${(() => { const _r = signedRR(t); return _r==null?'':rrClass(_r); })()}">${(() => { const _r = signedRR(t); return _r!=null ? fmtRR(_r) : (t.plannedRR ? fmt(t.plannedRR,2)+'R' : ''); })()}</div>
       </div>
     </div>`;
   }).join('')}</div>`;
@@ -6258,8 +6342,10 @@ function generateAnalysisExport(period) {
   const winRate  = closed.length ? (wins.length / closed.length * 100) : 0;
   const avgPRR   = closed.filter(t => t.plannedRR).length
     ? closed.filter(t => t.plannedRR).reduce((s, t, _, a) => s + t.plannedRR / a.length, 0) : 0;
-  const avgARR   = closed.filter(t => t.actualRR).length
-    ? closed.filter(t => t.actualRR).reduce((s, t, _, a) => s + t.actualRR / a.length, 0) : 0;
+  // TRUE signed average — includes BE (0R) and losses (negative) via signedRR()
+  const _arrSamples = closed.map(t => signedRR(t)).filter(v => v != null);
+  const avgARR = _arrSamples.length ? _arrSamples.reduce((s, v) => s + v, 0) / _arrSamples.length : 0;
+  const hasARR = _arrSamples.length > 0;
   const grossW   = wins.reduce((s, t) => s + (t.actualPnL || 0), 0);
   const grossL   = Math.abs(losses.reduce((s, t) => s + (t.actualPnL || 0), 0));
   const pf       = grossL > 0 ? grossW / grossL : 0;
@@ -6308,7 +6394,7 @@ function generateAnalysisExport(period) {
   out += `Win: ${wins.length}  |  Loss: ${losses.length}  |  Win Rate: ${closed.length ? winRate.toFixed(1) + '%' : '—'}\n`;
   out += `Total P&L: ${money(totalPnL)}\n`;
   out += `Profit Factor: ${pf ? d(pf) : '—'}\n`;
-  out += `Avg Planned R:R: ${avgPRR ? d(avgPRR) + 'R' : '—'}  |  Avg Actual R:R: ${avgARR ? d(avgARR) + 'R' : '—'}\n`;
+  out += `Avg Planned R:R: ${avgPRR ? d(avgPRR) + 'R' : '—'}  |  Avg Actual R:R: ${hasARR ? fmtRR(avgARR) : '—'}\n`;
   if (startCap) {
     out += `Starting Capital: $${d(startCap)}  |  Current Equity: $${d(startCap + totalPnL)}\n`;
   }
@@ -6414,7 +6500,7 @@ function generateAnalysisExport(period) {
     out += `\n`;
     if (t.status === 'closed' || t.status === 'partial') {
       out += `Result: ${t.status === 'partial' ? 'PARTIAL' : (t.outcome || '?').toUpperCase()} | Exit: ${fmt(t.exitPrice,5)} | P&L: ${money(t.actualPnL)}`;
-      if (t.actualRR != null) out += ` | Actual R: ${t.actualRR >= 0 ? '+' : ''}${d(t.actualRR)}R`;
+      { const _rr = signedRR(t); if (_rr != null) out += ` | Actual R: ${fmtRR(_rr)}`; }
       if (t.exitType) out += ` | Exit Type: ${{tp:'TP Hit',sl:'SL Hit',be:'Break Even',manual:'Manual Close'}[t.exitType] || t.exitType}`;
       out += `\n`;
       // Close events
@@ -6423,7 +6509,7 @@ function generateAnalysisExport(period) {
         out += `Close Events (${cEvents.length}):\n`;
         cEvents.forEach((ev, ci) => {
           const evTime = ev.timestamp ? dateStr(ev.timestamp) : '—';
-          out += `  #${ci+1} ${ev.type || 'Close'}: ${ev.percentClosed}% @ ${fmt(ev.price,5)} | P&L: ${money(ev.pnl)} | R:R: ${ev.rrAtClose != null ? (ev.rrAtClose>=0?'+':'') + d(ev.rrAtClose) + 'R' : '—'}`;
+          out += `  #${ci+1} ${ev.type || 'Close'}: ${ev.percentClosed}% @ ${fmt(ev.price,5)} | P&L: ${money(ev.pnl)} | R:R: ${fmtRR(ev.rrAtClose)}`;
           if (ev.reason) out += ` | Reason: ${ev.reason}`;
           out += ` | ${evTime}\n`;
           if (ev.notes?.trim()) out += `    Notes: ${ev.notes.trim()}\n`;
@@ -6617,12 +6703,14 @@ async function refreshLiveTrades() {
         let pnlNum = null;
         let pnlStr = '—', rrStr = '—', slDistStr = '—', tpDistStr = '—', currentStr = '—';
         let pnlClass = 'neutral';
+        let currentSignedRR = null;
         if (currentPrice && entry && sl) {
           pnlNum = dir === 'long' ? currentPrice - entry : entry - currentPrice;
           pnlStr = (pnlNum >= 0 ? '+' : '') + '$' + pnlNum.toFixed(2);
           pnlClass = pnlNum > 0 ? 'pos' : pnlNum < 0 ? 'neg' : 'neutral';
-          const signedRR = slDist > 0 ? pnlNum / slDist : 0;
-          rrStr = (signedRR >= 0 ? '+' : '') + signedRR.toFixed(1) + 'R';
+          // Signed current RR — positive when in profit, negative when in loss, zero at entry
+          currentSignedRR = slDist > 0 ? pnlNum / slDist : 0;
+          rrStr = fmtRR(currentSignedRR, 1);
           slDistStr = fmtDist(currentPrice, sl, t.pair, t.market || 'BTC/USDT');
           tpDistStr = tp ? fmtDist(currentPrice, tp, t.pair, t.market || 'BTC/USDT') : '—';
           currentStr = '$' + Number(currentPrice).toLocaleString();
@@ -6666,7 +6754,11 @@ async function refreshLiveTrades() {
         html += '</div>';
         html += '<div class="live-trade-header-right">';
         html += '<div class="live-trade-pnl-big ' + pnlClass + '">' + pnlStr + '</div>';
-        html += '<div class="live-trade-rr-big">' + rrStr + (isBeSet ? ' · risk free' : '') + '</div>';
+        const rrBigClass = currentSignedRR == null ? ''
+                         : currentSignedRR > 0 ? 'pos'
+                         : currentSignedRR < 0 ? 'neg'
+                         : 'amber';
+        html += '<div class="live-trade-rr-big ' + rrBigClass + '">' + rrStr + (isBeSet ? ' · risk free' : '') + '</div>';
         html += '</div>';
         html += '</div>';
         // Grid: Entry | Current | TP | SL | To TP | To SL (matches v3 prototype)
@@ -8125,7 +8217,7 @@ function generateCSV(tradeList) {
       t.risk || '',
       t.plannedRR ? t.plannedRR.toFixed(2) : '',
       t.exitPrice || '',
-      t.actualRR != null ? t.actualRR.toFixed(2) : '',
+      (function(){ const _r = signedRR(t); return _r != null ? _r.toFixed(2) : ''; })(),
       t.actualPnL != null ? t.actualPnL.toFixed(2) : '',
       t.outcome || '',
       t.status || '',
