@@ -1238,12 +1238,25 @@
   });
 
   function sendToJournal() {
+    // Sync `mode` with whichever tab is visually active — defensive so the
+    // validator never cross-checks the other tab's fields.
+    const activeTabEl = document.querySelector('.tab.active');
+    if (activeTabEl) {
+      if (activeTabEl.classList.contains('btc')   && mode !== 'btc')   mode = 'btc';
+      if (activeTabEl.classList.contains('forex') && mode !== 'forex') mode = 'forex';
+    }
+
     const capital = parseFloat(document.getElementById('capital').value);
     const riskPct = parseFloat(document.getElementById('riskPct').value);
+    if (!capital || !riskPct) { alert('Enter account capital and risk % first.'); return; }
+
+    let data = null;
+
     if (mode === 'forex') {
+      // ── Forex tab: validate Forex fields only ────────────────────
       const entry = parseFloat(document.getElementById('fxEntry').value);
       const pairType = document.getElementById('pairType').value;
-      if (!entry) { alert('Calculate a trade first.'); return; }
+      if (!entry) { alert('Enter an entry price on the Forex tab first.'); return; }
       const pipSz = fxPipSize(entry);
       const pipVal = fxPipValue(pairType, entry);
       // Resolve SL/TP to price
@@ -1257,7 +1270,7 @@
       if (fxTPMode === 'pips' && tpRaw) {
         tpPrice = fxDir === 'long' ? entry + tpRaw * pipSz : entry - tpRaw * pipSz;
       } else if (tpRaw) { tpPrice = tpRaw; }
-      if (!slPrice || !tpPrice) { alert('Enter SL and TP values first.'); return; }
+      if (!slPrice || !tpPrice) { alert('Enter SL and TP values on the Forex tab first.'); return; }
       const riskAmt = capital * (riskPct / 100);
       const lotSize = riskAmt / (slPips * pipVal);
       const slDist = Math.abs(entry - slPrice);
@@ -1268,34 +1281,42 @@
       if (pairType === 'usd_quote') pair = entry > 1 ? 'GBPUSD' : 'EURUSD';
       else if (pairType === 'usd_base') pair = entry > 20 ? 'USDJPY' : 'USDCAD';
       else pair = entry > 20 ? 'GBPJPY' : 'EURGBP';
-      const data = {
+      data = {
+        market: 'Forex',
         pair, direction: fxDir, entry,
         sl: parseFloat(entry > 20 ? slPrice.toFixed(3) : slPrice.toFixed(5)),
         tp: parseFloat(entry > 20 ? tpPrice.toFixed(3) : tpPrice.toFixed(5)),
         size: lotSize.toFixed(3), risk: parseFloat(riskAmt.toFixed(2)),
         rr: parseFloat(rr.toFixed(2))
       };
-      localStorage.setItem('calcToJournal', JSON.stringify(data));
-    } else {
-      // BTC mode
+    } else if (mode === 'btc') {
+      // ── BTC/USDT tab: validate BTC fields only ───────────────────
       const entry = parseFloat(document.getElementById('btcEntry').value);
-      if (!entry) { alert('Calculate a trade first.'); return; }
+      if (!entry) { alert('Enter an entry price on the BTC/USDT tab first.'); return; }
       const slRaw = parseFloat(document.getElementById('btcSL').value);
-      const tpRaw = parseFloat(document.getElementById('btcTP').value);
-      if (!slRaw || !tpRaw) { alert('Enter SL and TP values first.'); return; }
+      // TP can come from the user's typed TP or from the RR→TP back-calc
+      // that calculate() writes into btcTP_input. Either way, the INPUT is
+      // the source of truth (the id="btcTP" element is the result <div>).
+      const tpRaw = parseFloat(document.getElementById('btcTP_input').value);
+      if (!slRaw || !tpRaw) { alert('Enter SL and TP values on the BTC/USDT tab first.'); return; }
+      if (Math.abs(entry - slRaw) < 1e-9) { alert('SL cannot equal entry.'); return; }
       const riskAmt = capital * (riskPct / 100);
       const slDist = Math.abs(entry - slRaw);
       const size = riskAmt / slDist;
       const tpDist = Math.abs(tpRaw - entry);
       const rr = slDist > 0 ? tpDist / slDist : 1;
-      const data = {
+      data = {
+        market: 'BTC/USDT',
         pair: 'BTCUSDT', direction: dir, entry,
         sl: slRaw, tp: tpRaw,
         size: size.toFixed(5) + ' BTC', risk: parseFloat(riskAmt.toFixed(2)),
         rr: parseFloat(rr.toFixed(2))
       };
-      localStorage.setItem('calcToJournal', JSON.stringify(data));
+    } else {
+      alert('Unknown calculator mode.'); return;
     }
+
+    localStorage.setItem('calcToJournal', JSON.stringify(data));
     const toast = document.getElementById('sendToast');
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 3000);

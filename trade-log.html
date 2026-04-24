@@ -8092,6 +8092,21 @@ function checkCalcAutoFill() {
     const d = JSON.parse(data);
     nav('log');
     setTimeout(() => {
+      // Market first — lets downstream fields (pip size, symbol autocomplete) react correctly
+      if (d.market) {
+        const mk = document.getElementById('f_market');
+        if (mk) {
+          // Accept either "BTC/USDT" or legacy "Crypto" payloads
+          const want = d.market === 'Crypto' ? 'BTC/USDT' : d.market;
+          const hasOpt = Array.from(mk.options).some(o => o.value === want);
+          mk.value = hasOpt ? want : d.market;
+          mk.dispatchEvent(new Event('change'));
+        }
+      } else if (d.pair && /BTC/i.test(d.pair)) {
+        // Legacy payloads without `market` field — infer from pair name
+        const mk = document.getElementById('f_market');
+        if (mk) { mk.value = 'BTC/USDT'; mk.dispatchEvent(new Event('change')); }
+      }
       if (d.pair)      document.getElementById('f_pair').value = d.pair;
       if (d.direction)  setFDir(d.direction);
       if (d.entry)     document.getElementById('f_entry').value = d.entry;
