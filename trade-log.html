@@ -191,6 +191,28 @@
     .jrn-mode-btn.active { background: #21262d; color: #58a6ff; }
     .jrn-pips-sub { font-size: 0.7rem; color: #6e7681; margin-top: 2px; }
 
+    /* Live calc sub-hints under Position Size / Risk fields */
+    .jrn-calc-sub { font-size: 0.7rem; color: #6e7681; margin-top: 2px; line-height: 1.35; }
+    .jrn-calc-sub.ok   { color: #3fb950; }
+    .jrn-calc-sub.warn { color: #f59e0b; }
+    .jrn-calc-sub.bad  { color: #f85149; font-weight: 600; }
+
+    /* Planned R:R color tiers (green ≥2, amber 1–2, red <1) */
+    .jrn-rr-tier { display:inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 5px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.3px; }
+    .jrn-rr-tier.good { background: #0a1f0f; color: #3fb950; border: 1px solid rgba(63,185,80,0.35); }
+    .jrn-rr-tier.mid  { background: #2a1e05; color: #f59e0b; border: 1px solid rgba(245,158,11,0.35); }
+    .jrn-rr-tier.bad  { background: #1f0a0a; color: #f85149; border: 1px solid rgba(248,81,73,0.35); }
+
+    /* Risk cap warning banner */
+    .jrn-risk-warn {
+      display: none; align-items: center; gap: 8px;
+      margin-top: 8px; padding: 8px 12px;
+      background: #2a0a0a; border: 1px solid #f85149; border-radius: 7px;
+      color: #ffb4a8; font-size: 0.78rem; font-weight: 600;
+    }
+    .jrn-risk-warn.show { display: flex; }
+    .jrn-risk-warn .rw-ico { font-size: 1rem; }
+
     /* Exit type toggle */
     .exit-type-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
     .exit-type-btn { padding: 6px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #8b949e; transition: all 0.15s; }
@@ -1496,16 +1518,20 @@
           <div class="field">
             <label>Position Size</label>
             <input type="text" id="f_size" placeholder="e.g. 0.10 lots / 0.5 BTC">
+            <div class="jrn-calc-sub" id="f_size_sub"></div>
           </div>
           <div class="field">
             <label>Risk Amount ($)</label>
             <input type="number" id="f_risk" placeholder="0.00" step="any" required>
+            <div class="jrn-calc-sub" id="f_risk_sub"></div>
           </div>
           <div class="field">
             <label>Planned R:R</label>
             <input type="number" id="f_rr" placeholder="—" step="any" readonly style="color:#58a6ff; cursor:default;">
+            <div class="jrn-rr-tier" id="f_rr_tier" style="display:none;"></div>
           </div>
         </div>
+        <div class="jrn-risk-warn" id="f_risk_warn"><span class="rw-ico">⚠</span><span id="f_risk_warn_msg"></span></div>
 
         <!-- Confidence, Rationale, Chart -->
         <div class="card-title" style="margin-top:16px;">Pre-Trade Analysis</div>
@@ -2951,6 +2977,7 @@ function setFDir(d) {
   document.getElementById('f_direction').value = d;
   document.getElementById('fDirLong').classList.toggle('active', d === 'long');
   document.getElementById('fDirShort').classList.toggle('active', d === 'short');
+  if (typeof updateJrnCalcs === 'function') updateJrnCalcs();
 }
 
 function toggleChip(el) { el.classList.toggle('active'); }
@@ -2977,17 +3004,224 @@ function getJrnPrices() {
   return { entry, sl, tp };
 }
 
-function updateRR() {
-  const { entry, sl, tp } = getJrnPrices();
-  if (!entry || !sl || !tp) { document.getElementById('f_rr').value = ''; updateJrnSubs(); return; }
-  const slDist = Math.abs(entry - sl);
-  const tpDist = Math.abs(tp - entry);
-  if (slDist > 0) document.getElementById('f_rr').value = fmt(tpDist / slDist, 2);
-  updateJrnSubs();
+// ═══════════════════════════════════════════════════════
+// LOG TRADE — LIVE BIDIRECTIONAL CALCULATION
+// Mirrors forex-calculator.html logic exactly.
+// Typing Risk $ → auto-fills Position Size
+// Typing Position Size → auto-fills Risk $
+// Entry/SL/TP changes recompute both + Planned R:R + pip/% distances
+// BTC/USDT pairs use raw price diff (no pips).
+// Risk cap from Settings → red warning badge when exceeded.
+// ═══════════════════════════════════════════════════════
+let jrnLastEdit = 'risk';   // 'risk' | 'size' — which of the pair was typed last
+
+function jrnIsBTC() {
+  const mk = document.getElementById('f_market')?.value || '';
+  const pair = (document.getElementById('f_pair')?.value || '').toUpperCase();
+  return mk === 'BTC/USDT' || mk === 'Crypto' || /BTC/.test(pair) || /ETH|SOL|XRP|LTC|DOGE|ADA|BNB/.test(pair);
 }
 
-['f_entry','f_sl','f_tp'].forEach(id => {
-  document.getElementById(id)?.addEventListener('input', updateRR);
+function jrnPipSize(pair, entry) {
+  if (jrnIsBTC()) return 1; // BTC uses raw USD diff, not pips
+  if (pair && pair.toUpperCase().includes('JPY')) return 0.01;
+  if (entry > 20) return 0.01;
+  return 0.0001;
+}
+
+function jrnPipValue(pair, entry) {
+  // Standard lot = 100,000 units
+  if (jrnIsBTC()) return 1;
+  const p = (pair || '').toUpperCase();
+  const pipSz = jrnPipSize(pair, entry);
+  // USD quote (EURUSD, GBPUSD, AUDUSD, NZDUSD) → fixed $10 per pip per std lot
+  if (/^[A-Z]{3}USD$/.test(p)) return 10;
+  // USD base (USDJPY, USDCAD, USDCHF) → (pipSz / entry) * 100000
+  if (/^USD[A-Z]{3}$/.test(p) && entry > 0) return (pipSz / entry) * 100000;
+  // Cross / other — approximate via pip size & price
+  if (entry > 0) return (pipSz / entry) * 100000;
+  return 10;
+}
+
+function jrnGetCapitalRisk() {
+  // Prefer Settings; fall back to calc sync
+  let capital = 0, riskPct = 1, riskCapPct = 2;
+  try {
+    const s = JSON.parse(localStorage.getItem('tradeJournal_settings') || '{}');
+    if (s.profile) {
+      capital    = Number(s.profile.capital)    || 0;
+      riskPct    = Number(s.profile.riskPct)    || 1;
+      riskCapPct = Number(s.profile.riskCapPct) || 2;
+    }
+  } catch {}
+  if (!capital) {
+    try {
+      const sy = JSON.parse(localStorage.getItem('tradingTools_sync') || 'null');
+      if (sy) {
+        capital = Number(sy.runningCapital || sy.capital) || 0;
+        riskPct = Number(sy.riskPct) || riskPct;
+      }
+    } catch {}
+  }
+  return { capital, riskPct, riskCapPct };
+}
+
+function updateJrnCalcs() {
+  const { entry, sl, tp } = getJrnPrices();
+  const pair     = document.getElementById('f_pair')?.value || '';
+  const rrEl     = document.getElementById('f_rr');
+  const rrTierEl = document.getElementById('f_rr_tier');
+  const sizeEl   = document.getElementById('f_size');
+  const riskEl   = document.getElementById('f_risk');
+  const sizeSub  = document.getElementById('f_size_sub');
+  const riskSub  = document.getElementById('f_risk_sub');
+  const warnEl   = document.getElementById('f_risk_warn');
+  const warnMsg  = document.getElementById('f_risk_warn_msg');
+
+  // Always run pip/% sub renders for SL/TP
+  updateJrnSubs();
+
+  const btc = jrnIsBTC();
+  const { capital, riskCapPct } = jrnGetCapitalRisk();
+
+  // ── Planned R:R (always if entry+sl+tp) ───────────────────
+  let rr = null;
+  if (entry && sl && tp) {
+    const slDist = Math.abs(entry - sl);
+    const tpSigned = formDir === 'long' ? (tp - entry) : (entry - tp);
+    if (slDist > 0) rr = tpSigned / slDist;
+  }
+  if (rr != null && isFinite(rr)) {
+    rrEl.value = rr > 0 ? rr.toFixed(2) : '';
+    if (rrTierEl) {
+      if (rr >= 2)      { rrTierEl.textContent = '1 : ' + rr.toFixed(2) + '  •  good'; rrTierEl.className = 'jrn-rr-tier good';  rrTierEl.style.display = 'inline-block'; }
+      else if (rr >= 1) { rrTierEl.textContent = '1 : ' + rr.toFixed(2) + '  •  marginal'; rrTierEl.className = 'jrn-rr-tier mid';  rrTierEl.style.display = 'inline-block'; }
+      else              { rrTierEl.textContent = '1 : ' + rr.toFixed(2) + '  •  poor';     rrTierEl.className = 'jrn-rr-tier bad';  rrTierEl.style.display = 'inline-block'; }
+    }
+  } else {
+    rrEl.value = '';
+    if (rrTierEl) rrTierEl.style.display = 'none';
+  }
+
+  // ── Size ↔ Risk bidirectional calc ────────────────────────
+  if (!entry || !sl) {
+    if (sizeSub) sizeSub.textContent = '';
+    if (riskSub) riskSub.textContent = '';
+    if (warnEl)  warnEl.classList.remove('show');
+    return;
+  }
+
+  const slDist = Math.abs(entry - sl);
+  if (slDist <= 0) return;
+
+  const riskRaw = parseFloat(riskEl.value);
+  // Parse numeric portion from size input (e.g. "0.10 lots" → 0.10, "0.5 BTC" → 0.5)
+  const sizeMatch = (sizeEl.value || '').match(/[-+]?[0-9]*\.?[0-9]+/);
+  const sizeNum = sizeMatch ? parseFloat(sizeMatch[0]) : NaN;
+
+  let computedRisk = NaN, computedSize = NaN;
+
+  if (btc) {
+    // BTC/USDT: qty × $SL-dist = risk $
+    if (jrnLastEdit === 'size' && !isNaN(sizeNum) && sizeNum > 0) {
+      computedRisk = sizeNum * slDist;
+      riskEl.value = computedRisk.toFixed(2);
+    } else if (jrnLastEdit === 'risk' && !isNaN(riskRaw) && riskRaw > 0) {
+      computedSize = riskRaw / slDist;
+      sizeEl.value = computedSize.toFixed(6) + ' BTC';
+    } else if (!isNaN(riskRaw) && riskRaw > 0 && (isNaN(sizeNum) || sizeNum <= 0)) {
+      computedSize = riskRaw / slDist;
+      sizeEl.value = computedSize.toFixed(6) + ' BTC';
+    } else if (!isNaN(sizeNum) && sizeNum > 0 && (isNaN(riskRaw) || riskRaw <= 0)) {
+      computedRisk = sizeNum * slDist;
+      riskEl.value = computedRisk.toFixed(2);
+    }
+  } else {
+    // Forex: risk $ = lots × sl_pips × pip_value
+    const pipSz  = jrnPipSize(pair, entry);
+    const pipVal = jrnPipValue(pair, entry);
+    const slPips = slDist / pipSz;
+    if (slPips > 0 && pipVal > 0) {
+      if (jrnLastEdit === 'size' && !isNaN(sizeNum) && sizeNum > 0) {
+        computedRisk = sizeNum * slPips * pipVal;
+        riskEl.value = computedRisk.toFixed(2);
+      } else if (jrnLastEdit === 'risk' && !isNaN(riskRaw) && riskRaw > 0) {
+        computedSize = riskRaw / (slPips * pipVal);
+        sizeEl.value = computedSize.toFixed(3) + ' lots';
+      } else if (!isNaN(riskRaw) && riskRaw > 0 && (isNaN(sizeNum) || sizeNum <= 0)) {
+        computedSize = riskRaw / (slPips * pipVal);
+        sizeEl.value = computedSize.toFixed(3) + ' lots';
+      } else if (!isNaN(sizeNum) && sizeNum > 0 && (isNaN(riskRaw) || riskRaw <= 0)) {
+        computedRisk = sizeNum * slPips * pipVal;
+        riskEl.value = computedRisk.toFixed(2);
+      }
+    }
+  }
+
+  // ── Render sub-hints & risk cap warning ──────────────────
+  const finalRisk = parseFloat(riskEl.value) || 0;
+  const finalSizeMatch = (sizeEl.value || '').match(/[-+]?[0-9]*\.?[0-9]+/);
+  const finalSize = finalSizeMatch ? parseFloat(finalSizeMatch[0]) : 0;
+
+  // Size sub hint
+  if (sizeSub) {
+    if (finalSize > 0) {
+      if (btc) {
+        sizeSub.textContent = '≈ ' + (finalSize * entry).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT notional';
+      } else {
+        // Lot category hint
+        let cat = '';
+        if (finalSize >= 0.09)       cat = 'standard lot(s)';
+        else if (finalSize >= 0.009) cat = '= ' + (finalSize * 10).toFixed(2) + ' mini lot(s)';
+        else                         cat = '= ' + (finalSize * 100).toFixed(2) + ' micro lot(s)';
+        sizeSub.textContent = cat;
+      }
+      sizeSub.className = 'jrn-calc-sub';
+    } else {
+      sizeSub.textContent = '';
+    }
+  }
+
+  // Risk sub hint + cap check
+  let exceeded = false;
+  if (riskSub) {
+    if (finalRisk > 0 && capital > 0) {
+      const pctOfCap = (finalRisk / capital) * 100;
+      exceeded = pctOfCap > riskCapPct;
+      riskSub.innerHTML = pctOfCap.toFixed(2) + '% of capital ($' + capital.toLocaleString('en-US', {maximumFractionDigits:0}) + ')';
+      riskSub.className = exceeded ? 'jrn-calc-sub bad' : 'jrn-calc-sub ok';
+    } else if (finalRisk > 0) {
+      riskSub.textContent = 'Set capital in Settings to see % of account';
+      riskSub.className = 'jrn-calc-sub warn';
+    } else {
+      riskSub.textContent = '';
+    }
+  }
+
+  // Risk cap warning banner
+  if (warnEl && warnMsg) {
+    if (exceeded) {
+      const capAmt = capital * (riskCapPct / 100);
+      warnMsg.textContent = 'Risk exceeds ' + riskCapPct + '% cap — adjust position size (max $' + capAmt.toFixed(2) + ')';
+      warnEl.classList.add('show');
+    } else {
+      warnEl.classList.remove('show');
+    }
+  }
+}
+
+// Back-compat alias: anywhere still calling updateRR() gets the full calc.
+function updateRR() { updateJrnCalcs(); }
+
+// Track which of the paired fields was typed last, so re-running the calc
+// writes the *other* one (forex-calculator parity).
+document.getElementById('f_size')?.addEventListener('input', () => { jrnLastEdit = 'size'; updateJrnCalcs(); });
+document.getElementById('f_risk')?.addEventListener('input', () => { jrnLastEdit = 'risk'; updateJrnCalcs(); });
+
+['f_entry','f_sl','f_tp','f_pair','f_market'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const ev = el.tagName === 'SELECT' ? 'change' : 'input';
+  el.addEventListener(ev, updateJrnCalcs);
 });
 
 function handleImg(e, type) {
@@ -3168,6 +3402,12 @@ function resetForm() {
   document.getElementById('f_tp').placeholder = '0.00';
   document.getElementById('f_sl_sub').textContent = '';
   document.getElementById('f_tp_sub').textContent = '';
+  // Reset live calc hints
+  const _sz = document.getElementById('f_size_sub');   if (_sz) _sz.textContent = '';
+  const _rk = document.getElementById('f_risk_sub');   if (_rk) _rk.textContent = '';
+  const _rt = document.getElementById('f_rr_tier');    if (_rt) _rt.style.display = 'none';
+  const _rw = document.getElementById('f_risk_warn');  if (_rw) _rw.classList.remove('show');
+  jrnLastEdit = 'risk';
   // Reset new fields
   document.getElementById('trustedBOSPoiWrap').style.display = 'none';
   document.getElementById('mbosTFWrap').style.display = 'none';
@@ -6077,7 +6317,12 @@ function applySync() {
     if (!s) return;
     const cap     = s.runningCapital || s.capital;
     const riskPct = s.riskPct || 1;
-    if (cap) document.getElementById('f_risk').value = (cap * (riskPct / 100)).toFixed(2);
+    if (cap) {
+      document.getElementById('f_risk').value = (cap * (riskPct / 100)).toFixed(2);
+      // Trigger live calc so Position Size auto-fills from the applied risk
+      if (typeof jrnLastEdit !== 'undefined') jrnLastEdit = 'risk';
+      if (typeof updateJrnCalcs === 'function') updateJrnCalcs();
+    }
   } catch {}
 }
 
@@ -8118,8 +8363,10 @@ function checkCalcAutoFill() {
       jrnSLMode = 'price'; jrnTPMode = 'price';
       document.querySelectorAll('#jrnSLToggle .jrn-mode-btn').forEach((b,i) => b.classList.toggle('active', i === 0));
       document.querySelectorAll('#jrnTPToggle .jrn-mode-btn').forEach((b,i) => b.classList.toggle('active', i === 0));
-      updateRR();
-      updateJrnSubs();
+      // Calculator already computed both size + risk — prefer risk as the
+      // authoritative value so re-running the calc reconciles to the same size.
+      jrnLastEdit = 'risk';
+      updateJrnCalcs();
       // Show toast
       const toast = document.getElementById('calcToast');
       toast.classList.add('show');
