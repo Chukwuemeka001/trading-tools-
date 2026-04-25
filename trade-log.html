@@ -3554,8 +3554,48 @@ function renderJournal() {
   if (setup)   list = list.filter(t => setup === 'Other' ? t.setup?.startsWith('Other') : t.setup === setup);
 
   const el = document.getElementById('tradeList');
+
+  // ── MT5 auto-close review banner ──────────────────────────────────
+  // Counts trades that MT5 auto-closed and the user hasn't yet reviewed.
+  // Always pulls from the unfiltered `trades` so the banner persists when
+  // the user filters by status/outcome/etc.
+  const reviewQueue = trades.filter(t => t && t.mt5AutoClose && t.reviewNeeded);
+  let reviewBannerHtml = '';
+  if (reviewQueue.length) {
+    const firstId = reviewQueue[0].id;
+    const plural = reviewQueue.length === 1 ? 'trade' : 'trades';
+    const verb   = reviewQueue.length === 1 ? 'is' : 'are';
+    reviewBannerHtml = `
+      <div onclick="openModal('${firstId}')" style="
+        cursor:pointer;
+        background:linear-gradient(135deg, rgba(56,139,253,0.15), rgba(46,160,67,0.10));
+        border:1px solid rgba(56,139,253,0.40);
+        border-left:4px solid #58a6ff;
+        border-radius:8px;
+        padding:12px 16px;
+        margin-bottom:14px;
+        display:flex;
+        align-items:center;
+        gap:12px;
+        font-size:0.9rem;
+        color:#e6edf3;
+      ">
+        <span style="font-size:1.4rem;">\u{1F3AF}</span>
+        <div style="flex:1;">
+          <div style="font-weight:600;color:#58a6ff;">
+            MT5 closed ${reviewQueue.length} ${plural} \u2014 review and complete your post-trade analysis
+          </div>
+          <div style="font-size:0.78rem;color:#8b949e;margin-top:2px;">
+            ${reviewQueue.length} ${plural} ${verb} waiting for your review. Click to open the first one.
+          </div>
+        </div>
+        <span style="color:#58a6ff;font-size:1.1rem;">\u203A</span>
+      </div>`;
+  }
+
   if (!list.length) {
-    el.innerHTML = '<div class="empty-state">No trades found.<br>Start by clicking "Log Trade".</div>';
+    el.innerHTML = reviewBannerHtml +
+      '<div class="empty-state">No trades found.<br>Start by clicking "Log Trade".</div>';
     return;
   }
 
@@ -3629,7 +3669,7 @@ function renderJournal() {
     </div>`;
   }
 
-  el.innerHTML = html;
+  el.innerHTML = reviewBannerHtml + html;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -4095,6 +4135,86 @@ function openModal(id) {
   const actualRRcol= rrColor(sRR);
   const dateClose = t.dateClose ? new Date(t.dateClose).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
 
+  // ── MT5 auto-close review FORM ─────────────────────────────────────
+  // Shown when MT5 closed the trade but the user hasn't filled in the
+  // Section B review yet (`reviewNeeded`). Pre-populates with whatever
+  // values are already on the trade so the form double-duties as edit.
+  let mt5ReviewForm = '';
+  if (t.status === 'closed' && t.reviewNeeded) {
+    const _ratingInit = t.executionRating || 5;
+    mt5ReviewForm = `
+      <hr class="section-divider">
+      <div style="background:rgba(56,139,253,0.10);border:1px solid rgba(56,139,253,0.35);border-radius:8px;padding:14px 16px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <span style="font-size:1.2rem;">\u{1F4DD}</span>
+          <div style="flex:1;">
+            <div style="font-weight:600;color:#58a6ff;font-size:0.95rem;">Complete your post-trade review to finish this trade entry</div>
+            <div style="font-size:0.78rem;color:#8b949e;margin-top:2px;">MT5 already filled in the close data \u2014 add your reflection below.</div>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Did price respect the SC zone?</label>
+            <select id="reviewScRespected">
+              <option value="">\u2014</option>
+              <option ${t.scRespected==='Yes'?'selected':''}>Yes</option>
+              <option ${t.scRespected==='No'?'selected':''}>No</option>
+              <option ${t.scRespected==='Partially'?'selected':''}>Partially</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Did the mbms play out as expected?</label>
+            <select id="reviewMbmsPlayed">
+              <option value="">\u2014</option>
+              <option ${t.mbmsPlayedOut==='Yes'?'selected':''}>Yes</option>
+              <option ${t.mbmsPlayedOut==='No'?'selected':''}>No</option>
+              <option ${t.mbmsPlayedOut==='Partially'?'selected':''}>Partially</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Did HTF bias align with the trade?</label>
+            <select id="reviewHtfAligned">
+              <option value="">\u2014</option>
+              <option ${t.htfAligned==='Yes'?'selected':''}>Yes</option>
+              <option ${t.htfAligned==='No'?'selected':''}>No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Was liquidity properly taken before entry?</label>
+            <select id="reviewLiqProper">
+              <option value="">\u2014</option>
+              <option ${t.liqProperlyTaken==='Yes'?'selected':''}>Yes</option>
+              <option ${t.liqProperlyTaken==='No'?'selected':''}>No</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>What I expected vs what happened</label>
+          <textarea id="reviewExpected" rows="3" placeholder="Describe what you expected the market to do and what actually happened...">${escHtml(t.expectedVsActual||'')}</textarea>
+        </div>
+        <div class="field">
+          <label>Lesson learned</label>
+          <textarea id="reviewLesson" rows="3" placeholder="Key takeaway from this trade...">${escHtml(t.lessonLearned||'')}</textarea>
+        </div>
+        <div class="field">
+          <label>Trade Execution Rating \u2014 how well did you follow the rules?</label>
+          <div class="slider-wrap">
+            <input type="range" id="reviewExecRating" min="1" max="10" value="${_ratingInit}"
+              oninput="document.getElementById('reviewExecRatingVal').textContent=this.value">
+            <span class="slider-val" id="reviewExecRatingVal">${_ratingInit}</span>
+            <span style="font-size:0.72rem; color:#8b949e;">/10</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Post-Trade TradingView URL (optional)</label>
+          <input type="url" id="reviewPostTVLink" placeholder="https://www.tradingview.com/x/..." value="${escHtml(t.postTVLink||'')}" style="width:100%;background:#0d1117;border:1px solid #30363d;border-radius:7px;color:#e6edf3;font-size:0.88rem;padding:8px 10px;outline:none;">
+        </div>
+        <div class="btn-row" style="margin-top:12px;">
+          <button class="btn btn-success" onclick="saveAutoCloseReview('${t.id}')">Save Review</button>
+        </div>
+      </div>`;
+  }
+
   body.innerHTML = `
     <div class="info-row" style="grid-template-columns:repeat(3,1fr)">
       <div class="info-cell"><div class="info-cell-label">Entry</div><div class="info-cell-val">${fmt(t.entry,5)}</div></div>
@@ -4111,14 +4231,29 @@ function openModal(id) {
     ${sysHtml}
     ${htfHtml}
 
-    ${t.status === 'closed' ? `
-    <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:12px 14px; margin-bottom:14px; display:grid; grid-template-columns:repeat(${t.exitType ? 5 : 4},1fr); gap:10px;">
-      <div><div class="info-cell-label">Exit Price</div><div class="info-cell-val">${fmt(t.exitPrice,5)}</div></div>
-      <div><div class="info-cell-label">Actual P&L</div><div class="info-cell-val" style="color:${t.actualPnL>=0?'#3fb950':'#f85149'}">${fmtPnL(t.actualPnL)}</div></div>
-      <div><div class="info-cell-label">Actual R:R</div><div class="info-cell-val" style="color:${actualRRcol}">${actualRR}</div></div>
-      ${t.exitType ? `<div><div class="info-cell-label">Exit Type</div><div class="info-cell-val" style="font-size:0.78rem">${{tp:'TP Hit',sl:'SL Hit',be:'Break Even',manual:'Manual Close',partial:'Partial Close'}[t.exitType] || t.exitType}</div></div>` : ''}
-      <div><div class="info-cell-label">Closed</div><div class="info-cell-val" style="font-size:0.75rem">${dateClose}</div></div>
-    </div>` : ''}
+    ${t.status === 'closed' ? (() => {
+      // ── MT5 Auto-filled badge: appears on every cell the EA populated ──
+      // The chip is intentionally tiny so the value stays visually dominant.
+      const mt5Auto = !!t.mt5AutoClose;
+      const autoBadge = mt5Auto
+        ? `<span title="Auto-filled by MT5 close webhook" style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:8px;background:rgba(56,139,253,0.18);border:1px solid rgba(56,139,253,0.45);color:#58a6ff;font-size:0.62rem;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;vertical-align:middle;">MT5</span>`
+        : '';
+      const reasonText = t.mt5CloseReason || ({tp:'TP Hit',sl:'SL Hit',be:'Break Even',manual:'Manual Close',partial:'Partial Close'}[t.exitType] || t.exitType || '');
+      const showSlippage = mt5Auto && t.mt5Slippage != null;
+      const showTicket   = mt5Auto && t.mt5Ticket;
+      // Column count: base 4 (exit/pnl/rr/closed) + reason if any + slippage + ticket
+      const cols = 4 + (reasonText ? 1 : 0) + (showSlippage ? 1 : 0) + (showTicket ? 1 : 0);
+      return `
+    <div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:12px 14px; margin-bottom:14px; display:grid; grid-template-columns:repeat(${cols},1fr); gap:10px;">
+      <div><div class="info-cell-label">Exit Price${autoBadge}</div><div class="info-cell-val">${fmt(t.exitPrice,5)}</div></div>
+      <div><div class="info-cell-label">Actual P&L${autoBadge}</div><div class="info-cell-val" style="color:${t.actualPnL>=0?'#3fb950':'#f85149'}">${fmtPnL(t.actualPnL)}</div></div>
+      <div><div class="info-cell-label">Actual R:R${autoBadge}</div><div class="info-cell-val" style="color:${actualRRcol}">${actualRR}</div></div>
+      ${reasonText ? `<div><div class="info-cell-label">Close Reason${autoBadge}</div><div class="info-cell-val" style="font-size:0.78rem">${escHtml(reasonText)}</div></div>` : ''}
+      ${showSlippage ? `<div><div class="info-cell-label">Slippage${autoBadge}</div><div class="info-cell-val" style="font-size:0.78rem;color:${t.mt5Slippage>=0?'#3fb950':'#f85149'}">${(t.mt5Slippage>=0?'+':'')+fmt(t.mt5Slippage,1)} pips</div></div>` : ''}
+      ${showTicket ? `<div><div class="info-cell-label">MT5 Ticket${autoBadge}</div><div class="info-cell-val" style="font-size:0.78rem">#${escHtml(String(t.mt5Ticket))}</div></div>` : ''}
+      <div><div class="info-cell-label">Closed${autoBadge}</div><div class="info-cell-val" style="font-size:0.75rem">${dateClose}</div></div>
+    </div>`;
+    })() : ''}
 
     <div style="margin-bottom:10px">
       <div class="info-cell-label" style="margin-bottom:5px">Market Conditions</div>
@@ -4132,6 +4267,7 @@ function openModal(id) {
 
     ${preChartHtml}
     ${reviewDisplay}
+    ${mt5ReviewForm}
     ${closeSection}
   `;
 
@@ -4591,6 +4727,64 @@ function closeTrade(id) {
   pushSync();
   closeModal();
   renderJournal();
+}
+
+// ── Save the post-trade review for an MT5-auto-closed trade ─────────
+//
+// MT5 fills in the close data (exit price, P&L, R:R, reason, slippage,
+// duration). This handler captures the *user-supplied* Section B fields
+// (qualitative reflection + execution rating) and clears reviewNeeded
+// when the minimum set is filled in. Required fields: scRespected,
+// mbmsPlayedOut, htfAligned, executionRating (>0), and at least one of
+// expectedVsActual / lessonLearned.
+function saveAutoCloseReview(id) {
+  const t = trades.find(x => x.id === id);
+  if (!t) return;
+
+  const sc      = (document.getElementById('reviewScRespected') || {}).value || '';
+  const mbms    = (document.getElementById('reviewMbmsPlayed')  || {}).value || '';
+  const htf     = (document.getElementById('reviewHtfAligned')  || {}).value || '';
+  const liq     = (document.getElementById('reviewLiqProper')   || {}).value || '';
+  const expect  = (document.getElementById('reviewExpected')    || {}).value || '';
+  const lesson  = (document.getElementById('reviewLesson')      || {}).value || '';
+  const ratingV = (document.getElementById('reviewExecRating')  || {}).value;
+  const tvLink  = (document.getElementById('reviewPostTVLink')  || {}).value || '';
+  const rating  = parseInt(ratingV, 10) || 0;
+
+  t.scRespected      = sc      || t.scRespected;
+  t.mbmsPlayedOut    = mbms    || t.mbmsPlayedOut;
+  t.htfAligned       = htf     || t.htfAligned;
+  t.liqProperlyTaken = liq     || t.liqProperlyTaken;
+  t.expectedVsActual = expect  || t.expectedVsActual;
+  t.lessonLearned    = lesson  || t.lessonLearned;
+  if (rating > 0) t.executionRating = rating;
+  if (tvLink) t.postTVLink = tvLink;
+  t.updatedAt = new Date().toISOString();
+
+  // Clear reviewNeeded only when the required minimum is satisfied.
+  const requiredOk =
+    !!t.scRespected &&
+    !!t.mbmsPlayedOut &&
+    !!t.htfAligned &&
+    (t.executionRating || 0) > 0 &&
+    ((t.expectedVsActual || '').trim() || (t.lessonLearned || '').trim());
+
+  if (requiredOk) {
+    t.reviewNeeded = false;
+  }
+
+  save();
+  pushSync();
+
+  // Re-open so the user sees the updated state, or close if review is fully done.
+  if (requiredOk) {
+    closeModal();
+    renderJournal();
+  } else {
+    renderJournal();
+    openModal(id);
+    alert('Review partially saved. Fill SC/mbms/HTF + Execution Rating + at least one of Expected vs Actual / Lesson to mark it complete.');
+  }
 }
 
 function editTrade(id) {
