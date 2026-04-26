@@ -179,11 +179,12 @@
     <h2>Account</h2>
     <div class="grid-2">
       <div class="field">
-        <label>Capital</label>
+        <label>Capital <button type="button" id="pullBitunixBtn" onclick="pullBitunixBalance()" style="margin-left:6px; padding:2px 8px; font-size:0.65rem; background:#3a2a08; color:#f7931a; border:1px solid #f7931a; border-radius:4px; cursor:pointer;" title="Pull live balance from your Bitunix futures account">⬇ Pull from Bitunix</button></label>
         <div class="input-wrap">
           <input type="number" id="capital" value="10000" min="0" step="100">
           <span class="unit">USDT</span>
         </div>
+        <div id="bitunixPullStatus" style="font-size:0.7rem; color:#8b949e; margin-top:4px; min-height:1em;"></div>
       </div>
       <div class="field">
         <label>Risk Per Trade</label>
@@ -423,6 +424,31 @@
           </div>
         </div>
       </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Leverage <span style="color:#f7931a; font-size:0.65rem;">(Bitunix)</span></label>
+          <div class="input-wrap">
+            <select id="btcLeverage" style="background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:8px 10px; width:100%;">
+              <option value="1">1x</option>
+              <option value="2">2x</option>
+              <option value="5">5x</option>
+              <option value="10" selected>10x</option>
+              <option value="20">20x</option>
+              <option value="50">50x</option>
+              <option value="100">100x</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Margin Mode</label>
+          <div class="input-wrap">
+            <select id="btcMarginMode" style="background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:8px 10px; width:100%;">
+              <option value="CROSS" selected>Cross</option>
+              <option value="ISOLATION">Isolated</option>
+            </select>
+          </div>
+        </div>
+      </div>
       <div id="btcNote" class="info-note btc-note"></div>
     </div>
 
@@ -498,6 +524,11 @@
           <div class="result-label">R:R Ratio</div>
           <div class="result-value" id="btcRRDisplay">—</div>
           <div class="result-sub" id="btcPosVal">—</div>
+        </div>
+        <div class="result-item" style="border-color:#f7931a;">
+          <div class="result-label" style="color:#f7931a;">Required Margin</div>
+          <div class="result-value" id="btcRequiredMargin">—</div>
+          <div class="result-sub" id="btcRequiredMarginSub">—</div>
         </div>
         <div class="result-item green">
           <div class="result-label">After Win</div>
@@ -1018,6 +1049,10 @@
     const posVal    = qty * entry;
     const rewardAmt = riskAmt * rr;
     const slPct     = (slDist / entry) * 100;
+    const tpPct     = (tpDist / entry) * 100;
+    const lev       = parseInt(document.getElementById('btcLeverage')?.value) || 10;
+    const requiredMargin = lev > 0 ? (qty * entry) / lev : 0;
+    const marginMode = document.getElementById('btcMarginMode')?.value || 'CROSS';
 
     document.getElementById('btcNote').textContent =
       `Position Size = Risk $ ÷ SL Distance → $${fmt(riskAmt)} ÷ $${fmt(slDist)} = ${fmt(qty,6)} BTC`;
@@ -1034,11 +1069,13 @@
     set('btcRRDisplay', '1 : ' + fmt(rr, 2));
     set('btcPosVal',    '$' + fmt(posVal) + ' notional');
     set('btcTP',        fmtPrice(tpPrice));
-    set('btcTPDist',    (dir === 'long' ? '+' : '-') + '$' + fmt(tpDist) + ' from entry');
+    set('btcTPDist',    (dir === 'long' ? '+' : '-') + '$' + fmt(tpDist) + '  (' + fmt(tpPct, 2) + '%)');
     set('btcCapWin',    '$' + fmt(capital + rewardAmt));
     set('btcCapWinPct', '+' + fmt((rewardAmt / capital) * 100, 1) + '%');
     set('btcCapLoss',   '$' + fmt(capital - riskAmt));
     set('btcCapLossPct', '-' + fmt((riskAmt / capital) * 100, 1) + '%');
+    set('btcRequiredMargin', '$' + fmt(requiredMargin));
+    set('btcRequiredMarginSub', lev + 'x ' + marginMode + '  ·  ' + (capital > 0 ? fmt((requiredMargin / capital) * 100, 1) + '% of capital' : '—'));
 
     // Risk sub with badge
     const riskSubEl = document.getElementById('btcRiskPct');
@@ -1200,6 +1237,46 @@
     }
   }
 
+  // ── Bitunix balance pull ─────────────────────────────────
+  function getBackendUrl() {
+    return localStorage.getItem('poiwatcher_backend') || 'https://poiwatcher-backend.onrender.com';
+  }
+
+  async function pullBitunixBalance(opts = {}) {
+    const silent = opts.silent === true;
+    const statusEl = document.getElementById('bitunixPullStatus');
+    const setStatus = (msg, color) => { if (statusEl) { statusEl.textContent = msg; statusEl.style.color = color || '#8b949e'; } };
+    if (!silent) setStatus('Pulling balance from Bitunix…', '#f7931a');
+    try {
+      const res = await fetch(getBackendUrl() + '/bitunix/account', { mode: 'cors' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      // Backend returns shape like: { ok: true, balanceUsdt: 12345.67, ... } or
+      // { balance: 12345.67 } depending on version — try several common keys.
+      let bal = null;
+      const candidates = [data?.balanceUsdt, data?.balance, data?.equity,
+                         data?.account?.balanceUsdt, data?.account?.balance,
+                         data?.totalEquity, data?.usdtBalance];
+      for (const c of candidates) { if (typeof c === 'number' && c > 0) { bal = c; break; } }
+      if (bal == null) {
+        if (!silent) setStatus('No balance returned — check Bitunix Settings on the journal app.', '#f85149');
+        return null;
+      }
+      const capInput = document.getElementById('capital');
+      if (capInput) {
+        capInput.value = bal.toFixed(2);
+        calculate();
+        saveSettings();
+      }
+      const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setStatus(`✓ Pulled $${bal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} at ${t}`, '#3fb950');
+      return bal;
+    } catch (e) {
+      if (!silent) setStatus('Pull failed — backend unreachable. ' + (e?.message || ''), '#f85149');
+      return null;
+    }
+  }
+
   // ── Event listeners ──────────────────────────────────────
   // Track which field was last edited for smart calculation
   document.getElementById('fxSL').addEventListener('input', () => { fxLastEdited = 'sl'; calculate(); });
@@ -1207,6 +1284,11 @@
   document.getElementById('fxRR').addEventListener('input', () => { fxLastEdited = 'rr'; calculate(); });
   document.getElementById('btcTP_input').addEventListener('input', () => { btcLastEdited = 'tp'; calculate(); });
   document.getElementById('btcRR').addEventListener('input', () => { btcLastEdited = 'rr'; calculate(); });
+  // Leverage / margin mode → recompute required margin without flipping the rr/tp last-edited mode
+  const _btcLevEl = document.getElementById('btcLeverage');
+  if (_btcLevEl) _btcLevEl.addEventListener('change', () => calculate());
+  const _btcMmEl = document.getElementById('btcMarginMode');
+  if (_btcMmEl) _btcMmEl.addEventListener('change', () => calculate());
 
   const allInputs = [
     'capital','riskPct',
@@ -1305,12 +1387,21 @@
       const size = riskAmt / slDist;
       const tpDist = Math.abs(tpRaw - entry);
       const rr = slDist > 0 ? tpDist / slDist : 1;
+      const lev = parseInt(document.getElementById('btcLeverage')?.value) || 10;
+      const marginMode = document.getElementById('btcMarginMode')?.value || 'CROSS';
+      const requiredMargin = lev > 0 ? (size * entry) / lev : 0;
       data = {
         market: 'BTC/USDT',
         pair: 'BTCUSDT', direction: dir, entry,
         sl: slRaw, tp: tpRaw,
         size: size.toFixed(5) + ' BTC', risk: parseFloat(riskAmt.toFixed(2)),
-        rr: parseFloat(rr.toFixed(2))
+        rr: parseFloat(rr.toFixed(2)),
+        venue: 'bitunix',
+        bitunixLeverage: lev,
+        bitunixMargin: marginMode,
+        bitunixQty: parseFloat(size.toFixed(5)),
+        bitunixNotional: parseFloat((size * entry).toFixed(2)),
+        bitunixRequiredMargin: parseFloat(requiredMargin.toFixed(2))
       };
     } else {
       alert('Unknown calculator mode.'); return;
@@ -1322,10 +1413,37 @@
     setTimeout(() => toast.classList.remove('show'), 3000);
   }
 
+  // ── Persist leverage / margin selections in localStorage (Bitunix tab only) ──
+  function loadBitunixCalcSettings() {
+    try {
+      const raw = JSON.parse(localStorage.getItem('tradeJournal_settings') || '{}');
+      const b = raw.bitunix || {};
+      const levEl = document.getElementById('btcLeverage');
+      const mmEl  = document.getElementById('btcMarginMode');
+      if (levEl && b.leverage) {
+        const v = String(b.leverage);
+        if ([...levEl.options].some(o => o.value === v)) levEl.value = v;
+      }
+      if (mmEl && b.marginMode) mmEl.value = b.marginMode;
+    } catch {}
+  }
+
   loadSettings();
   loadFxModes();
+  loadBitunixCalcSettings();
   calculate();
   saveSettings();
+
+  // Auto-pull live Bitunix balance on load (silent — never overwrites user edits noisily)
+  // Only fires if no fresh capital sync (< 5 min old) is already in place.
+  (function autoPullOnLoad() {
+    try {
+      const s = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null');
+      const fresh = s && s.lastUpdated && (Date.now() - new Date(s.lastUpdated).getTime() < 5 * 60 * 1000);
+      if (fresh) return;
+      pullBitunixBalance({ silent: true });
+    } catch { pullBitunixBalance({ silent: true }); }
+  })();
 </script>
 </body>
 </html>

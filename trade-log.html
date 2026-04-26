@@ -581,6 +581,10 @@
     .live-trade-val { font-weight: 600; margin-top: 1px; }
     .live-trade-be { margin-top: 8px; font-size: 0.75rem; padding: 5px 10px; border-radius: 6px; border: 1px solid #21262d; background: #0d1117; }
     .mt4-badge { display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: #1f6feb; color: #fff; margin-left: 6px; vertical-align: middle; }
+    .bitunix-badge { display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: #f7931a; color: #1c1300; margin-left: 6px; vertical-align: middle; }
+    .manual-badge  { display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: #30363d; color: #c9d1d9; margin-left: 6px; vertical-align: middle; }
+    .trade-row .bitunix-badge { background: #3a2a08; color: #f7931a; margin: 0; }
+    .trade-row .manual-badge  { background: #21262d; color: #8b949e; margin: 0; }
 
     /* ── Session Monitor ── */
     .session-bar {
@@ -1156,6 +1160,10 @@
   </span>
   <span id="exchangeDot" class="exchange-dot" title="Exchange Connection"><span class="dot grey" id="exchangeDotIcon"></span> <span id="exchangeDotText">Exchange</span></span>
   <span id="mt4Dot" class="mt4-dot off" title="MT5 Connection">&#9899; MT5</span>
+  <span id="bitunixDot" class="bitunix-dot off" title="Bitunix Futures" style="font-size:0.71rem;font-weight:600;letter-spacing:0.02em;padding:3px 8px;border-radius:6px;background:rgba(247,147,26,0.10);color:#7a4a00;border:1px solid rgba(247,147,26,0.28);white-space:nowrap;display:inline-flex;align-items:center;gap:4px;cursor:default;">
+    <span id="bitunixDotIcon" class="dot grey" style="width:6px;height:6px;border-radius:50%;background:#8b949e;display:inline-block;"></span>
+    <span id="bitunixDotText">Bitunix</span>
+  </span>
   <span id="syncDot" style="font-size:0.71rem;color:#8b949e;white-space:nowrap;padding:0 4px;"></span>
   <button class="cloud-btn" onclick="openSettingsModal()" style="font-size:0.75rem;">&#9881;</button>
   <button class="cloud-btn" onclick="openBrokerModal()" style="font-size:0.75rem;">Broker</button>
@@ -1337,7 +1345,7 @@
           </div>
           <div class="field">
             <label>Pair / Symbol</label>
-            <input type="text" id="f_pair" placeholder="e.g. EURUSD, BTCUSDT" required>
+            <input type="text" id="f_pair" placeholder="e.g. EURUSD, BTCUSDT" required oninput="onSymbolChangeUpdateVenue()">
           </div>
           <div class="field">
             <label>Direction</label>
@@ -1345,6 +1353,15 @@
               <div class="dir-btn long active" id="fDirLong"  onclick="setFDir('long')">Long</div>
               <div class="dir-btn short"       id="fDirShort" onclick="setFDir('short')">Short</div>
             </div>
+          </div>
+          <div class="field">
+            <label>Venue <span id="f_venueAuto" style="color:#7d8590;font-size:0.65rem;font-weight:400;margin-left:4px;"></span></label>
+            <select id="f_venue" onchange="onVenueOverride()">
+              <option value="auto" selected>Auto-detect</option>
+              <option value="mt5">Force MT5</option>
+              <option value="bitunix">Force Bitunix</option>
+              <option value="manual">Manual (no auto-execute)</option>
+            </select>
           </div>
           <div class="field">
             <label>Timeframe</label>
@@ -1749,6 +1766,12 @@
       <option>Indices</option>
       <option>Commodities</option>
     </select>
+    <select class="filter-select" id="fltVenue" onchange="onFilterChange()" title="Filter by execution venue">
+      <option value="">All Venues</option>
+      <option value="mt5">MT5 only</option>
+      <option value="bitunix">Bitunix only</option>
+      <option value="manual">Manual only</option>
+    </select>
     <select class="filter-select" id="fltSetup" onchange="onFilterChange()">
       <option value="">All Setups</option>
       <option>Secondary POI + SC entry</option>
@@ -1883,8 +1906,9 @@
      LIVE TRADES (MT5)
 ════════════════════════════════════════════════════════ -->
 <div id="page-live" class="page">
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
-    <h1 style="font-size:1.1rem; font-weight:700;">Live MT5 Trades</h1>
+  <!-- ═══════════ 📊 LIVE MT5 TRADES (Forex) ═══════════ -->
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px; padding:10px 14px; background:linear-gradient(90deg, rgba(31,111,235,0.10), transparent); border-left:3px solid #1f6feb; border-radius:6px;">
+    <h1 style="font-size:1.05rem; font-weight:700; color:#58a6ff;">📊 LIVE MT5 TRADES <span style="font-size:0.72rem;color:#8b949e;font-weight:500;">(Forex)</span></h1>
     <div style="display:flex; gap:8px; align-items:center;">
       <span id="mt4ConnStatus" style="font-size:0.75rem; color:#8b949e;"></span>
       <button class="btn btn-ghost" onclick="refreshLiveTrades()" style="padding:5px 10px; font-size:0.72rem;">Refresh</button>
@@ -1941,6 +1965,11 @@
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
       <div class="card-title" style="margin:0;">Execution Log</div>
       <div style="display:flex;gap:6px;align-items:center;">
+        <select id="execLogVenue" onchange="refreshExecutionLog()" style="background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:5px;padding:4px 8px;font-size:0.72rem;" title="Filter by venue">
+          <option value="">All venues</option>
+          <option value="mt5">MT5 only</option>
+          <option value="bitunix">Bitunix only</option>
+        </select>
         <select id="execLogFilter" onchange="refreshExecutionLog()" style="background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:5px;padding:4px 8px;font-size:0.72rem;">
           <option value="all">All</option>
           <option value="success">Success</option>
@@ -1975,6 +2004,60 @@
     <div style="font-size:0.72rem; color:#6e7681; margin-bottom:12px;">These trades were logged automatically from MT5. Click to add your HTF bias, setup type, confidence, and rationale.</div>
     <div id="mt4NeedsAnalysis">
       <div style="color:#6e7681; font-size:0.82rem;">No MT5 trades needing analysis.</div>
+    </div>
+  </div>
+
+  <!-- ═══════════ 🟧 LIVE BITUNIX TRADES (Crypto) ═══════════ -->
+  <div style="margin-top:32px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:10px 14px; background:linear-gradient(90deg, rgba(247,147,26,0.10), transparent); border-left:3px solid #f7931a; border-radius:6px;">
+    <h1 style="font-size:1.05rem; font-weight:700; color:#f7931a;">🟧 LIVE BITUNIX TRADES <span style="font-size:0.72rem;color:#8b949e;font-weight:500;">(Crypto Futures)</span></h1>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <span id="bitunixConnStatus" style="font-size:0.75rem; color:#8b949e;"></span>
+      <button class="btn btn-ghost" onclick="refreshBitunixLiveTrades()" style="padding:5px 10px; font-size:0.72rem; color:#f7931a; border-color:#5a3a08;">Refresh</button>
+    </div>
+  </div>
+
+  <div id="bitunixLivePanel" style="margin-top:14px;">
+    <div style="color:#6e7681; font-size:0.82rem;">Configure Bitunix in Settings and click Refresh to see live positions here.</div>
+  </div>
+
+  <!-- Pending Bitunix Orders -->
+  <div style="margin-top:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <div class="card-title" style="margin:0;color:#f7931a;">⏳ Pending Bitunix Orders</div>
+      <button class="btn btn-ghost" onclick="refreshBitunixPendingOrders()" style="padding:3px 8px;font-size:0.7rem;">↻ Refresh</button>
+    </div>
+    <div style="font-size:0.72rem; color:#6e7681; margin-bottom:8px;">Limit / stop orders queued on Bitunix waiting to fill. Cancel them here or let them trigger.</div>
+    <div id="bitunixPendingPanel">
+      <div style="color:#6e7681;font-size:0.78rem;">No pending Bitunix orders.</div>
+    </div>
+  </div>
+
+  <!-- Bitunix Execution System Status -->
+  <div style="margin-top:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
+      <div class="card-title" style="margin:0;color:#f7931a;">Bitunix Execution Status</div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-ghost" onclick="refreshBitunixHealth()" style="padding:3px 8px;font-size:0.7rem;">↻ Refresh</button>
+        <button class="btn btn-ghost" onclick="runBitunixTest()" style="padding:3px 8px;font-size:0.7rem;color:#f7931a;border-color:#5a3a08;">🧪 Test Pipeline</button>
+        <button class="btn btn-ghost" onclick="bitunixEmergencyStopConfirm()" style="padding:3px 8px;font-size:0.7rem;color:#f85149;border-color:#5c1616;">🛑 Bitunix Kill Switch</button>
+      </div>
+    </div>
+    <div style="font-size:0.72rem; color:#6e7681; margin-bottom:8px;">Independent of MT5. Test pipeline runs a paper-mode size+route check without sending to the venue.</div>
+    <div id="bitunixHealthPanel">
+      <div style="color:#6e7681;font-size:0.78rem;">Click Refresh to check.</div>
+    </div>
+    <div id="bitunixTestResult" style="margin-top:10px;"></div>
+  </div>
+
+  <!-- Bitunix-only Execution Log slice -->
+  <div style="margin-top:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
+      <div class="card-title" style="margin:0;color:#f7931a;">Bitunix Event Log</div>
+      <button class="btn btn-ghost" onclick="refreshBitunixEventLog()" style="padding:3px 8px;font-size:0.7rem;">↻ Refresh</button>
+    </div>
+    <div style="font-size:0.72rem; color:#6e7681; margin-bottom:8px;">Last 30 Bitunix-related events from the audit trail (orders placed, paper executions, BE moves, kill-switch flips).</div>
+    <div id="bitunixEventLogPanel">
+      <div style="color:#6e7681;font-size:0.78rem;">Click Refresh to load.</div>
     </div>
   </div>
 </div>
@@ -2546,6 +2629,56 @@
           </div>
           <div style="font-size:0.65rem; color:#6e7681; margin-top:6px;">Run through the 9-item checklist before flipping <code>PAPER_TRADING_MODE=false</code> on Render.</div>
         </div>
+
+        <!-- ── Bitunix Futures (crypto venue) ────────────────────── -->
+        <div style="margin-top:18px; padding-top:14px; border-top:1px solid #21262d;">
+          <div style="font-size:0.78rem; font-weight:600; margin-bottom:8px; color:#f7931a;display:flex;align-items:center;gap:8px;">
+            🟧 Bitunix Futures (Crypto Venue)
+            <span id="sett_bitunixStatus" style="font-size:0.65rem;font-weight:600;padding:2px 8px;border-radius:10px;background:#21262d;color:#8b949e;">Checking…</span>
+          </div>
+          <div class="settings-grid">
+            <div class="settings-field">
+              <label>Bitunix API Key (local cookie only)</label>
+              <input type="password" id="sett_bitunixKey" placeholder="Stored in cookie, never in Gist" autocomplete="off">
+              <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">Optional. The backend already has its own key; this field is for local reference only and is NEVER synced to Gist or exported.</div>
+            </div>
+            <div class="settings-field">
+              <label>Bitunix API Secret (local cookie only)</label>
+              <input type="password" id="sett_bitunixSecret" placeholder="Stored in cookie, never in Gist" autocomplete="off">
+              <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">Same — cookie storage, never sent to backend, never exported.</div>
+            </div>
+          </div>
+          <div class="settings-grid" style="margin-top:8px;">
+            <div class="settings-field">
+              <label>Default Leverage</label>
+              <select id="sett_bitunixLeverage" onchange="saveSettingsFromForm()">
+                <option value="1">1×</option><option value="2">2×</option><option value="3">3×</option>
+                <option value="5">5×</option><option value="10" selected>10×</option><option value="20">20×</option>
+                <option value="25">25×</option><option value="50">50×</option><option value="75">75×</option>
+                <option value="100">100×</option>
+              </select>
+              <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">Applied per trade unless overridden in the approval modal.</div>
+            </div>
+            <div class="settings-field">
+              <label>Default Margin Mode</label>
+              <select id="sett_bitunixMargin" onchange="saveSettingsFromForm()">
+                <option value="CROSS" selected>CROSS</option>
+                <option value="ISOLATION">ISOLATION</option>
+              </select>
+              <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">CROSS uses your full balance as margin. ISOLATION limits risk to the position margin only.</div>
+            </div>
+          </div>
+          <div class="settings-row" style="margin-top:6px;">
+            <div><div class="settings-row-label">Notify on Bitunix connection lost</div><div class="settings-row-sub">Telegram alert when Bitunix sync fails</div></div>
+            <button class="stoggle on" id="sett_bitunixNotify" onclick="toggleSetting(this,'bitunixNotify')"></button>
+          </div>
+          <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="testBitunixConnection()" style="padding:6px 12px;font-size:0.74rem;color:#f7931a;border-color:#5a3a08;">🔌 Test Connection</button>
+            <button class="btn btn-ghost" onclick="bitunixEmergencyStopConfirm()" style="padding:6px 12px;font-size:0.74rem;color:#f85149;border-color:#5c1616;">🛑 Bitunix Kill Switch</button>
+          </div>
+          <div id="sett_bitunixTestOut" style="display:none;margin-top:10px;padding:8px 12px;border-radius:6px;font-size:0.74rem;"></div>
+          <div style="font-size:0.65rem; color:#6e7681; margin-top:6px;">Bitunix kill switch only stops crypto auto-execution — MT5 stays untouched.</div>
+        </div>
       </div>
 
       <!-- DISPLAY -->
@@ -2933,7 +3066,10 @@ function nav(view) {
   if (view === 'journal')   { restoreJournalFilters(); renderJournal(); }
   if (view === 'log')       initForm();
   if (view === 'alerts')    initAlerts();
-  if (view === 'live')      { refreshLiveTrades(); refreshPendingLimitOrders(); refreshExecutionQueue(); refreshExecutionHealth(); refreshExecutionLog(); }
+  if (view === 'live')      {
+    refreshLiveTrades(); refreshPendingLimitOrders(); refreshExecutionQueue(); refreshExecutionHealth(); refreshExecutionLog();
+    refreshBitunixLiveTrades(); refreshBitunixPendingOrders(); refreshBitunixHealth(); refreshBitunixEventLog();
+  }
   window.scrollTo(0, 0);
 }
 
@@ -2968,6 +3104,68 @@ function autoFillSessionChips() {
       }
     }
   });
+}
+
+// ═══════════════════════════════════════════════════════
+// VENUE — auto-detection + override resolution
+// MT5 = forex / indices / commodities · Bitunix = USDT-quoted crypto
+// ═══════════════════════════════════════════════════════
+function detectVenueFromSymbol(symbol) {
+  const s = (symbol || '').toString().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!s) return 'mt5';
+  // USDT-quoted crypto futures → Bitunix (BTCUSDT, ETHUSDT, SOLUSDT…)
+  if (/USDT$/.test(s)) return 'bitunix';
+  // 6-letter alpha pair = forex → MT5
+  if (/^[A-Z]{6}$/.test(s)) return 'mt5';
+  // Common non-forex MT5 instruments
+  if (/^(XAU|XAG|XBR|XTI|US30|US500|NAS100|GER40|UK100|JP225)/.test(s)) return 'mt5';
+  // Fallback: if it ends in USD/JPY/EUR (and isn't a 6-alpha pair) treat as MT5;
+  // anything else with USDT-style suffix-ish goes to Bitunix
+  return 'mt5';
+}
+
+// Resolve the form's venue dropdown value into a stored venue string
+function resolveVenueForTrade(symbol, dropdownValue) {
+  const v = (dropdownValue || 'auto').toLowerCase();
+  if (v === 'mt5' || v === 'bitunix' || v === 'manual') return v;
+  return detectVenueFromSymbol(symbol);
+}
+
+// User changed the symbol — refresh the auto-detect hint shown next to the venue label
+function onSymbolChangeUpdateVenue() {
+  const sym = document.getElementById('f_pair').value;
+  const detected = detectVenueFromSymbol(sym);
+  const lbl = document.getElementById('f_venueAuto');
+  if (lbl) {
+    lbl.textContent = sym ? `(auto: ${detected === 'bitunix' ? 'Bitunix' : 'MT5'})` : '';
+  }
+  if (typeof updateApproveButtonForVenue === 'function') updateApproveButtonForVenue();
+}
+
+// User picked an override from the dropdown
+function onVenueOverride() {
+  if (typeof updateApproveButtonForVenue === 'function') updateApproveButtonForVenue();
+}
+
+// Pretty label for badges, modals, exports
+function venueLabel(venue) {
+  if (venue === 'mt5')     return 'MT5';
+  if (venue === 'mt4')     return 'MT5'; // legacy rows pre-migration
+  if (venue === 'bitunix') return 'Bitunix';
+  if (venue === 'manual')  return 'Manual';
+  return venue || '—';
+}
+
+// What venue is a trade row recorded against? Falls back to source-/symbol-based detection
+// for legacy rows that pre-date the venue field.
+function venueForRow(t) {
+  if (!t) return 'manual';
+  if (t.venue) return t.venue;
+  const src = (t.source || '').toLowerCase();
+  if (src === 'mt4' || src === 'mt5') return 'mt5';
+  if (src === 'bitunix' || src === 'bitunix_auto_close') return 'bitunix';
+  if (src === 'binance') return 'manual';
+  return detectVenueFromSymbol(t.pair || t.symbol || '');
 }
 
 function setFDir(d) {
@@ -3288,6 +3486,7 @@ function submitTrade(e) {
     market:     document.getElementById('f_market').value,
     pair:       document.getElementById('f_pair').value.toUpperCase(),
     direction:  formDir,
+    venue:      resolveVenueForTrade(document.getElementById('f_pair').value, document.getElementById('f_venue').value),
     timeframe:  document.getElementById('f_tf').value,
     setup:      setupVal === 'Other' ? 'Other: ' + (document.getElementById('f_setupOther').value || 'unspecified') : setupVal,
     dateOpen:   document.getElementById('f_dateOpen').value,
@@ -3438,6 +3637,7 @@ function restoreJournalFilters() {
     if (saved.status)  document.getElementById('fltStatus').value  = saved.status;
     if (saved.outcome) document.getElementById('fltOutcome').value = saved.outcome;
     if (saved.market)  document.getElementById('fltMarket').value  = saved.market;
+    if (saved.venue)   document.getElementById('fltVenue').value   = saved.venue;
     if (saved.setup)   document.getElementById('fltSetup').value   = saved.setup;
   } catch {}
 }
@@ -3464,40 +3664,82 @@ function renderExecBadge(t) {
 }
 
 function renderExecActionButton(t) {
+  const venue = venueForRow(t);
+  // Primary venue button — green for MT5, orange for Bitunix
+  const primaryStyle = venue === 'bitunix'
+    ? 'background:#f7931a;color:#1c1300;'
+    : 'background:#1f6feb;color:#fff;';
+  const primaryLabel = venue === 'bitunix'
+    ? '🟧 Send to Bitunix'
+    : '🚀 Send to MT5';
+  const otherVenue = venue === 'bitunix' ? 'mt5' : 'bitunix';
+  const otherLabel = otherVenue === 'bitunix' ? 'Or send to Bitunix' : 'Or send to MT5';
+
+  // Secondary "send to other venue" button — only show when no exec yet, or after a failure/rejection
+  const secondaryBtn = venue !== 'manual'
+    ? `<button class="btn btn-ghost" onclick="approveForVenue('${t.id}','${otherVenue}')" style="font-size:0.72rem;margin-left:6px;color:#8b949e;border-color:#30363d;">${otherLabel}</button>`
+    : '';
+
   if (!t.execStatus) {
-    return `<button class="btn btn-primary" onclick="approveForMT4('${t.id}')" id="btnApproveMT4" style="background:#1f6feb;">✅ Approve for MT5 Execution</button>`;
+    return `<button class="btn btn-primary" onclick="approveForVenue('${t.id}','${venue}')" id="btnApproveMT4" style="${primaryStyle}">${primaryLabel}</button>${secondaryBtn}`;
   }
   if (t.execStatus === 'pending') {
     return `<button class="btn" id="btnApproveMT4" disabled style="background:#bb8009;color:#fff;">🟡 Pending Execution…</button>
             <button class="btn btn-ghost" style="color:#f85149;border-color:#5c1616;" onclick="cancelExecution('${t.id}')">Cancel Pending</button>`;
   }
   if (t.execStatus === 'executed') {
-    return `<button class="btn" disabled style="background:#0e3a1e;color:#56d364;">🚀 Executed via MT5${t.execPaper?' (Paper)':''}</button>`;
+    const venueExec = venue === 'bitunix' ? '🟧 Executed via Bitunix' : '🚀 Executed via MT5';
+    return `<button class="btn" disabled style="background:#0e3a1e;color:#56d364;">${venueExec}${t.execPaper?' (Paper)':''}</button>`;
   }
   if (t.execStatus === 'paper_executed') {
     return `<button class="btn" disabled style="background:#1a2a44;color:#58a6ff;">📄 Paper-executed (demo)</button>
-            <button class="btn btn-primary" onclick="approveForMT4('${t.id}')" id="btnApproveMT4" style="background:#1f6feb;">Re-approve</button>`;
+            <button class="btn btn-primary" onclick="approveForVenue('${t.id}','${venue}')" id="btnApproveMT4" style="${primaryStyle}">Re-approve</button>${secondaryBtn}`;
   }
   if (t.execStatus === 'execution_failed') {
     return `<button class="btn" disabled style="background:#3a1216;color:#ff7b72;">⚠ Execution failed</button>
-            <button class="btn btn-primary" onclick="approveForMT4('${t.id}')" id="btnApproveMT4" style="background:#1f6feb;">Retry</button>`;
+            <button class="btn btn-primary" onclick="approveForVenue('${t.id}','${venue}')" id="btnApproveMT4" style="${primaryStyle}">Retry</button>${secondaryBtn}`;
   }
   // rejected or cancelled — allow re-approval
-  return `<button class="btn btn-primary" onclick="approveForMT4('${t.id}')" id="btnApproveMT4" style="background:#1f6feb;">Re-approve for MT5</button>`;
+  const reLabel = venue === 'bitunix' ? 'Re-approve for Bitunix' : 'Re-approve for MT5';
+  return `<button class="btn btn-primary" onclick="approveForVenue('${t.id}','${venue}')" id="btnApproveMT4" style="${primaryStyle}">${reLabel}</button>${secondaryBtn}`;
+}
+
+// Route to either MT5 or Bitunix approval. Sets the trade's venue first so
+// the modal/confirmation reflects the chosen route.
+function approveForVenue(tradeId, venue) {
+  const t = trades.find(x => x.id === tradeId);
+  if (!t) return;
+  if (venue && venue !== venueForRow(t)) {
+    t.venue = venue;
+    save();
+  }
+  if (venue === 'bitunix') {
+    approveForBitunix(tradeId);
+  } else {
+    approveForMT4(tradeId);
+  }
 }
 
 function renderExecStatusBlock(t) {
+  const venue = venueForRow(t);
+  const venueChip = venue === 'bitunix'
+    ? '<span class="bitunix-badge">🟧 Bitunix</span>'
+    : venue === 'mt5'
+      ? '<span class="mt4-badge">MT5</span>'
+      : '<span class="manual-badge">Manual</span>';
+
   if (!t.execStatus) {
     return `<div style="margin-bottom:10px;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:6px;font-size:0.74rem;color:#8b949e;">
-      Execution: <span style="color:#e6edf3;">Manual</span>
+      Venue: ${venueChip} &nbsp;·&nbsp; Execution: <span style="color:#e6edf3;">Manual</span>
     </div>`;
   }
   const isJpyOrCrypto = t.pair && (t.pair.includes('JPY') || (t.entry && t.entry > 20));
   const pipSz = isJpyOrCrypto ? 0.01 : 0.0001;
+  const isBitunix = venue === 'bitunix' || t.execMode === 'bitunix_auto';
 
   let mode = 'Manual';
-  if (t.execStatus === 'executed') mode = t.execPaper ? 'MT5 Auto (Paper)' : 'MT5 Auto';
-  else if (t.execStatus === 'paper_executed') mode = 'Paper executed (demo account)';
+  if (t.execStatus === 'executed') mode = t.execPaper ? `${isBitunix ? 'Bitunix' : 'MT5'} Auto (Paper)` : `${isBitunix ? 'Bitunix' : 'MT5'} Auto`;
+  else if (t.execStatus === 'paper_executed') mode = `Paper executed on ${isBitunix ? 'Bitunix' : 'MT5'} (demo)`;
   else if (t.execStatus === 'execution_failed') mode = 'Execution failed';
   else if (t.execStatus === 'pending') mode = 'Pending';
   else if (t.execStatus === 'rejected') mode = 'Rejected by risk engine';
@@ -3505,18 +3747,35 @@ function renderExecStatusBlock(t) {
 
   let extras = '';
   if (t.execStatus === 'executed' || t.execStatus === 'paper_executed') {
-    const slip = t.execSlippagePips != null
-      ? t.execSlippagePips
-      : (t.execActualEntry != null && t.entry != null ? Math.round(((t.execActualEntry - t.entry) / pipSz) * 10) / 10 : null);
-    const slipStr = slip == null ? '—' : (slip > 0 ? '+' : '') + slip.toFixed(1) + ' pips';
-    const slipCol = slip == null ? '#8b949e' : (Math.abs(slip) < 0.5 ? '#3fb950' : Math.abs(slip) < 2 ? '#f0883e' : '#f85149');
-    extras = `
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px 14px;margin-top:8px;">
-        <div><div class="info-cell-label">Planned Entry</div><div style="font-weight:600;">${t.entry ?? '—'}</div></div>
-        <div><div class="info-cell-label">Actual Entry</div><div style="font-weight:600;">${t.execActualEntry ?? '—'}</div></div>
-        <div><div class="info-cell-label">Slippage</div><div style="font-weight:700;color:${slipCol};">${slipStr}</div></div>
-        <div><div class="info-cell-label">MT5 Ticket</div><div style="font-weight:600;">${t.execTicket ? '#' + t.execTicket : '—'}</div></div>
-      </div>`;
+    if (isBitunix) {
+      const slipPct = (t.execActualEntry != null && t.entry) ? (((t.execActualEntry - t.entry) / t.entry) * 100) : null;
+      const slipStr = slipPct == null ? '—' : (slipPct > 0 ? '+' : '') + slipPct.toFixed(3) + '%';
+      const slipCol = slipPct == null ? '#8b949e' : (Math.abs(slipPct) < 0.05 ? '#3fb950' : Math.abs(slipPct) < 0.2 ? '#f0883e' : '#f85149');
+      extras = `
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px 14px;margin-top:8px;">
+          <div><div class="info-cell-label">Planned Entry</div><div style="font-weight:600;">${t.entry ?? '—'}</div></div>
+          <div><div class="info-cell-label">Actual Entry</div><div style="font-weight:600;">${t.execActualEntry ?? '—'}</div></div>
+          <div><div class="info-cell-label">Slippage</div><div style="font-weight:700;color:${slipCol};">${slipStr}</div></div>
+          <div><div class="info-cell-label">Bitunix Order</div><div style="font-weight:600;">${t.bitunixOrderId ? '#' + escHtml(t.bitunixOrderId) : '—'}</div></div>
+          <div><div class="info-cell-label">Leverage</div><div style="font-weight:600;color:#f7931a;">${t.bitunixLeverage ? t.bitunixLeverage + '×' : '—'}</div></div>
+          <div><div class="info-cell-label">Margin Mode</div><div style="font-weight:600;">${t.bitunixMargin || '—'}</div></div>
+          <div><div class="info-cell-label">Position Size</div><div style="font-weight:600;">${t.bitunixQty ?? '—'} ${t.pair ? t.pair.replace(/USDT?$/i,'') : ''}</div></div>
+          <div><div class="info-cell-label">Required Margin</div><div style="font-weight:600;">${t.bitunixRequiredMargin != null ? '$' + Number(t.bitunixRequiredMargin).toFixed(2) : '—'}</div></div>
+        </div>`;
+    } else {
+      const slip = t.execSlippagePips != null
+        ? t.execSlippagePips
+        : (t.execActualEntry != null && t.entry != null ? Math.round(((t.execActualEntry - t.entry) / pipSz) * 10) / 10 : null);
+      const slipStr = slip == null ? '—' : (slip > 0 ? '+' : '') + slip.toFixed(1) + ' pips';
+      const slipCol = slip == null ? '#8b949e' : (Math.abs(slip) < 0.5 ? '#3fb950' : Math.abs(slip) < 2 ? '#f0883e' : '#f85149');
+      extras = `
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px 14px;margin-top:8px;">
+          <div><div class="info-cell-label">Planned Entry</div><div style="font-weight:600;">${t.entry ?? '—'}</div></div>
+          <div><div class="info-cell-label">Actual Entry</div><div style="font-weight:600;">${t.execActualEntry ?? '—'}</div></div>
+          <div><div class="info-cell-label">Slippage</div><div style="font-weight:700;color:${slipCol};">${slipStr}</div></div>
+          <div><div class="info-cell-label">MT5 Ticket</div><div style="font-weight:600;">${t.execTicket ? '#' + t.execTicket : '—'}</div></div>
+        </div>`;
+    }
   } else if (t.execStatus === 'rejected' && t.execRejectReason) {
     extras = `<div style="margin-top:6px;color:#ff7b72;font-size:0.78rem;">Reason: ${escHtml(t.execRejectReason)}</div>`;
   }
@@ -3526,9 +3785,10 @@ function renderExecStatusBlock(t) {
     warnings = `<div style="margin-top:6px;color:#ffa657;font-size:0.74rem;">⚠ ${t.execWarnings.map(w => escHtml(w)).join(' · ')}</div>`;
   }
 
-  return `<div style="margin-bottom:10px;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;font-size:0.78rem;">
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-      <div>Execution Status: <strong style="color:#58a6ff;">${escHtml(mode)}</strong></div>
+  const modeColor = isBitunix ? '#f7931a' : '#58a6ff';
+  return `<div style="margin-bottom:10px;padding:10px 14px;background:#0d1117;border:1px solid ${isBitunix ? '#f7931a44' : '#30363d'};border-radius:8px;font-size:0.78rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div>Venue: ${venueChip} &nbsp;·&nbsp; <span style="color:#8b949e;">Status:</span> <strong style="color:${modeColor};">${escHtml(mode)}</strong></div>
       <div>${renderExecBadge(t)}</div>
     </div>
     ${extras}
@@ -3540,15 +3800,17 @@ function renderJournal() {
   const status  = document.getElementById('fltStatus').value;
   const outcome = document.getElementById('fltOutcome').value;
   const market  = document.getElementById('fltMarket').value;
+  const venue   = document.getElementById('fltVenue')?.value || '';
   const setup   = document.getElementById('fltSetup').value;
 
   // Persist filter state
-  try { sessionStorage.setItem('tj_filters', JSON.stringify({ status, outcome, market, setup })); } catch {}
+  try { sessionStorage.setItem('tj_filters', JSON.stringify({ status, outcome, market, venue, setup })); } catch {}
 
   let list = [...trades];
   if (status)  list = list.filter(t => t.status === status);
   if (outcome) list = list.filter(t => t.outcome === outcome);
   if (market)  list = list.filter(t => t.market === market);
+  if (venue)   list = list.filter(t => venueForRow(t) === venue);
   if (setup)   list = list.filter(t => setup === 'Other' ? t.setup?.startsWith('Other') : t.setup === setup);
 
   const el = document.getElementById('tradeList');
@@ -3613,9 +3875,11 @@ function renderJournal() {
       : t.outcome === 'loss' ? '<span class="trade-badge badge-loss">Loss</span>'
       : '<span class="trade-badge badge-be">BE</span>';
     const execBadge = renderExecBadge(t);
-    const srcBadge  = t.source === 'mt5' ? '<span class="mt4-badge">MT5</span>'
-                    : t.source === 'mt4' ? '<span class="mt4-badge">MT4</span>'
+    const _venueRow = venueForRow(t);
+    const srcBadge  = _venueRow === 'bitunix' ? '<span class="bitunix-badge">🟧 Bitunix</span>'
+                    : _venueRow === 'mt5' && (t.source === 'mt5' || t.source === 'mt4' || t.execMode === 'mt5_auto') ? `<span class="mt4-badge">${t.source === 'mt4' ? 'MT4' : 'MT5'}</span>`
                     : t.source === 'binance' ? '<span class="exchange-badge binance">Binance</span>'
+                    : _venueRow === 'manual' ? '<span class="manual-badge">Manual</span>'
                     : '';
     // Paper-trade chip — only show when renderExecBadge isn't already covering it
     // (renderExecBadge shows a paper label for execStatus=paper_executed OR executed+execPaper).
@@ -4795,6 +5059,8 @@ function editTrade(id) {
     document.getElementById('formSubmitBtn').textContent = 'Update Trade';
     document.getElementById('f_market').value   = t.market;
     document.getElementById('f_pair').value     = t.pair;
+    document.getElementById('f_venue').value    = (t.venue && ['mt5','bitunix','manual'].includes(t.venue)) ? t.venue : 'auto';
+    if (typeof onSymbolChangeUpdateVenue === 'function') onSymbolChangeUpdateVenue();
     document.getElementById('f_tf').value       = t.timeframe;
     // Handle setup: if it starts with "Other:" restore the Other option + text
     if (t.setup?.startsWith('Other:')) {
@@ -5100,19 +5366,265 @@ async function submitTradeApproval(tradeId) {
   }
 }
 
+// ── Bitunix Approval ───────────────────────────────────────────────
+function approveForBitunix(tradeId) {
+  const t = trades.find(x => x.id === tradeId);
+  if (!t) return;
+
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  if (!execKey) {
+    alert('Execution API key not set.\n\nGo to Settings → Profile → MT5 Execution Pipeline to configure it (same key works for Bitunix).');
+    return;
+  }
+
+  const backendUrl = getExecBackendUrl();
+  if (!backendUrl) {
+    alert('Backend URL not set.\n\nGo to the Alerts tab and save your backend URL first.');
+    return;
+  }
+
+  const sett = getSettings();
+  const exec = sett.execution || { mode: 'manual', minScore: 7, requireChecklist: true };
+  const bitSett = sett.bitunix || {};
+  const leverage   = parseInt(bitSett.leverage || 10, 10) || 10;
+  const marginMode = (bitSett.marginMode || 'CROSS').toUpperCase();
+
+  // Pre-flight checks
+  if (exec.requireChecklist && !checklistComplete(t)) {
+    alert('Pre-trade checklist incomplete.\n\nFill HTF bias, POI type, BOS timeframe, entry confirmation and confidence before approving for execution.\n\nDisable "Require pre-trade checklist" in Settings if you want to skip this.');
+    return;
+  }
+
+  const sysScore = calcSystemScore(t);
+  const direction = t.direction === 'long' ? 'BUY' : 'SELL';
+  const slDist = Math.abs(t.entry - t.sl);
+  const tpDist = Math.abs(t.tp - t.entry);
+  const rr = slDist > 0 ? (tpDist / slDist) : 0;
+  const slPct = t.entry ? ((slDist / t.entry) * 100).toFixed(2) : '—';
+  const tpPct = t.entry ? ((tpDist / t.entry) * 100).toFixed(2) : '—';
+
+  const capital = sett.profile.capital || 0;
+  const riskPct = sett.profile.riskPct || 1;
+  const riskAmt = capital * (riskPct / 100);
+  // Position size in BASE units (e.g. BTC) — matches backend formula
+  const qtyEst = (slDist > 0 && riskAmt > 0) ? +(riskAmt / slDist).toFixed(4) : 0;
+  const notional = qtyEst * t.entry;
+  const requiredMargin = leverage > 0 ? (notional / leverage) : 0;
+
+  let scoreWarning = '';
+  if (sysScore < (exec.minScore || 7)) {
+    scoreWarning = `<div style="margin-top:10px;padding:8px 10px;background:#3a2a16;border:1px solid #f0883e;border-radius:6px;color:#ffa657;font-size:0.78rem;">
+      ⚠ System alignment score is <strong>${sysScore}/10</strong> &mdash; below your threshold of ${exec.minScore}. Consider re-checking your setup before sending.
+    </div>`;
+  }
+
+  // Auto-execution shortcut (same rules as MT5 path)
+  if (exec.mode === 'autoAll' || (exec.mode === 'autoHigh' && sysScore >= (exec.minScore || 7))) {
+    submitBitunixApproval(tradeId);
+    return;
+  }
+
+  const overlay = document.getElementById('execConfirmOverlay');
+  document.getElementById('execConfirmTitle').textContent = 'Send Trade to Bitunix for Execution';
+  document.getElementById('execConfirmBody').innerHTML = `
+    <div style="font-size:0.85rem; line-height:1.6; color:#c9d1d9;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 18px; padding:12px 14px; background:#0d1117; border:1px solid #f7931a44; border-radius:8px; margin-bottom:10px;">
+        <div><div class="info-cell-label">Symbol</div><div style="font-weight:700;color:#f7931a;">${escHtml(t.pair)}</div></div>
+        <div><div class="info-cell-label">Direction</div><div style="font-weight:700;color:${t.direction==='long'?'#3fb950':'#f85149'};">${direction}</div></div>
+        <div><div class="info-cell-label">Entry</div><div style="font-weight:700;">${t.entry}</div></div>
+        <div><div class="info-cell-label">R:R</div><div style="font-weight:700;color:#58a6ff;">1:${rr.toFixed(2)}</div></div>
+        <div><div class="info-cell-label">SL</div><div>${t.sl} <span style="color:#6e7681;font-size:0.72rem;">(${slPct}%)</span></div></div>
+        <div><div class="info-cell-label">TP</div><div>${t.tp} <span style="color:#6e7681;font-size:0.72rem;">(${tpPct}%)</span></div></div>
+        <div><div class="info-cell-label">Risk</div><div>${riskPct}% ${capital ? '($' + riskAmt.toFixed(2) + ')' : ''}</div></div>
+        <div><div class="info-cell-label">Position Size</div><div>${qtyEst || '—'} ${t.pair?.replace(/USDT?$/i,'') || ''}</div></div>
+        <div><div class="info-cell-label">Leverage</div><div style="font-weight:700;color:#f7931a;">${leverage}×</div></div>
+        <div><div class="info-cell-label">Margin Mode</div><div>${marginMode}</div></div>
+        <div><div class="info-cell-label">Notional</div><div>$${notional.toFixed(2)}</div></div>
+        <div><div class="info-cell-label">Required Margin</div><div style="font-weight:700;">$${requiredMargin.toFixed(2)}</div></div>
+        <div><div class="info-cell-label">System Score</div><div style="font-weight:700;color:${sysScore>=7?'#3fb950':sysScore>=5?'#f0883e':'#f85149'};">${sysScore}/10</div></div>
+        <div><div class="info-cell-label">Confidence</div><div>${t.confidence||'—'}/10</div></div>
+      </div>
+      ${scoreWarning}
+      <div style="margin-top:10px;padding:10px 12px;background:#1a1408;border:1px solid #f7931a55;border-radius:6px;color:#f7c87a;font-size:0.76rem;">
+        🟧 This will place a futures order on Bitunix at ${leverage}× leverage (${marginMode}). The risk engine validates first; in paper-trading mode no live order is sent.
+      </div>
+      <div id="execConfirmStatus" style="display:none;margin-top:10px;padding:10px 12px;border-radius:6px;font-size:0.8rem;"></div>
+      <div class="btn-row" style="margin-top:14px;">
+        <button class="btn btn-ghost" onclick="closeExecConfirm()">Cancel</button>
+        <button class="btn btn-primary" id="execConfirmBtn" onclick="submitBitunixApproval('${tradeId}')" style="background:#f7931a;color:#1c1300;">Confirm — Send to Bitunix</button>
+      </div>
+    </div>`;
+  overlay.classList.add('open');
+}
+
+async function submitBitunixApproval(tradeId) {
+  const t = trades.find(x => x.id === tradeId);
+  if (!t) return;
+
+  const backendUrl = getExecBackendUrl();
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  const sett = getSettings();
+  const bitSett = sett.bitunix || {};
+  const leverage   = parseInt(bitSett.leverage || 10, 10) || 10;
+  const marginMode = (bitSett.marginMode || 'CROSS').toUpperCase();
+  const direction = t.direction === 'long' ? 'BUY' : 'SELL';
+  const sysScore = calcSystemScore(t);
+
+  const statusEl = document.getElementById('execConfirmStatus');
+  const btn = document.getElementById('execConfirmBtn');
+  const journalBtn = document.getElementById('btnApproveMT4');
+
+  if (statusEl) {
+    statusEl.style.display = '';
+    statusEl.style.background = '#1a2332';
+    statusEl.style.border = '1px solid #30363d';
+    statusEl.style.color = '#8b949e';
+    statusEl.textContent = 'Validating with risk engine + sizing position…';
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+
+  try {
+    const resp = await fetch(backendUrl + '/bitunix/trade/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Execution-Key': execKey },
+      body: JSON.stringify({
+        symbol: t.pair,
+        direction: direction,
+        entry: t.entry,
+        sl: t.sl,
+        tp: t.tp,
+        risk_percent: sett.profile.riskPct || 1,
+        leverage: leverage,
+        margin_mode: marginMode,
+        order_type: 'MARKET',
+        be_trigger_rr: sett.profile.beTriggerRR || 1.5,
+        journal_trade_id: t.id,
+        confidence: t.confidence || 0,
+        system_score: sysScore,
+        dxy_confirms: t.dxyConfirms || '',
+        entry_confirmation: t.entryConfirmation || '',
+        htf_bias: t.htfBias || '',
+        poi_type: t.poiType || '',
+        bos_tf: t.bosTF || '',
+        setup: t.setup || '',
+        risk_limits: {
+          riskPerTrade: sett.profile.riskCapPct || 2,
+          dailyLoss: sett.profile.ddDaily || 2,
+          weeklyLoss: sett.profile.ddWeekly || 10,
+          monthlyLoss: sett.profile.ddMonthly || 25,
+        },
+      }),
+    });
+
+    const data = await resp.json();
+
+    if (data.approved) {
+      // Persist execution status on the trade
+      t.venue = 'bitunix';
+      t.execStatus = data.paper ? 'paper_executed' : 'executed';
+      t.execApprovedAt = new Date().toISOString();
+      t.execQueueId = data.trade_id || '';
+      t.execMode = 'bitunix_auto';
+      t.execPaper = !!data.paper;
+      t.bitunixOrderId = data.order_id || '';
+      t.bitunixLeverage = leverage;
+      t.bitunixMargin = marginMode;
+      t.bitunixQty = data.qty;
+      t.bitunixNotional = data.notional;
+      t.bitunixRequiredMargin = data.required_margin;
+      t.execActualEntry = t.entry;
+      t.execExecutedAt = new Date().toISOString();
+      t.execWarnings = data.warnings || [];
+      save();
+      renderJournal();
+
+      if (statusEl) {
+        statusEl.style.background = '#0e3a1e';
+        statusEl.style.border = '1px solid #3fb950';
+        statusEl.style.color = '#56d364';
+        let html = data.paper
+          ? `<strong>📄 Paper-executed on Bitunix (no live order sent).</strong><br>Qty: ${data.qty} · Margin: $${(data.required_margin||0).toFixed(2)}`
+          : `<strong>🟧 Bitunix order placed!</strong><br>Order ID: <code>${escHtml(data.order_id||'')}</code><br>Qty: ${data.qty} · Margin: $${(data.required_margin||0).toFixed(2)}`;
+        if (data.warnings?.length) {
+          html += '<br><br><strong>⚠ Warnings:</strong><br>' + data.warnings.map(w => '• ' + escHtml(w)).join('<br>');
+        }
+        statusEl.innerHTML = html;
+      }
+      if (btn) { btn.textContent = data.paper ? 'Paper-executed ✓' : 'Executed ✓'; btn.style.background = '#238636'; btn.style.color = '#fff'; }
+      if (journalBtn) {
+        journalBtn.textContent = data.paper ? '📄 Paper-executed' : '🟧 Executed via Bitunix';
+        journalBtn.style.background = data.paper ? '#1a2a44' : '#0e3a1e';
+        journalBtn.style.color = data.paper ? '#58a6ff' : '#56d364';
+        journalBtn.disabled = true;
+      }
+
+      setTimeout(() => closeExecConfirm(), 2500);
+    } else {
+      t.execStatus = 'rejected';
+      t.execRejectReason = data.reason || data.error || 'Unknown';
+      save();
+      renderJournal();
+      if (statusEl) {
+        statusEl.style.background = '#3a1216';
+        statusEl.style.border = '1px solid #f85149';
+        statusEl.style.color = '#ff7b72';
+        statusEl.innerHTML = `<strong>❌ Bitunix rejected:</strong> ${escHtml(data.reason || data.error || 'Unknown reason')}`;
+      }
+      if (btn) { btn.disabled = false; btn.textContent = 'Confirm — Send to Bitunix'; btn.style.background = '#f7931a'; btn.style.color = '#1c1300'; }
+    }
+  } catch (e) {
+    if (statusEl) {
+      statusEl.style.background = '#3a1216';
+      statusEl.style.border = '1px solid #f85149';
+      statusEl.style.color = '#ff7b72';
+      statusEl.innerHTML = `<strong>Connection error:</strong> ${escHtml(e.message)}<br>Check that the backend is running and Bitunix API key is configured.`;
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm — Send to Bitunix'; }
+  }
+}
+
+// Refresh any visible Approve button preview on the Log Trade form when
+// the user changes symbol or venue dropdown. Currently a no-op preview;
+// kept as a hook so future inline previews don't need wiring changes.
+function updateApproveButtonForVenue() {
+  try {
+    const sym = document.getElementById('f_pair')?.value || '';
+    const vSel = document.getElementById('f_venue')?.value || 'auto';
+    const venue = resolveVenueForTrade(sym, vSel);
+    const lbl = document.getElementById('f_venueAuto');
+    if (lbl && vSel === 'auto') lbl.textContent = sym ? `(auto: ${venueLabel(venue)})` : '';
+    else if (lbl) lbl.textContent = `(forced: ${venueLabel(venue)})`;
+  } catch {}
+}
+
 async function cancelExecution(tradeId) {
   const t = trades.find(x => x.id === tradeId);
   if (!t || !t.execQueueId) return;
-  if (!confirm('Cancel this pending MT5 execution?')) return;
+  const isBitunix = (t.execMode === 'bitunix_auto') || (venueForRow(t) === 'bitunix');
+  const venueWord = isBitunix ? 'Bitunix' : 'MT5';
+  if (!confirm(`Cancel this pending ${venueWord} execution?`)) return;
 
   const backendUrl = getExecBackendUrl();
   const execKey = localStorage.getItem('tj_executionKey') || '';
   try {
-    const resp = await fetch(backendUrl + '/api/trade/cancelled', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Execution-Key': execKey },
-      body: JSON.stringify({ id: t.execQueueId }),
-    });
+    let resp;
+    if (isBitunix) {
+      resp = await fetch(backendUrl + '/bitunix/trade/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Execution-Key': execKey },
+        body: JSON.stringify({
+          symbol: t.pair,
+          order_id: t.bitunixOrderId || undefined,
+          client_id: t.id,
+        }),
+      });
+    } else {
+      resp = await fetch(backendUrl + '/api/trade/cancelled', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Execution-Key': execKey },
+        body: JSON.stringify({ id: t.execQueueId }),
+      });
+    }
     if (resp.ok) {
       t.execStatus = 'cancelled';
       t.execCancelledAt = new Date().toISOString();
@@ -5420,6 +5932,7 @@ async function refreshExecutionLog() {
     return;
   }
   const filter = (document.getElementById('execLogFilter') || {}).value || 'all';
+  const venueFlt = (document.getElementById('execLogVenue') || {}).value || '';
   try {
     const url = backendUrl + '/api/execution/log?limit=50&status=' + encodeURIComponent(filter);
     const resp = await fetch(url, { headers: { 'X-Execution-Key': execKey } });
@@ -5428,7 +5941,19 @@ async function refreshExecutionLog() {
       return;
     }
     const data = await resp.json();
-    const log = data.log || [];
+    let log = data.log || [];
+    // Client-side venue filter — works with any backend by inferring venue
+    // from the symbol (USDT → bitunix, otherwise mt5) and from the source/venue
+    // fields when present.
+    if (venueFlt) {
+      log = log.filter(e => {
+        const v = (e.venue || '').toLowerCase();
+        if (v) return v === venueFlt;
+        const sym = (e.symbol || '').toUpperCase();
+        const inferred = /USDT$/.test(sym) ? 'bitunix' : 'mt5';
+        return inferred === venueFlt;
+      });
+    }
     if (!log.length) {
       panel.innerHTML = '<div style="color:#6e7681;font-size:0.78rem;">No log entries match this filter.</div>';
       return;
@@ -5577,6 +6102,113 @@ async function emergencyStopConfirm() {
     refreshExecutionQueue();
     refreshExecutionLog();
   } catch (e) { alert('Emergency stop failed: ' + e.message); }
+}
+
+// ── Bitunix-only kill switch ───────────────────────────
+async function bitunixEmergencyStopConfirm() {
+  if (!confirm('🛑 BITUNIX KILL SWITCH\n\nThis will:\n• Block any new Bitunix futures order from being placed\n• Leave MT5 execution untouched\n\nProceed?')) return;
+  const backendUrl = getExecBackendUrl();
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  if (!backendUrl || !execKey) { alert('Set Execution API Key in Settings first.'); return; }
+  try {
+    const resp = await fetch(backendUrl + '/api/bitunix/emergency-stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Execution-Key': execKey },
+      body: JSON.stringify({ by: 'journal' }),
+    });
+    const j = await resp.json();
+    if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
+    alert('🛑 Bitunix kill switch ACTIVATED.\n\nNo new Bitunix orders will be placed until you clear it from the backend.');
+    if (typeof updateBitunixDot === 'function') updateBitunixDot();
+    if (typeof refreshBitunixSettingsStatus === 'function') refreshBitunixSettingsStatus();
+  } catch (e) { alert('Bitunix kill switch failed: ' + e.message); }
+}
+
+// ── Test Bitunix connection (Settings panel button) ────
+async function testBitunixConnection() {
+  const out = document.getElementById('sett_bitunixTestOut');
+  if (!out) return;
+  out.style.display = '';
+  out.style.background = '#1a2332';
+  out.style.border = '1px solid #30363d';
+  out.style.color = '#8b949e';
+  out.textContent = 'Testing connection…';
+
+  const backendUrl = getExecBackendUrl();
+  if (!backendUrl) {
+    out.style.background = '#3a1216'; out.style.border = '1px solid #f85149'; out.style.color = '#ff7b72';
+    out.textContent = '❌ Backend URL not set. Open the Alerts tab and save your Render URL first.';
+    return;
+  }
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+
+  try {
+    // 1) Lightweight status — works even without execution key
+    const sResp = await fetch(backendUrl + '/bitunix/exchange/status', { mode: 'cors' });
+    const sJson = sResp.ok ? await sResp.json() : { error: 'HTTP ' + sResp.status };
+    if (!sResp.ok || !sJson.configured) {
+      out.style.background = '#3a2a16'; out.style.border = '1px solid #f0883e'; out.style.color = '#ffa657';
+      out.innerHTML = `⚠ Bitunix not configured on backend.<br>${escHtml(sJson.error || 'Set BITUNIX_API_KEY + BITUNIX_API_SECRET on Render.')}`;
+      return;
+    }
+    if (sJson.disabled) {
+      out.style.background = '#3a1216'; out.style.border = '1px solid #f85149'; out.style.color = '#ff7b72';
+      out.innerHTML = `❌ Bitunix sync disabled: ${escHtml(sJson.error || 'unknown error')}.<br>Restart the Render service after fixing the credentials.`;
+      return;
+    }
+    // 2) Authenticated balance check
+    if (!execKey) {
+      out.style.background = '#3a2a16'; out.style.border = '1px solid #f0883e'; out.style.color = '#ffa657';
+      out.textContent = '⚠ Backend reachable, but no Execution API key set — can\'t fetch balance.';
+      return;
+    }
+    const aResp = await fetch(backendUrl + '/bitunix/account', { mode: 'cors', headers: { 'X-Execution-Key': execKey } });
+    const aJson = await aResp.json();
+    if (!aResp.ok) {
+      out.style.background = '#3a1216'; out.style.border = '1px solid #f85149'; out.style.color = '#ff7b72';
+      out.innerHTML = `❌ ${escHtml(aJson.error || 'HTTP ' + aResp.status)}`;
+      return;
+    }
+    const bal = (aJson.balance && (aJson.balance.total ?? aJson.balance.equity ?? aJson.balance.available)) ?? aJson.equity ?? aJson.total ?? null;
+    const balStr = bal != null ? '$' + Number(bal).toFixed(2) : '—';
+    const positions = aJson.position_count ?? aJson.positions ?? '—';
+    const orders = aJson.order_count ?? aJson.orders ?? '—';
+    out.style.background = '#0e3a1e'; out.style.border = '1px solid #3fb950'; out.style.color = '#56d364';
+    out.innerHTML = `✅ Connected to Bitunix.<br>Balance: <strong>${balStr}</strong> · Open positions: ${positions} · Pending orders: ${orders}`;
+    if (typeof updateBitunixDot === 'function') updateBitunixDot();
+  } catch (e) {
+    out.style.background = '#3a1216'; out.style.border = '1px solid #f85149'; out.style.color = '#ff7b72';
+    out.textContent = '❌ ' + (e?.message || 'connection failed');
+  }
+}
+
+// Refresh the small status pill at the top of the Bitunix Settings card
+async function refreshBitunixSettingsStatus() {
+  const pill = document.getElementById('sett_bitunixStatus');
+  if (!pill) return;
+  const url = getBackendUrl();
+  if (!url) {
+    pill.textContent = 'No backend URL';
+    pill.style.background = '#3a2a16'; pill.style.color = '#ffa657';
+    return;
+  }
+  try {
+    const r = await fetch(url + '/bitunix/exchange/status', { mode: 'cors' });
+    const j = r.ok ? await r.json() : { error: 'HTTP ' + r.status };
+    if (!r.ok || !j.configured) {
+      pill.textContent = 'Not configured';
+      pill.style.background = '#3a2a16'; pill.style.color = '#ffa657';
+    } else if (j.disabled) {
+      pill.textContent = 'Disabled';
+      pill.style.background = '#3a1216'; pill.style.color = '#ff7b72';
+    } else {
+      pill.textContent = 'Connected';
+      pill.style.background = '#0e3a1e'; pill.style.color = '#56d364';
+    }
+  } catch {
+    pill.textContent = 'Offline';
+    pill.style.background = '#3a1216'; pill.style.color = '#ff7b72';
+  }
 }
 
 // ── Go-Live Checklist ─────────────────────────────────
@@ -6789,7 +7421,7 @@ function generateAnalysisExport(period) {
   const sorted   = [...filtered].sort((a, b) => new Date(a.dateOpen) - new Date(b.dateOpen));
   const periodLabel = {all:'All Time', week:'Last 7 Days', month:'This Month', year:'This Year'}[period];
 
-  const setupMap = {}, tfMap = {}, condMap = {}, sessMap = {};
+  const setupMap = {}, tfMap = {}, condMap = {}, sessMap = {}, venueMap = {};
   closed.forEach(t => {
     const s = t.setup || 'Unknown';
     if (!setupMap[s]) setupMap[s] = {w:0, l:0, pnl:0};
@@ -6811,6 +7443,12 @@ function generateAnalysisExport(period) {
     if (!sessMap[sess]) sessMap[sess] = {w:0, l:0, pnl:0};
     if (t.outcome === 'win') sessMap[sess].w++; else if (t.outcome === 'loss') sessMap[sess].l++;
     sessMap[sess].pnl += t.actualPnL || 0;
+
+    // Venue breakdown (mt5 / bitunix / manual)
+    const v = (typeof venueForRow === 'function') ? venueForRow(t) : (t.venue || t.source || 'manual');
+    if (!venueMap[v]) venueMap[v] = {w:0, l:0, pnl:0};
+    venueMap[v].pnl += t.actualPnL || 0;
+    if (t.outcome === 'win') venueMap[v].w++; else if (t.outcome === 'loss') venueMap[v].l++;
   });
 
   const d = (n, dec=2) => n == null ? '—' : Number(n).toFixed(dec);
@@ -6860,6 +7498,26 @@ function generateAnalysisExport(period) {
   }
   out += `\n`;
 
+  // Venue performance breakdown (MT5 / Bitunix / Manual)
+  const venueKeys = Object.keys(venueMap);
+  if (venueKeys.length) {
+    out += `VENUE PERFORMANCE:\n`;
+    const venueOrder = ['mt5', 'bitunix', 'manual'];
+    const sortedVenues = venueKeys.sort((a, b) => {
+      const ai = venueOrder.indexOf(a); const bi = venueOrder.indexOf(b);
+      return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+    });
+    sortedVenues.forEach(v => {
+      const g = venueMap[v];
+      const tot = g.w + g.l;
+      const wr  = tot ? ((g.w / tot) * 100).toFixed(1) + '%' : '—';
+      const label = (typeof venueLabel === 'function') ? venueLabel(v)
+                  : (v === 'mt5' ? 'MT5' : v === 'bitunix' ? 'Bitunix' : v === 'manual' ? 'Manual' : v);
+      out += `  ${label}: ${tot} trades  |  W ${g.w} / L ${g.l}  |  WR ${wr}  |  P&L ${money(g.pnl)}\n`;
+    });
+    out += `\n`;
+  }
+
   // Comparison insights
   const cmpFields = [
     { label: 'POI Type', field: 'poiType' },
@@ -6893,8 +7551,11 @@ function generateAnalysisExport(period) {
   sorted.forEach((t, i) => {
     if (t.status === 'closed' && t.actualPnL) equity += t.actualPnL;
     out += `---\n`;
-    const srcTag = t.source === 'mt5' ? ' [MT5 Auto-logged]' : t.source === 'mt4' ? ' [MT4 Auto-logged]' : t.source === 'binance' ? ' [Binance Auto-logged]' : '';
+    const srcTag = t.source === 'mt5' ? ' [MT5 Auto-logged]' : t.source === 'mt4' ? ' [MT4 Auto-logged]' : t.source === 'bitunix' ? ' [Bitunix Auto-logged]' : t.source === 'binance' ? ' [Binance Auto-logged]' : '';
     out += `ID: ${String(i+1).padStart(3,'0')} | Date: ${dateStr(t.dateOpen)} | Symbol: ${t.pair}${srcTag}\n`;
+    const _vRow = (typeof venueForRow === 'function') ? venueForRow(t) : (t.venue || t.source || 'manual');
+    const _vLabel = (typeof venueLabel === 'function') ? venueLabel(_vRow) : (_vRow === 'mt5' ? 'MT5' : _vRow === 'bitunix' ? 'Bitunix' : _vRow === 'manual' ? 'Manual' : _vRow);
+    out += `Venue: ${_vLabel}\n`;
     const tradeSession = detectSession(new Date(t.dateOpen));
     const isOverlap = t.conditions?.includes('London Session') && t.conditions?.includes('NY Session') || tradeSession === 'London/NY Overlap';
     out += `Direction: ${t.direction.toUpperCase()} | Market: ${t.market} | TF: ${t.timeframe} | Setup: ${t.setup}\n`;
@@ -7086,6 +7747,338 @@ function startMT4Polling() {
   if (_mt4Interval) return;
   updateMT4Dot();
   _mt4Interval = setInterval(updateMT4Dot, 30000);
+}
+
+// ── Bitunix nav-bar indicator ──────────────────────────────────────
+let _bitunixInterval = null;
+async function updateBitunixDot() {
+  const url = getBackendUrl();
+  const dot     = document.getElementById('bitunixDot');
+  const dotIcon = document.getElementById('bitunixDotIcon');
+  const dotText = document.getElementById('bitunixDotText');
+  if (!url || !dot || !dotIcon || !dotText) return;
+
+  const setDisconnected = (reason) => {
+    dot.className = 'bitunix-dot off';
+    dot.style.background = 'rgba(247,147,26,0.10)';
+    dot.style.color = '#7a4a00';
+    dot.style.border = '1px solid rgba(247,147,26,0.28)';
+    dotIcon.style.background = '#f85149';
+    dotText.textContent = 'Bitunix offline';
+    dot.title = '🔴 Bitunix offline' + (reason ? ' — ' + reason : '');
+  };
+
+  try {
+    const execKey = localStorage.getItem('tj_executionKey') || '';
+    // First: lightweight status check
+    const statusResp = await fetch(url + '/bitunix/exchange/status', { mode: 'cors' });
+    if (!statusResp.ok) { setDisconnected('HTTP ' + statusResp.status); return; }
+    const status = await statusResp.json();
+    if (!status.configured || status.disabled) {
+      setDisconnected(status.error || (status.configured ? 'disabled' : 'not configured'));
+      return;
+    }
+    // Configured + not disabled — pull balance for nav badge text
+    let balText = '';
+    if (execKey) {
+      try {
+        const acctResp = await fetch(url + '/bitunix/account', { mode: 'cors', headers: { 'X-Execution-Key': execKey } });
+        if (acctResp.ok) {
+          const a = await acctResp.json();
+          const bal = (a.balance && (a.balance.total ?? a.balance.equity ?? a.balance.available)) ?? a.equity ?? a.total ?? null;
+          if (bal != null) {
+            const n = Number(bal);
+            balText = ' · $' + (n >= 10000 ? Math.round(n).toLocaleString() : n.toFixed(2));
+          }
+        }
+      } catch {}
+    }
+    dot.className = 'bitunix-dot on';
+    dot.style.background = 'rgba(247,147,26,0.18)';
+    dot.style.color = '#f7931a';
+    dot.style.border = '1px solid #f7931a';
+    dotIcon.style.background = '#f7931a';
+    dotText.textContent = 'Bitunix' + balText;
+    dot.title = '🟧 Bitunix connected' + balText;
+  } catch (e) {
+    setDisconnected(e?.message || 'fetch error');
+  }
+}
+
+function startBitunixPolling() {
+  if (_bitunixInterval) return;
+  updateBitunixDot();
+  _bitunixInterval = setInterval(updateBitunixDot, 30000);
+}
+
+// ── Bitunix Live tab — positions ───────────────────────
+async function refreshBitunixLiveTrades() {
+  const url = getBackendUrl();
+  const panel = document.getElementById('bitunixLivePanel');
+  const conn  = document.getElementById('bitunixConnStatus');
+  if (!panel) return;
+  if (!url) {
+    panel.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">Set your backend URL in the Alerts tab first.</div>';
+    return;
+  }
+  if (conn) conn.textContent = 'Loading…';
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  try {
+    const resp = await fetch(url + '/bitunix/positions', {
+      mode: 'cors',
+      headers: execKey ? { 'X-Execution-Key': execKey } : {},
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      panel.innerHTML = `<div style="color:#f85149;font-size:0.82rem;">Failed to load Bitunix positions: ${escHtml(err.error || 'HTTP ' + resp.status)}</div>`;
+      if (conn) conn.textContent = '🔴 Bitunix offline';
+      return;
+    }
+    const data = await resp.json();
+    const positions = data.positions || data.data || [];
+    if (!positions.length) {
+      panel.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">No open Bitunix positions.</div>';
+      if (conn) { conn.textContent = '🟧 Bitunix connected'; conn.style.color = '#f7931a'; }
+      return;
+    }
+    let html = '';
+    positions.forEach(p => {
+      const side = (p.side || p.positionSide || '').toUpperCase();
+      const sideCol = side === 'LONG' || side === 'BUY' ? '#3fb950' : '#f85149';
+      const sym = p.symbol || '—';
+      const qty = p.qty ?? p.size ?? p.positionAmt ?? '—';
+      const entry = p.avgEntryPrice ?? p.entryPrice ?? '—';
+      const mark = p.markPrice ?? p.lastPrice ?? '—';
+      const lev = p.leverage || '—';
+      const margin = p.marginMode || p.margin || '—';
+      const pnl = p.unrealizedPnl ?? p.uPnl ?? p.unRealizedProfit ?? null;
+      const pnlCol = pnl == null ? '#8b949e' : Number(pnl) >= 0 ? '#3fb950' : '#f85149';
+      const pnlStr = pnl == null ? '—' : (Number(pnl) >= 0 ? '+' : '') + Number(pnl).toFixed(2);
+      html += `
+        <div class="card" style="border-left:3px solid #f7931a; margin-bottom:10px; padding:10px 12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+            <div style="font-weight:700;color:${sideCol};">${escHtml(side || '—')} <span style="color:#f7931a;">${escHtml(sym)}</span></div>
+            <div style="font-size:0.75rem;color:#8b949e;">Lev ${escHtml(String(lev))}× · ${escHtml(String(margin))}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px 10px;margin-top:6px;font-size:0.78rem;">
+            <div><div class="info-cell-label">Qty</div><div>${escHtml(String(qty))}</div></div>
+            <div><div class="info-cell-label">Entry</div><div>${escHtml(String(entry))}</div></div>
+            <div><div class="info-cell-label">Mark</div><div>${escHtml(String(mark))}</div></div>
+            <div><div class="info-cell-label">uPnL</div><div style="color:${pnlCol};font-weight:600;">$${pnlStr}</div></div>
+          </div>
+        </div>`;
+    });
+    panel.innerHTML = html;
+    if (conn) { conn.textContent = `🟧 ${positions.length} position${positions.length===1?'':'s'}`; conn.style.color = '#f7931a'; }
+  } catch (e) {
+    panel.innerHTML = `<div style="color:#f85149;font-size:0.82rem;">Bitunix request failed: ${escHtml(e.message)}</div>`;
+    if (conn) { conn.textContent = '🔴 Bitunix offline'; conn.style.color = '#f85149'; }
+  }
+}
+
+// ── Bitunix Live tab — pending orders ──────────────────
+async function refreshBitunixPendingOrders() {
+  const panel = document.getElementById('bitunixPendingPanel');
+  if (!panel) return;
+  const url = getBackendUrl();
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  if (!url) {
+    panel.innerHTML = '<div style="color:#6e7681;font-size:0.78rem;">Set backend URL first.</div>';
+    return;
+  }
+  try {
+    const resp = await fetch(url + '/bitunix/orders/pending', {
+      mode: 'cors',
+      headers: execKey ? { 'X-Execution-Key': execKey } : {},
+    });
+    if (!resp.ok) {
+      panel.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">HTTP ' + resp.status + '</div>';
+      return;
+    }
+    const data = await resp.json();
+    const orders = data.orders || data.data || [];
+    if (!orders.length) {
+      panel.innerHTML = '<div style="color:#6e7681;font-size:0.78rem;">No pending Bitunix orders.</div>';
+      return;
+    }
+    let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.74rem;">';
+    html += '<thead><tr style="color:#8b949e;border-bottom:1px solid #21262d;">'
+         + '<th style="text-align:left;padding:5px 8px;">Symbol</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Side</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Type</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Price</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Qty</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Order ID</th>'
+         + '<th style="text-align:left;padding:5px 8px;"></th>'
+         + '</tr></thead><tbody>';
+    orders.forEach(o => {
+      const sym = o.symbol || '';
+      const side = (o.side || '').toUpperCase();
+      const sideCol = side === 'BUY' || side === 'LONG' ? '#3fb950' : '#f85149';
+      const otype = o.type || o.orderType || '';
+      const price = o.price ?? o.triggerPrice ?? '—';
+      const qty = o.qty ?? o.origQty ?? '—';
+      const oid = o.orderId || o.id || '';
+      html += `<tr style="border-bottom:1px solid #161b22;">
+        <td style="padding:5px 8px;color:#f7931a;font-weight:600;">${escHtml(sym)}</td>
+        <td style="padding:5px 8px;color:${sideCol};font-weight:600;">${escHtml(side)}</td>
+        <td style="padding:5px 8px;color:#8b949e;">${escHtml(otype)}</td>
+        <td style="padding:5px 8px;color:#e6edf3;">${escHtml(String(price))}</td>
+        <td style="padding:5px 8px;color:#e6edf3;">${escHtml(String(qty))}</td>
+        <td style="padding:5px 8px;color:#8b949e;font-family:ui-monospace,monospace;font-size:0.7rem;">${escHtml(oid)}</td>
+        <td style="padding:5px 8px;text-align:right;"><button class="btn btn-ghost" onclick="cancelBitunixOrder('${escHtml(sym)}','${escHtml(oid)}')" style="padding:2px 6px;font-size:0.68rem;color:#f85149;border-color:#5c1616;">Cancel</button></td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+    panel.innerHTML = html;
+  } catch (e) {
+    panel.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">' + escHtml(e.message) + '</div>';
+  }
+}
+
+async function cancelBitunixOrder(symbol, orderId) {
+  if (!confirm(`Cancel Bitunix order ${orderId} on ${symbol}?`)) return;
+  const url = getExecBackendUrl();
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  if (!url || !execKey) { alert('Set Execution API Key first.'); return; }
+  try {
+    const resp = await fetch(url + '/bitunix/trade/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Execution-Key': execKey },
+      body: JSON.stringify({ symbol, order_id: orderId }),
+    });
+    const j = await resp.json();
+    if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
+    refreshBitunixPendingOrders();
+  } catch (e) { alert('Cancel failed: ' + e.message); }
+}
+
+// ── Bitunix Health Panel ──────────────────────────────
+async function refreshBitunixHealth() {
+  const panel = document.getElementById('bitunixHealthPanel');
+  if (!panel) return;
+  const url = getBackendUrl();
+  if (!url) { panel.innerHTML = '<div style="color:#6e7681;font-size:0.78rem;">Set backend URL first.</div>'; return; }
+  panel.innerHTML = '<div style="color:#8b949e;font-size:0.78rem;">Checking…</div>';
+
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  const checks = [
+    { label: 'Backend reachable', test: async () => {
+      try { const r = await fetch(url + '/health', { mode:'cors' }); return { ok: r.ok, detail: r.ok ? '200' : 'HTTP ' + r.status }; }
+      catch (e) { return { ok: false, detail: e.message }; }
+    }},
+    { label: 'Bitunix configured', test: async () => {
+      try { const r = await fetch(url + '/bitunix/exchange/status', { mode:'cors' }); const j = await r.json();
+        if (!j.configured) return { ok: false, detail: 'Set BITUNIX_API_KEY/SECRET on Render' };
+        if (j.disabled)   return { ok: false, detail: j.error || 'disabled' };
+        return { ok: true, detail: 'reachable' };
+      } catch (e) { return { ok: false, detail: e.message }; }
+    }},
+    { label: 'Account auth (balance)', test: async () => {
+      if (!execKey) return { ok: false, detail: 'No Execution API Key set' };
+      try { const r = await fetch(url + '/bitunix/account', { mode:'cors', headers: { 'X-Execution-Key': execKey } });
+        const j = await r.json(); if (!r.ok) return { ok: false, detail: j.error || ('HTTP ' + r.status) };
+        const bal = (j.balance && (j.balance.total ?? j.balance.equity ?? j.balance.available)) ?? null;
+        return { ok: true, detail: bal != null ? '$' + Number(bal).toFixed(2) : 'no balance field' };
+      } catch (e) { return { ok: false, detail: e.message }; }
+    }},
+    { label: 'Kill switch', test: async () => {
+      if (!execKey) return { ok: false, detail: 'No Execution API Key set' };
+      try { const r = await fetch(url + '/api/bitunix/emergency-stop', { mode:'cors', headers: { 'X-Execution-Key': execKey } });
+        const j = await r.json(); return { ok: !j.active, detail: j.active ? 'ACTIVE — orders blocked' : 'inactive' };
+      } catch (e) { return { ok: false, detail: e.message }; }
+    }},
+  ];
+
+  const results = await Promise.all(checks.map(async c => ({ ...c, ...(await c.test()) })));
+  const html = results.map(r => `
+    <div style="display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px solid #21262d;font-size:0.78rem;">
+      <div style="color:#e6edf3;">${r.ok ? '🟢' : '🔴'} ${escHtml(r.label)}</div>
+      <div style="color:${r.ok ? '#3fb950' : '#f85149'};font-family:ui-monospace,monospace;">${escHtml(r.detail || '')}</div>
+    </div>`).join('');
+  panel.innerHTML = html;
+}
+
+async function runBitunixTest() {
+  const out = document.getElementById('bitunixTestResult');
+  if (!out) return;
+  out.innerHTML = '<div style="color:#8b949e;font-size:0.78rem;padding:8px 10px;border:1px dashed #30363d;border-radius:6px;">Running paper-mode pipeline test on Bitunix…</div>';
+  const url = getExecBackendUrl();
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  if (!url || !execKey) {
+    out.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">Set Execution API Key first.</div>'; return;
+  }
+  // Use the existing /api/execution/test endpoint with venue=bitunix.
+  // If the backend doesn't recognize the param it will still run an MT5 test —
+  // we present the result either way.
+  try {
+    const resp = await fetch(url + '/api/execution/test?venue=bitunix', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Execution-Key': execKey },
+      body: JSON.stringify({ venue: 'bitunix' }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      out.innerHTML = '<div style="color:#f85149;font-size:0.78rem;padding:8px 10px;background:#3a1216;border:1px solid #f85149;border-radius:6px;">Test failed: ' + escHtml(data.error || ('HTTP ' + resp.status)) + '</div>';
+      return;
+    }
+    const passed = data.passed ?? data.ok ?? data.success ?? false;
+    out.innerHTML = `<div style="padding:8px 10px;background:${passed?'#0e3a1e':'#3a2a16'};border:1px solid ${passed?'#3fb950':'#f0883e'};border-radius:6px;color:${passed?'#56d364':'#ffa657'};font-size:0.78rem;">
+      ${passed ? '✅' : '⚠'} ${escHtml(data.message || (passed ? 'Test passed' : 'Test completed with warnings'))}
+    </div>`;
+    refreshBitunixHealth();
+  } catch (e) {
+    out.innerHTML = '<div style="color:#f85149;font-size:0.78rem;padding:8px 10px;">' + escHtml(e.message) + '</div>';
+  }
+}
+
+// ── Bitunix-only event log slice ──────────────────────
+async function refreshBitunixEventLog() {
+  const panel = document.getElementById('bitunixEventLogPanel');
+  if (!panel) return;
+  const url = getExecBackendUrl();
+  const execKey = localStorage.getItem('tj_executionKey') || '';
+  if (!url || !execKey) {
+    panel.innerHTML = '<div style="color:#6e7681;font-size:0.78rem;">Set Execution API Key first.</div>';
+    return;
+  }
+  try {
+    const r = await fetch(url + '/api/execution/log?limit=80&status=all', { headers: { 'X-Execution-Key': execKey } });
+    if (!r.ok) { panel.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">HTTP ' + r.status + '</div>'; return; }
+    const data = await r.json();
+    const log = (data.log || []).filter(e => {
+      const v = (e.venue || '').toLowerCase();
+      if (v) return v === 'bitunix';
+      const sym = (e.symbol || '').toUpperCase();
+      return /USDT$/.test(sym);
+    }).slice(0, 30);
+    if (!log.length) { panel.innerHTML = '<div style="color:#6e7681;font-size:0.78rem;">No Bitunix events yet.</div>'; return; }
+    let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.72rem;">';
+    html += '<thead><tr style="color:#8b949e;border-bottom:1px solid #21262d;">'
+         + '<th style="text-align:left;padding:5px 8px;">Time</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Symbol</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Status</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Order</th>'
+         + '<th style="text-align:left;padding:5px 8px;">Reason</th>'
+         + '</tr></thead><tbody>';
+    log.forEach(e => {
+      const ts = e.ts ? new Date(e.ts).toLocaleString() : '';
+      const tag = (e.paper ? '📄 ' : '') + (e.test ? '🧪 ' : '');
+      const statusCol = ['executed','paper_executed','approved'].includes(e.status) ? '#3fb950'
+                      : ['execution_failed','rejected'].includes(e.status) ? '#f85149' : '#ffa657';
+      html += `<tr style="border-bottom:1px solid #161b22;">
+        <td style="padding:5px 8px;color:#8b949e;white-space:nowrap;">${escHtml(ts)}</td>
+        <td style="padding:5px 8px;color:#f7931a;font-weight:600;">${tag}${escHtml(e.symbol||'')} ${escHtml(e.direction||'')}</td>
+        <td style="padding:5px 8px;color:${statusCol};font-weight:600;">${escHtml(e.status||'')}</td>
+        <td style="padding:5px 8px;color:#8b949e;font-family:ui-monospace,monospace;font-size:0.7rem;">${e.mt4_ticket ? '#'+escHtml(e.mt4_ticket) : ''}</td>
+        <td style="padding:5px 8px;color:#8b949e;">${escHtml(e.reason||'')}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+    panel.innerHTML = html;
+  } catch (e) {
+    panel.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">' + escHtml(e.message) + '</div>';
+  }
 }
 
 async function refreshLiveTrades() {
@@ -8132,7 +9125,10 @@ const DEFAULT_SETTINGS = {
   display: { showSession: true, showEquity: true },
   sharing: { publicProfile: false, publicUser: '', sharePnL: false, shareWR: false, shareSetups: false, shareCharts: false, inviteCode: '' },
   export: { exportName: true, exportBalance: true, exportPeriod: 'all' },
-  execution: { mode: 'manual', minScore: 7, requireChecklist: true }
+  execution: { mode: 'manual', minScore: 7, requireChecklist: true },
+  // Bitunix: leverage + marginMode + notify-on-disconnect are Gist-synced.
+  // API key/secret are NEVER persisted here — they live in cookies only via setCookie().
+  bitunix: { leverage: 10, marginMode: 'CROSS', bitunixNotify: true }
 };
 
 function getSettings() {
@@ -8143,7 +9139,8 @@ function getSettings() {
       display: { ...DEFAULT_SETTINGS.display, ...raw.display },
       sharing: { ...DEFAULT_SETTINGS.sharing, ...raw.sharing },
       export:  { ...DEFAULT_SETTINGS.export,  ...raw.export  },
-      execution: { ...DEFAULT_SETTINGS.execution, ...(raw.execution || {}) }
+      execution: { ...DEFAULT_SETTINGS.execution, ...(raw.execution || {}) },
+      bitunix:   { ...DEFAULT_SETTINGS.bitunix,   ...(raw.bitunix   || {}) }
     };
   } catch { return JSON.parse(JSON.stringify(DEFAULT_SETTINGS)); }
 }
@@ -8209,6 +9206,20 @@ function populateSettingsForm() {
   document.getElementById('sett_execMinScore').value = s.execution.minScore || 7;
   document.getElementById('sett_execMinScoreVal').textContent = s.execution.minScore || 7;
   document.getElementById('sett_execRequireChecklist').classList.toggle('on', s.execution.requireChecklist !== false);
+  // Bitunix
+  const bit = s.bitunix || {};
+  const lvEl = document.getElementById('sett_bitunixLeverage');
+  if (lvEl) lvEl.value = String(bit.leverage || 10);
+  const mmEl = document.getElementById('sett_bitunixMargin');
+  if (mmEl) mmEl.value = (bit.marginMode || 'CROSS').toUpperCase();
+  const ntEl = document.getElementById('sett_bitunixNotify');
+  if (ntEl) ntEl.classList.toggle('on', bit.bitunixNotify !== false);
+  const bkEl = document.getElementById('sett_bitunixKey');
+  if (bkEl) bkEl.value = getCookie('tj_bitunixKey') || '';
+  const bsEl = document.getElementById('sett_bitunixSecret');
+  if (bsEl) bsEl.value = getCookie('tj_bitunixSecret') || '';
+  // Auto-refresh status pill on open
+  if (typeof refreshBitunixSettingsStatus === 'function') refreshBitunixSettingsStatus();
   // Display toggles
   document.getElementById('sett_showSession').classList.toggle('on', s.display.showSession);
   document.getElementById('sett_showEquity').classList.toggle('on', s.display.showEquity);
@@ -8244,6 +9255,22 @@ function saveSettingsFromForm() {
   if (execModeEl) s.execution.mode = execModeEl.value || 'manual';
   const execMinEl = document.getElementById('sett_execMinScore');
   if (execMinEl) s.execution.minScore = parseInt(execMinEl.value, 10) || 7;
+  // Bitunix (leverage + marginMode synced; key/secret cookie-only)
+  if (!s.bitunix) s.bitunix = { ...DEFAULT_SETTINGS.bitunix };
+  const lvEl = document.getElementById('sett_bitunixLeverage');
+  if (lvEl) s.bitunix.leverage = parseInt(lvEl.value, 10) || 10;
+  const mmEl = document.getElementById('sett_bitunixMargin');
+  if (mmEl) s.bitunix.marginMode = (mmEl.value || 'CROSS').toUpperCase();
+  const bkEl = document.getElementById('sett_bitunixKey');
+  if (bkEl) {
+    const v = bkEl.value || '';
+    if (v) setCookie('tj_bitunixKey', v, 365); else delCookie('tj_bitunixKey');
+  }
+  const bsEl = document.getElementById('sett_bitunixSecret');
+  if (bsEl) {
+    const v = bsEl.value || '';
+    if (v) setCookie('tj_bitunixSecret', v, 365); else delCookie('tj_bitunixSecret');
+  }
   s.sharing.publicUser = document.getElementById('sett_publicUser').value;
   s.sharing.inviteCode = document.getElementById('sett_inviteCode').value;
   s.export.exportPeriod = document.getElementById('sett_exportPeriod').value;
@@ -8259,6 +9286,10 @@ function toggleSetting(btn, key) {
   else if (['publicProfile','sharePnL','shareWR','shareSetups','shareCharts'].includes(key)) s.sharing[key] = val;
   else if (['exportName','exportBalance'].includes(key)) s.export[key] = val;
   else if (key === 'execRequireChecklist') s.execution.requireChecklist = val;
+  else if (key === 'bitunixNotify') {
+    if (!s.bitunix) s.bitunix = { ...DEFAULT_SETTINGS.bitunix };
+    s.bitunix.bitunixNotify = val;
+  }
   putSettings(s);
 }
 
@@ -8536,6 +9567,16 @@ function checkCalcAutoFill() {
       if (d.tp)        document.getElementById('f_tp').value = d.tp;
       if (d.size)      document.getElementById('f_size').value = d.size;
       if (d.risk)      document.getElementById('f_risk').value = d.risk;
+      // Venue: prefer calculator's explicit choice, else auto-detect from pair
+      const venueDD = document.getElementById('f_venue');
+      if (venueDD) {
+        if (d.venue && ['mt5','bitunix','manual','auto'].includes(d.venue)) {
+          venueDD.value = d.venue;
+        } else {
+          venueDD.value = 'auto';
+        }
+        if (typeof onSymbolChangeUpdateVenue === 'function') onSymbolChangeUpdateVenue();
+      }
       // Set SL/TP mode to price since calculator sends prices
       jrnSLMode = 'price'; jrnTPMode = 'price';
       document.querySelectorAll('#jrnSLToggle .jrn-mode-btn').forEach((b,i) => b.classList.toggle('active', i === 0));
@@ -8572,6 +9613,7 @@ function startBackgroundTimers() {
     _exchangeInterval = setInterval(syncExchangeStatus, 60000);
   }
   startMT4Polling();
+  startBitunixPolling();
 }
 
 function stopBackgroundTimers() {
@@ -8579,6 +9621,7 @@ function stopBackgroundTimers() {
   if (_sessionInterval) { clearInterval(_sessionInterval); _sessionInterval = null; }
   if (_exchangeInterval){ clearInterval(_exchangeInterval);_exchangeInterval = null; }
   if (_mt4Interval)     { clearInterval(_mt4Interval);     _mt4Interval = null; }
+  if (_bitunixInterval) { clearInterval(_bitunixInterval); _bitunixInterval = null; }
   clearTimeout(gistPushTimer);
 }
 
@@ -8591,6 +9634,7 @@ document.addEventListener('visibilitychange', () => {
     updateSessionBar();
     syncExchangeStatus();
     updateMT4Dot();
+    updateBitunixDot();
   }
 });
 
