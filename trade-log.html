@@ -643,7 +643,7 @@
       .session-pill { padding: 2px 7px; font-size: 0.62rem; }
     }
 
-    /* ── Exchange / Kraken UI ── */
+    /* ── Exchange UI ── */
     .exchange-dot {
       font-size: 0.71rem; white-space: nowrap; padding: 0 4px;
       display: inline-flex; align-items: center; gap: 4px;
@@ -656,17 +656,16 @@
       display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 1px 6px;
       border-radius: 4px; background: #d29922; color: #0d1117; margin-left: 6px; vertical-align: middle;
     }
-    .exchange-badge.kraken { background: #7b61ff; color: #fff; }
     .exchange-badge.binance { background: #f0b90b; color: #0d1117; }
-    .kraken-panel {
+    .exchange-panel {
       display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px;
     }
-    .kraken-panel-item {
+    .exchange-panel-item {
       padding: 10px 12px; border-radius: 8px; border: 1px solid #30363d; background: #0d1117;
     }
-    .kraken-panel-label { font-size: 0.65rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
-    .kraken-panel-value { font-size: 1rem; font-weight: 700; margin-top: 3px; color: #e6edf3; }
-    .kraken-incomplete-prompt {
+    .exchange-panel-label { font-size: 0.65rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+    .exchange-panel-value { font-size: 1rem; font-weight: 700; margin-top: 3px; color: #e6edf3; }
+    .incomplete-prompt {
       padding: 8px 12px; border-radius: 6px; border: 1px solid #d29922;
       background: #1f1a0d; font-size: 0.75rem; color: #e3b341; margin-top: 8px;
     }
@@ -963,7 +962,6 @@
     }
     .trade-row .trade-paper-badge { background: var(--blue-bg); color: var(--blue); }
     .trade-row .mt4-badge { background: var(--blue-bg); color: var(--blue); margin: 0; }
-    .trade-row .exchange-badge.kraken  { background: #1e1638; color: #a78bfa; }
     .trade-row .exchange-badge.binance { background: #2a2408; color: #f0b90b; }
     /* Narrow viewports — stack setup line below symbol */
     @media (max-width: 720px) {
@@ -1125,7 +1123,7 @@
     .live-trade-val.amber { color: var(--amber); }
     .live-trade-be { margin-top: 8px; font-size: 0.72rem; padding: 7px 11px; border-radius: var(--radius-item); border: 1px solid var(--border); background: var(--bg-inset); color: var(--text-2); }
     .live-trade-be.risk-free { border-color: var(--blue-border); background: var(--blue-bg); color: var(--blue); }
-    .kraken-incomplete-prompt { margin-top: 6px; padding: 6px 10px; background: var(--amber-bg); border: 1px solid var(--amber-border); border-radius: 5px; font-size: 0.72rem; color: var(--amber); }
+    .incomplete-prompt { margin-top: 6px; padding: 6px 10px; background: var(--amber-bg); border: 1px solid var(--amber-border); border-radius: 5px; font-size: 0.72rem; color: var(--amber); }
 
     /* Ensure any inline style="background:#161b22" legacy markup is visually consistent */
     [style*="#161b22"] { background-color: var(--bg-card) !important; }
@@ -1278,7 +1276,7 @@
   <!-- Exchange Account Panel -->
   <div class="card" id="exchangePanelCard" style="display:none;">
     <div class="card-title">Exchange Account <button class="btn" onclick="syncExchangeStatus()" style="float:right;padding:3px 10px;font-size:0.7rem;background:#21262d;border:1px solid #30363d;">Sync Now</button></div>
-    <div class="kraken-panel" id="exchangePanel"></div>
+    <div class="exchange-panel" id="exchangePanel"></div>
     <div style="font-size:0.62rem; color:#6e7681; margin-top:6px; text-align:right;" id="exchangeSyncTime"></div>
   </div>
 
@@ -3617,7 +3615,6 @@ function renderJournal() {
     const execBadge = renderExecBadge(t);
     const srcBadge  = t.source === 'mt5' ? '<span class="mt4-badge">MT5</span>'
                     : t.source === 'mt4' ? '<span class="mt4-badge">MT4</span>'
-                    : t.source === 'kraken'  ? '<span class="exchange-badge kraken">Kraken</span>'
                     : t.source === 'binance' ? '<span class="exchange-badge binance">Binance</span>'
                     : '';
     // Paper-trade chip — only show when renderExecBadge isn't already covering it
@@ -6447,8 +6444,7 @@ function renderRecent(list) {
     const pnlClass = !t.actualPnL ? 'neutral' : t.actualPnL >= 0 ? 'pos' : 'neg';
     const pnlStr   = t.status === 'partial' ? fmtPnL(t.actualPnL||0) + ' (partial)' : t.actualPnL != null && t.status === 'closed' ? fmtPnL(t.actualPnL) : 'Open';
     const dateStr  = new Date(t.dateOpen).toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
-    const srcBadge = t.source === 'kraken' ? '<span class="exchange-badge kraken">Kraken</span>'
-                   : t.source === 'binance' ? '<span class="exchange-badge binance">Binance</span>'
+    const srcBadge = t.source === 'binance' ? '<span class="exchange-badge binance">Binance</span>'
                    : t.source === 'mt5' ? '<span class="mt4-badge">MT5</span>'
                    : t.source === 'mt4' ? '<span class="mt4-badge">MT4</span>' : '';
     return `<div class="trade-row ${rowClass}" onclick="openModal('${t.id}')">
@@ -6897,7 +6893,7 @@ function generateAnalysisExport(period) {
   sorted.forEach((t, i) => {
     if (t.status === 'closed' && t.actualPnL) equity += t.actualPnL;
     out += `---\n`;
-    const srcTag = t.source === 'mt5' ? ' [MT5 Auto-logged]' : t.source === 'mt4' ? ' [MT4 Auto-logged]' : t.source === 'kraken' ? ' [Kraken Auto-logged]' : t.source === 'binance' ? ' [Binance Auto-logged]' : '';
+    const srcTag = t.source === 'mt5' ? ' [MT5 Auto-logged]' : t.source === 'mt4' ? ' [MT4 Auto-logged]' : t.source === 'binance' ? ' [Binance Auto-logged]' : '';
     out += `ID: ${String(i+1).padStart(3,'0')} | Date: ${dateStr(t.dateOpen)} | Symbol: ${t.pair}${srcTag}\n`;
     const tradeSession = detectSession(new Date(t.dateOpen));
     const isOverlap = t.conditions?.includes('London Session') && t.conditions?.includes('NY Session') || tradeSession === 'London/NY Overlap';
@@ -7220,20 +7216,19 @@ async function refreshLiveTrades() {
     panel.innerHTML = '<div style="color:#f85149; font-size:0.82rem;">Failed to load: ' + escHtml(e.message) + '</div>';
   }
 
-  // Auto-logged trades needing analysis (MT4/MT5, Kraken, Binance)
+  // Auto-logged trades needing analysis (MT4/MT5, Binance)
   try {
     const allTrades = trades;
-    const autoTrades = allTrades.filter(t => (t.source === 'mt4' || t.source === 'mt5' || t.source === 'kraken' || t.source === 'binance') && !t.htfBias && !t.setup);
+    const autoTrades = allTrades.filter(t => (t.source === 'mt4' || t.source === 'mt5' || t.source === 'binance') && !t.htfBias && !t.setup);
     if (!autoTrades.length) {
       needs.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">All auto-logged trades have been analysed.</div>';
     } else {
       let html = '';
       autoTrades.forEach(t => {
         const outcome = t.status === 'closed' ? (t.outcome === 'win' ? ' \u2705 Win' : t.outcome === 'loss' ? ' \uD83D\uDD34 Loss' : ' \u2796 BE') : ' \uD83D\uDFE2 Open';
-        const badgeClass = t.source === 'kraken' ? 'exchange-badge kraken' : t.source === 'binance' ? 'exchange-badge binance' : 'mt4-badge';
+        const badgeClass = t.source === 'binance' ? 'exchange-badge binance' : 'mt4-badge';
         // Badge label reflects the actual platform; mt5 is the current EA, mt4 kept for historical rows.
-        const badgeLabel = t.source === 'kraken' ? 'Kraken Auto-logged'
-                          : t.source === 'binance' ? 'Binance Auto-logged'
+        const badgeLabel = t.source === 'binance' ? 'Binance Auto-logged'
                           : t.source === 'mt5' ? 'MT5 Auto-logged'
                           : 'MT4 Auto-logged';
         html += '<div class="live-trade" style="cursor:pointer;" onclick="editMT4Trade(\'' + t.id + '\')">';
@@ -7246,7 +7241,7 @@ async function refreshLiveTrades() {
         if (t.exitPrice) html += ' \u2192 Exit: $' + Number(t.exitPrice).toLocaleString();
         if (t.actualPnL != null) html += ' \u00b7 P&L: ' + (t.actualPnL >= 0 ? '+' : '') + '$' + t.actualPnL.toFixed(2);
         html += '</div>';
-        if (!t.setup) html += '<div class="kraken-incomplete-prompt">Add your pre-trade analysis to complete this entry</div>';
+        if (!t.setup) html += '<div class="incomplete-prompt">Add your pre-trade analysis to complete this entry</div>';
         html += '</div>';
       });
       needs.innerHTML = html;
@@ -7878,17 +7873,12 @@ function renderExchangeStatus(data) {
     return;
   }
 
-  const kr = data.kraken || {};
   const bn = data.binance || {};
-  const anyConnected = kr.connected || bn.connected;
 
-  if (anyConnected) {
+  if (bn.connected) {
     dotIcon.className = 'dot green';
-    const parts = [];
-    if (kr.connected) parts.push('Kraken $' + (kr.balance_usdt || 0).toFixed(0));
-    if (bn.connected) parts.push('Binance $' + (bn.balance_usdt || 0).toFixed(0));
-    dotText.textContent = parts.join(' · ');
-  } else if (kr.disabled && bn.disabled) {
+    dotText.textContent = 'Binance $' + (bn.balance_usdt || 0).toFixed(0);
+  } else if (bn.disabled) {
     dotIcon.className = 'dot red';
     dotText.textContent = 'Exchange Error';
   } else {
@@ -7897,28 +7887,21 @@ function renderExchangeStatus(data) {
   }
 
   // Panel
-  if (kr.connected || bn.connected) {
+  if (bn.connected) {
     panelCard.style.display = 'block';
     let html = '';
-    if (kr.connected) {
-      html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Kraken USDT</div><div class="kraken-panel-value">$${(kr.balance_usdt||0).toFixed(2)}</div></div>`;
-      html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Kraken BTC</div><div class="kraken-panel-value">${(kr.balance_btc||0).toFixed(6)}</div></div>`;
-      html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Open Positions</div><div class="kraken-panel-value">${kr.open_positions||0}</div></div>`;
-    }
-    if (bn.connected) {
-      html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Binance USDT</div><div class="kraken-panel-value">$${(bn.balance_usdt||0).toFixed(2)}</div></div>`;
-      html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Binance BTC</div><div class="kraken-panel-value">${(bn.balance_btc||0).toFixed(6)}</div></div>`;
-      html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Open Orders</div><div class="kraken-panel-value">${bn.open_positions||0}</div></div>`;
-    }
+    html += `<div class="exchange-panel-item"><div class="exchange-panel-label">Binance USDT</div><div class="exchange-panel-value">$${(bn.balance_usdt||0).toFixed(2)}</div></div>`;
+    html += `<div class="exchange-panel-item"><div class="exchange-panel-label">Binance BTC</div><div class="exchange-panel-value">${(bn.balance_btc||0).toFixed(6)}</div></div>`;
+    html += `<div class="exchange-panel-item"><div class="exchange-panel-label">Open Orders</div><div class="exchange-panel-value">${bn.open_positions||0}</div></div>`;
+
     // Today's P&L from journal
     const today = new Date().toISOString().slice(0,10);
-    const todayPnL = trades.filter(t => t.status === 'closed' && (t.source === 'kraken' || t.source === 'binance')
+    const todayPnL = trades.filter(t => t.status === 'closed' && t.source === 'binance'
       && t.dateClose && t.dateClose.startsWith(today)).reduce((s,t) => s + (t.actualPnL||0), 0);
-    html += `<div class="kraken-panel-item"><div class="kraken-panel-label">Today P&L</div><div class="kraken-panel-value" style="color:${todayPnL>=0?'#3fb950':'#f85149'}">${todayPnL>=0?'+':''}$${todayPnL.toFixed(2)}</div></div>`;
+    html += `<div class="exchange-panel-item"><div class="exchange-panel-label">Today P&L</div><div class="exchange-panel-value" style="color:${todayPnL>=0?'#3fb950':'#f85149'}">${todayPnL>=0?'+':''}$${todayPnL.toFixed(2)}</div></div>`;
     panel.innerHTML = html;
 
-    const lastSync = kr.last_sync || bn.last_sync;
-    syncTime.textContent = lastSync ? 'Last sync: ' + new Date(lastSync).toLocaleTimeString() : '';
+    syncTime.textContent = bn.last_sync ? 'Last sync: ' + new Date(bn.last_sync).toLocaleTimeString() : '';
   } else {
     panelCard.style.display = 'none';
   }
