@@ -1215,6 +1215,18 @@
 
   <div class="stats-row" id="statsRow"></div>
 
+  <!-- Venue Performance (MT5 vs Bitunix side-by-side) -->
+  <div class="card" id="venuePerformanceCard" style="display:none;">
+    <div class="card-title">Venue Performance — MT5 (Forex) vs Bitunix (Crypto)</div>
+    <div id="venuePerformanceContent"></div>
+  </div>
+
+  <!-- Bitunix Crypto-Specific Metrics -->
+  <div class="card" id="cryptoMetricsCard" style="display:none;">
+    <div class="card-title">Crypto Metrics — Leverage, Funding, Symbol Breakdown</div>
+    <div id="cryptoMetricsContent"></div>
+  </div>
+
   <!-- Drawdown Tracking -->
   <div class="card" id="drawdownCard" style="display:none;">
     <div class="card-title">Drawdown &amp; Streak Tracker</div>
@@ -6474,6 +6486,27 @@ function renderDrawdown(allTrades) {
   const barClass = (val, limit) => val >= limit ? 'dd-bar-danger' : val >= limit * 0.7 ? 'dd-bar-warn' : 'dd-bar-ok';
   const barPct = (val, limit) => Math.min((val / limit) * 100, 100);
 
+  // Phase 4 — per-venue drawdown contribution.
+  // Splits the realized losses each venue has produced this monthly window
+  // against the same global capital base so the user can see which venue is
+  // eating the most risk allowance. Drawdown limits remain global — we're not
+  // creating per-venue limits, just attributing usage.
+  const venueLossPct = (venueKey) => {
+    const inPeriod = closed.filter(t => new Date(t.dateClose) >= monthStart && venueForRow(t) === venueKey);
+    const loss = inPeriod.filter(t => t.actualPnL < 0).reduce((s, t) => s + Math.abs(t.actualPnL), 0);
+    return capital > 0 ? (loss / capital) * 100 : 0;
+  };
+  const ddMt5 = venueLossPct('mt5');
+  const ddBx  = venueLossPct('bitunix');
+  const ddManual = venueLossPct('manual');
+  const ddCombined = ddMt5 + ddBx + ddManual; // share-of-monthly draw
+  const limit = ddLimits.monthly;
+  const venueShare = (val) => {
+    const pct = ddCombined > 0 ? (val / ddCombined) * 100 : 0;
+    return { pct, of: val };
+  };
+  const m = venueShare(ddMt5), b = venueShare(ddBx), x = venueShare(ddManual);
+
   el.innerHTML = `
     <div class="dd-grid">
       <div class="dd-card">
@@ -6503,6 +6536,26 @@ function renderDrawdown(allTrades) {
       <div class="dd-progress-label"><span>Monthly (${fmt(monthlyDD,1)}%)</span><span>Limit: ${ddLimits.monthly}%</span></div>
       <div class="dd-bar"><div class="dd-bar-fill ${barClass(monthlyDD, ddLimits.monthly)}" style="width:${barPct(monthlyDD, ddLimits.monthly)}%"></div></div>
     </div>
+    ${ddCombined > 0 ? `
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid #21262d;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
+        <div style="color:#8b949e;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.6px;">Drawdown contribution by venue (this month)</div>
+        <div style="font-size:0.68rem;color:#6e7681;">Combined: ${fmt(ddCombined,1)}% of ${limit}% monthly limit</div>
+      </div>
+      ${ddMt5 > 0 ? `<div class="dd-progress" style="margin-bottom:6px;">
+        <div class="dd-progress-label"><span style="color:#58a6ff;font-weight:600;">MT5 ${fmt(ddMt5,1)}% draw</span><span style="color:#6e7681;">${m.pct.toFixed(0)}% of venue mix</span></div>
+        <div class="dd-bar"><div class="dd-bar-fill" style="width:${barPct(ddMt5, limit)}%;background:#58a6ff;"></div></div>
+      </div>` : ''}
+      ${ddBx > 0 ? `<div class="dd-progress" style="margin-bottom:6px;">
+        <div class="dd-progress-label"><span style="color:#f7931a;font-weight:600;">Bitunix ${fmt(ddBx,1)}% draw</span><span style="color:#6e7681;">${b.pct.toFixed(0)}% of venue mix</span></div>
+        <div class="dd-bar"><div class="dd-bar-fill" style="width:${barPct(ddBx, limit)}%;background:#f7931a;"></div></div>
+      </div>` : ''}
+      ${ddManual > 0 ? `<div class="dd-progress" style="margin-bottom:6px;">
+        <div class="dd-progress-label"><span style="color:#8b949e;font-weight:600;">Manual ${fmt(ddManual,1)}% draw</span><span style="color:#6e7681;">${x.pct.toFixed(0)}% of venue mix</span></div>
+        <div class="dd-bar"><div class="dd-bar-fill" style="width:${barPct(ddManual, limit)}%;background:#8b949e;"></div></div>
+      </div>` : ''}
+      <div style="font-size:0.65rem;color:#6e7681;margin-top:4px;">Limits are account-wide \u2014 venues share the same global daily/weekly/monthly cap.</div>
+    </div>` : ''}
     <div class="streak-row">
       <div class="streak-item"><div class="streak-dot" style="background:#3fb950;"></div> Win streak: <strong>${winStreak}</strong> (best: ${maxWinStreak})</div>
       <div class="streak-item"><div class="streak-dot" style="background:#f85149;"></div> Loss streak: <strong>${lossStreak}</strong> (worst: ${maxLossStreak})</div>
@@ -6582,13 +6635,48 @@ function renderCalendar(allTrades) {
 function renderComparison(allTrades) {
   const el = document.getElementById('comparisonContent');
   if (!el) return;
-  const closed = allTrades.filter(t => t.status === 'closed');
+
+  // Venue scope filter — independent of which preset is active. Default 'all'.
+  const venueScope = el.dataset.venueScope || 'all';
+  const scoped = venueScope === 'all'
+    ? allTrades
+    : allTrades.filter(t => venueForRow(t) === venueScope);
+
+  const closed = scoped.filter(t => t.status === 'closed');
+  // Header for the venue-scope chips renders even when there are too few trades,
+  // so the user can switch off a too-narrow scope without losing the control.
+  const venueScopeHtml = (() => {
+    const opts = [
+      { id: 'all',     label: 'All venues' },
+      { id: 'mt5',     label: 'MT5 only' },
+      { id: 'bitunix', label: 'Bitunix only' },
+    ];
+    return `<div class="cmp-presets" style="margin-bottom:6px;">` + opts.map(o =>
+      `<div class="cmp-preset ${o.id === venueScope ? 'active' : ''}" onclick="document.getElementById('comparisonContent').dataset.venueScope='${o.id}';renderComparison(trades);">${o.label}</div>`
+    ).join('') + `</div>`;
+  })();
+
   if (closed.length < 3) {
-    el.innerHTML = '<div style="color:#6e7681;font-size:0.8rem;">Need at least 3 closed trades for comparisons.</div>';
+    el.innerHTML = venueScopeHtml + '<div style="color:#6e7681;font-size:0.8rem;">Need at least 3 closed trades in this scope for comparisons.</div>';
     return;
   }
 
+  // Two new presets at the top:
+  //  - "MT5 vs Bitunix" — venue-as-group
+  //  - "Forex vs Crypto" — market-class-as-group (forex catches MT5 indices too)
   const presets = [
+    { id: 'venue', label: 'MT5 vs Bitunix', fn: t => {
+        const v = venueForRow(t);
+        return v === 'mt5' ? 'MT5 (Forex)' : v === 'bitunix' ? 'Bitunix (Crypto)' : 'Manual';
+      } },
+    { id: 'market', label: 'Forex vs Crypto', fn: t => {
+        const v = venueForRow(t);
+        if (v === 'bitunix') return 'Crypto';
+        // Treat any non-bitunix MT5 row as Forex/Indices (the system trades both)
+        const sym = (t.pair || '').toUpperCase();
+        if (/^(XAU|XAG|XBR|XTI|US30|US500|NAS100|GER40|UK100|JP225)/.test(sym)) return 'Indices/Metals';
+        return 'Forex';
+      } },
     { id: 'poi', label: 'POI Type', field: 'poiType' },
     { id: 'dxy', label: 'DXY Alignment', field: 'dxyConfirms' },
     { id: 'htf', label: 'HTF Alignment', field: 'htfAligned' },
@@ -6597,9 +6685,9 @@ function renderComparison(allTrades) {
     { id: 'confidence', label: 'Confidence', fn: t => (t.confidence||0) >= 7 ? 'High (7-10)' : (t.confidence||0) >= 4 ? 'Mid (4-6)' : 'Low (1-3)' },
   ];
 
-  const activePreset = el.dataset.activePreset || 'poi';
+  const activePreset = el.dataset.activePreset || 'venue';
 
-  let html = `<div class="cmp-presets">`;
+  let html = venueScopeHtml + `<div class="cmp-presets">`;
   presets.forEach(p => {
     html += `<div class="cmp-preset ${p.id === activePreset ? 'active' : ''}" onclick="document.getElementById('comparisonContent').dataset.activePreset='${p.id}';renderComparison(trades);">${p.label}</div>`;
   });
@@ -6729,6 +6817,208 @@ function calcLeftOnTable(tradeList) {
   return { total, avgCaptured: capturedCount > 0 ? capturedSum / capturedCount : 0, avgExitTiming, timingCount };
 }
 
+// ═══════════════════════════════════════════════════════
+// Phase 4 — Bitunix dashboard analytics
+// Splits the existing stats by venue (MT5/Bitunix) and adds
+// crypto-only metrics: leverage tier, symbol, funding fees.
+// Reuses signedRR/venueForRow/fmtRR/rrColor — no new helpers.
+// ═══════════════════════════════════════════════════════
+function _venueStats(closedRows) {
+  // Build {venue: {trades, wins, losses, pnl, rr[], setupMap}} for each venue.
+  const venues = { mt5: { trades: [], wins: 0, losses: 0, pnl: 0, rr: [], setupMap: {} },
+                   bitunix: { trades: [], wins: 0, losses: 0, pnl: 0, rr: [], setupMap: {} },
+                   manual: { trades: [], wins: 0, losses: 0, pnl: 0, rr: [], setupMap: {} } };
+  closedRows.forEach(t => {
+    const v = venueForRow(t);
+    if (!venues[v]) venues[v] = { trades: [], wins: 0, losses: 0, pnl: 0, rr: [], setupMap: {} };
+    const g = venues[v];
+    g.trades.push(t);
+    g.pnl += (t.actualPnL || 0);
+    if (t.outcome === 'win') g.wins++;
+    else if (t.outcome === 'loss') g.losses++;
+    const _sr = signedRR(t);
+    if (_sr != null) g.rr.push(_sr);
+    const setup = t.setup || 'Unknown';
+    if (!g.setupMap[setup]) g.setupMap[setup] = { w: 0, l: 0, pnl: 0 };
+    g.setupMap[setup].pnl += (t.actualPnL || 0);
+    if (t.outcome === 'win') g.setupMap[setup].w++;
+    else if (t.outcome === 'loss') g.setupMap[setup].l++;
+  });
+  return venues;
+}
+
+function _bestWorstSetup(setupMap) {
+  // Min 2 trades to count — avoids 1-trade flukes dominating.
+  const entries = Object.entries(setupMap).filter(([, s]) => (s.w + s.l) >= 2);
+  if (!entries.length) return { best: null, worst: null };
+  const scored = entries.map(([k, s]) => {
+    const tot = s.w + s.l;
+    return { name: k, wr: tot ? (s.w / tot) * 100 : 0, pnl: s.pnl, n: tot };
+  }).sort((a, b) => b.wr - a.wr || b.pnl - a.pnl);
+  return { best: scored[0], worst: scored[scored.length - 1] };
+}
+
+function renderVenuePerformance(allTrades) {
+  const card = document.getElementById('venuePerformanceCard');
+  const el   = document.getElementById('venuePerformanceContent');
+  if (!card || !el) return;
+  const closed = allTrades.filter(t => t.status === 'closed');
+  if (!closed.length) { card.style.display = 'none'; return; }
+  const v = _venueStats(closed);
+  // Only show the card if there's at least one venue with trades — otherwise hide.
+  const hasMt5 = v.mt5 && v.mt5.trades.length > 0;
+  const hasBx  = v.bitunix && v.bitunix.trades.length > 0;
+  if (!hasMt5 && !hasBx) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  const cardHtml = (venueKey, accent, label, sub, g) => {
+    const tot = g.wins + g.losses;
+    const wr  = tot ? ((g.wins / tot) * 100) : 0;
+    const avgRR = g.rr.length ? (g.rr.reduce((s, r) => s + r, 0) / g.rr.length) : null;
+    const bw  = _bestWorstSetup(g.setupMap);
+    const bestLine  = bw.best  ? `${bw.best.name} (${bw.best.wr.toFixed(0)}% WR, n=${bw.best.n})` : '—';
+    const worstLine = bw.worst && bw.worst.name !== (bw.best && bw.best.name)
+      ? `${bw.worst.name} (${bw.worst.wr.toFixed(0)}% WR, n=${bw.worst.n})`
+      : '—';
+    return `<div style="background:#0d1117;border:1px solid ${accent}55;border-left:4px solid ${accent};border-radius:10px;padding:14px 16px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:1.0rem;font-weight:700;color:${accent};letter-spacing:0.3px;">${label}</div>
+        <div style="font-size:0.7rem;color:#8b949e;">${sub}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:10px;">
+        <div><div class="info-cell-label">Total Trades</div><div class="info-cell-val">${g.trades.length}</div></div>
+        <div><div class="info-cell-label">Win Rate</div><div class="info-cell-val" style="color:${wr>=50?'#3fb950':wr>0?'#f85149':'#8b949e'}">${tot ? wr.toFixed(1) + '%' : '—'}</div></div>
+        <div><div class="info-cell-label">Total P&amp;L</div><div class="info-cell-val" style="color:${g.pnl>=0?'#3fb950':'#f85149'}">${g.pnl>=0?'+':''}$${fmt(Math.abs(g.pnl))}</div></div>
+        <div><div class="info-cell-label">Avg Actual R</div><div class="info-cell-val" style="color:${avgRR!=null?rrColor(avgRR):'#8b949e'}">${avgRR!=null?fmtRR(avgRR):'—'}</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:0.74rem;border-top:1px solid #21262d;padding-top:10px;">
+        <div><div style="color:#8b949e;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">Best Setup</div><div style="color:#3fb950;font-weight:600;">${bestLine}</div></div>
+        <div><div style="color:#8b949e;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">Worst Setup</div><div style="color:#f85149;font-weight:600;">${worstLine}</div></div>
+      </div>
+    </div>`;
+  };
+
+  let html = `<div style="display:grid;grid-template-columns:${hasMt5 && hasBx ? '1fr 1fr' : '1fr'};gap:14px;">`;
+  if (hasMt5) html += cardHtml('mt5',     '#58a6ff', 'MT5 (Forex / Indices)',  'Auto-logged via POIWatcher EA', v.mt5);
+  if (hasBx)  html += cardHtml('bitunix', '#f7931a', 'Bitunix (Crypto Futures)', 'Auto-logged via Bitunix close monitor', v.bitunix);
+  html += `</div>`;
+
+  // Cross-venue insight — only meaningful if both have ≥3 trades.
+  if (hasMt5 && hasBx && v.mt5.trades.length >= 3 && v.bitunix.trades.length >= 3) {
+    const mt5wr = v.mt5.wins + v.mt5.losses ? (v.mt5.wins / (v.mt5.wins + v.mt5.losses)) * 100 : 0;
+    const bxwr  = v.bitunix.wins + v.bitunix.losses ? (v.bitunix.wins / (v.bitunix.wins + v.bitunix.losses)) * 100 : 0;
+    const lead = mt5wr > bxwr ? { name: 'MT5', wr: mt5wr, pnl: v.mt5.pnl, accent: '#58a6ff' } : { name: 'Bitunix', wr: bxwr, pnl: v.bitunix.pnl, accent: '#f7931a' };
+    const trail = mt5wr > bxwr ? { name: 'Bitunix', wr: bxwr, pnl: v.bitunix.pnl } : { name: 'MT5', wr: mt5wr, pnl: v.mt5.pnl };
+    html += `<div class="cmp-insight" style="margin-top:14px;border-left-color:${lead.accent};">
+      <strong>Cross-venue:</strong> <strong>${lead.name}</strong> is leading at ${lead.wr.toFixed(0)}% WR (${lead.pnl>=0?'+':''}$${fmt(Math.abs(lead.pnl))}) vs <strong>${trail.name}</strong> at ${trail.wr.toFixed(0)}% WR (${trail.pnl>=0?'+':''}$${fmt(Math.abs(trail.pnl))}).
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderCryptoMetrics(allTrades) {
+  const card = document.getElementById('cryptoMetricsCard');
+  const el   = document.getElementById('cryptoMetricsContent');
+  if (!card || !el) return;
+  const closed = allTrades.filter(t => t.status === 'closed' && venueForRow(t) === 'bitunix');
+  if (!closed.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  // Aggregate leverage, fees, liquidations
+  const levSamples  = closed.map(t => parseFloat(t.bitunixLeverage)).filter(v => v > 0);
+  const avgLeverage = levSamples.length ? levSamples.reduce((s, v) => s + v, 0) / levSamples.length : 0;
+  const totFunding  = closed.reduce((s, t) => s + (parseFloat(t.bitunixFundingFee) || 0), 0);
+  const totFee      = closed.reduce((s, t) => s + (parseFloat(t.bitunixFee) || 0), 0);
+  const liqCount    = closed.filter(t => t.liquidated || t.closeReason === 'Liquidated' || t.exitType === 'liquidation').length;
+
+  // Leverage tier breakdown — 1-5x, 5-10x, 10x+
+  const tiers = {
+    '1-5x':  { trades: 0, wins: 0, losses: 0, pnl: 0 },
+    '5-10x': { trades: 0, wins: 0, losses: 0, pnl: 0 },
+    '10x+':  { trades: 0, wins: 0, losses: 0, pnl: 0 },
+    'unknown': { trades: 0, wins: 0, losses: 0, pnl: 0 },
+  };
+  closed.forEach(t => {
+    const lev = parseFloat(t.bitunixLeverage) || 0;
+    const tier = lev <= 0 ? 'unknown' : lev < 5 ? '1-5x' : lev < 10 ? '5-10x' : '10x+';
+    const g = tiers[tier];
+    g.trades++;
+    g.pnl += (t.actualPnL || 0);
+    if (t.outcome === 'win') g.wins++;
+    else if (t.outcome === 'loss') g.losses++;
+  });
+
+  // Symbol breakdown (BTCUSDT / ETHUSDT / etc.)
+  const symMap = {};
+  closed.forEach(t => {
+    const sym = (t.pair || '—').toString().toUpperCase();
+    if (!symMap[sym]) symMap[sym] = { trades: 0, wins: 0, losses: 0, pnl: 0, rr: [] };
+    const g = symMap[sym];
+    g.trades++;
+    g.pnl += (t.actualPnL || 0);
+    if (t.outcome === 'win') g.wins++;
+    else if (t.outcome === 'loss') g.losses++;
+    const _sr = signedRR(t);
+    if (_sr != null) g.rr.push(_sr);
+  });
+
+  // Headline tiles
+  let html = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
+    <div class="stat-card"><div class="stat-label">Avg Leverage</div><div class="stat-value" style="color:#f7931a;">${avgLeverage ? avgLeverage.toFixed(1) + '\u00d7' : '\u2014'}</div></div>
+    <div class="stat-card"><div class="stat-label">Funding Paid</div><div class="stat-value" style="color:${totFunding>=0?'#3fb950':'#f85149'};">${totFunding>=0?'+':''}$${fmt(Math.abs(totFunding),2)}</div></div>
+    <div class="stat-card"><div class="stat-label">Trading Fees</div><div class="stat-value" style="color:#d29922;">$${fmt(Math.abs(totFee),2)}</div></div>
+    <div class="stat-card"><div class="stat-label">Liquidations</div><div class="stat-value" style="color:${liqCount?'#f85149':'#3fb950'};">${liqCount}</div></div>
+  </div>`;
+
+  // Leverage tier table
+  html += `<div style="margin-bottom:14px;">
+    <div style="color:#8b949e;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Performance by leverage tier</div>
+    <div style="display:grid;grid-template-columns:repeat(${Object.values(tiers).filter(g => g.trades).length || 1},1fr);gap:8px;">`;
+  ['1-5x', '5-10x', '10x+', 'unknown'].forEach(k => {
+    const g = tiers[k];
+    if (!g.trades) return;
+    const tot = g.wins + g.losses;
+    const wr = tot ? (g.wins / tot) * 100 : 0;
+    const wrCol = !tot ? '#8b949e' : wr >= 50 ? '#3fb950' : '#f85149';
+    const klabel = k === 'unknown' ? 'No leverage data' : k;
+    html += `<div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px 12px;">
+      <div style="font-weight:700;font-size:0.84rem;color:#f7931a;">${klabel}</div>
+      <div style="font-size:0.72rem;color:#8b949e;margin-top:4px;">${g.trades} trade${g.trades===1?'':'s'}</div>
+      <div style="margin-top:4px;font-size:0.78rem;"><span style="color:${wrCol};font-weight:700;">${tot ? wr.toFixed(0) + '%' : '\u2014'}</span> WR &middot; <span style="color:${g.pnl>=0?'#3fb950':'#f85149'};">${g.pnl>=0?'+':''}$${fmt(Math.abs(g.pnl))}</span></div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // Symbol breakdown table
+  const symEntries = Object.entries(symMap).sort((a, b) => b[1].pnl - a[1].pnl);
+  if (symEntries.length) {
+    html += `<div>
+      <div style="color:#8b949e;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;">Performance by symbol</div>
+      <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+        <thead><tr style="color:#8b949e;border-bottom:1px solid #21262d;">
+          <th style="text-align:left;padding:5px 8px;">Symbol</th>
+          <th style="text-align:right;padding:5px 8px;">Trades</th>
+          <th style="text-align:right;padding:5px 8px;">WR</th>
+          <th style="text-align:right;padding:5px 8px;">P&amp;L</th>
+          <th style="text-align:right;padding:5px 8px;">Avg R</th>
+        </tr></thead><tbody>`;
+    symEntries.forEach(([sym, g]) => {
+      const tot = g.wins + g.losses;
+      const wr = tot ? (g.wins / tot) * 100 : 0;
+      const avgRR = g.rr.length ? (g.rr.reduce((s, r) => s + r, 0) / g.rr.length) : null;
+      html += `<tr style="border-top:1px solid #161b22;">
+        <td style="padding:5px 8px;color:#f7931a;font-weight:700;">${escHtml(sym)}</td>
+        <td style="padding:5px 8px;text-align:right;color:#e6edf3;">${g.trades}</td>
+        <td style="padding:5px 8px;text-align:right;color:${tot && wr>=50?'#3fb950':tot?'#f85149':'#8b949e'};">${tot ? wr.toFixed(0) + '%' : '\u2014'}</td>
+        <td style="padding:5px 8px;text-align:right;color:${g.pnl>=0?'#3fb950':'#f85149'};">${g.pnl>=0?'+':''}$${fmt(Math.abs(g.pnl))}</td>
+        <td style="padding:5px 8px;text-align:right;color:${avgRR!=null?rrColor(avgRR):'#8b949e'};">${avgRR!=null?fmtRR(avgRR):'\u2014'}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+  el.innerHTML = html;
+}
+
 function renderDashboard() {
   const filtered = filterByPeriod(trades, activePeriod);
   const closed   = filtered.filter(t => t.status === 'closed');
@@ -6771,6 +7061,10 @@ function renderDashboard() {
     `<div class="stat-card"><div class="stat-label">${s.label}</div>
      <div class="stat-value ${s.cls}">${s.val}</div></div>`
   ).join('');
+
+  // Phase 4: per-venue breakdown + crypto-only metrics
+  renderVenuePerformance(filtered);
+  renderCryptoMetrics(filtered);
 
   // EV headline
   renderEV(closed, wins, losses, winRate);
@@ -7542,11 +7836,48 @@ function generateAnalysisExport(period) {
     if (t.outcome === 'win') sessMap[sess].w++; else if (t.outcome === 'loss') sessMap[sess].l++;
     sessMap[sess].pnl += t.actualPnL || 0;
 
-    // Venue breakdown (mt5 / bitunix / manual)
+    // Venue breakdown (mt5 / bitunix / manual) — Phase 4 tracks setupMap +
+    // signed RR samples so the export can include best/worst setup per venue
+    // and a true average actual-R per venue.
     const v = (typeof venueForRow === 'function') ? venueForRow(t) : (t.venue || t.source || 'manual');
-    if (!venueMap[v]) venueMap[v] = {w:0, l:0, pnl:0};
+    if (!venueMap[v]) venueMap[v] = {w:0, l:0, pnl:0, rr:[], setupMap:{}};
     venueMap[v].pnl += t.actualPnL || 0;
     if (t.outcome === 'win') venueMap[v].w++; else if (t.outcome === 'loss') venueMap[v].l++;
+    const _vrr = signedRR(t);
+    if (_vrr != null) venueMap[v].rr.push(_vrr);
+    const _vSet = t.setup || 'Unknown';
+    if (!venueMap[v].setupMap[_vSet]) venueMap[v].setupMap[_vSet] = {w:0, l:0, pnl:0};
+    venueMap[v].setupMap[_vSet].pnl += t.actualPnL || 0;
+    if (t.outcome === 'win') venueMap[v].setupMap[_vSet].w++;
+    else if (t.outcome === 'loss') venueMap[v].setupMap[_vSet].l++;
+  });
+
+  // Phase 4 — crypto-only aggregates (Bitunix). Built once, used by the
+  // CRYPTO METRICS section below.
+  const cryptoTrades = closed.filter(t => (typeof venueForRow === 'function' ? venueForRow(t) : (t.venue || '')) === 'bitunix');
+  const cryptoSymMap = {};
+  const cryptoLevTiers = { '1-5x': {n:0,w:0,l:0,pnl:0}, '5-10x': {n:0,w:0,l:0,pnl:0}, '10x+': {n:0,w:0,l:0,pnl:0} };
+  let cryptoLevSum = 0, cryptoLevN = 0, cryptoFunding = 0, cryptoFee = 0, cryptoLiq = 0;
+  cryptoTrades.forEach(t => {
+    const sym = (t.pair || '').toString().toUpperCase() || '—';
+    if (!cryptoSymMap[sym]) cryptoSymMap[sym] = {w:0, l:0, pnl:0, rr:[], n:0};
+    cryptoSymMap[sym].n++;
+    cryptoSymMap[sym].pnl += t.actualPnL || 0;
+    if (t.outcome === 'win') cryptoSymMap[sym].w++;
+    else if (t.outcome === 'loss') cryptoSymMap[sym].l++;
+    const _csr = signedRR(t);
+    if (_csr != null) cryptoSymMap[sym].rr.push(_csr);
+    const lev = parseFloat(t.bitunixLeverage) || 0;
+    if (lev > 0) { cryptoLevSum += lev; cryptoLevN++; }
+    const tier = lev <= 0 ? null : lev < 5 ? '1-5x' : lev < 10 ? '5-10x' : '10x+';
+    if (tier) {
+      const g = cryptoLevTiers[tier];
+      g.n++; g.pnl += t.actualPnL || 0;
+      if (t.outcome === 'win') g.w++; else if (t.outcome === 'loss') g.l++;
+    }
+    cryptoFunding += parseFloat(t.bitunixFundingFee) || 0;
+    cryptoFee     += parseFloat(t.bitunixFee) || 0;
+    if (t.liquidated || t.closeReason === 'Liquidated' || t.exitType === 'liquidation') cryptoLiq++;
   });
 
   const d = (n, dec=2) => n == null ? '—' : Number(n).toFixed(dec);
@@ -7596,7 +7927,7 @@ function generateAnalysisExport(period) {
   }
   out += `\n`;
 
-  // Venue performance breakdown (MT5 / Bitunix / Manual)
+  // Venue performance breakdown (MT5 / Bitunix / Manual) — Phase 4 expanded
   const venueKeys = Object.keys(venueMap);
   if (venueKeys.length) {
     out += `VENUE PERFORMANCE:\n`;
@@ -7605,14 +7936,70 @@ function generateAnalysisExport(period) {
       const ai = venueOrder.indexOf(a); const bi = venueOrder.indexOf(b);
       return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
     });
+    const _bestWorst = (setupMap) => {
+      const entries = Object.entries(setupMap || {}).filter(([, s]) => (s.w + s.l) >= 2);
+      if (!entries.length) return { best: null, worst: null };
+      const ranked = entries.map(([k, s]) => {
+        const tot = s.w + s.l;
+        return { name: k, wr: tot ? (s.w / tot) * 100 : 0, pnl: s.pnl, n: tot };
+      }).sort((a, b) => b.wr - a.wr || b.pnl - a.pnl);
+      return { best: ranked[0], worst: ranked.length > 1 ? ranked[ranked.length - 1] : null };
+    };
     sortedVenues.forEach(v => {
       const g = venueMap[v];
       const tot = g.w + g.l;
       const wr  = tot ? ((g.w / tot) * 100).toFixed(1) + '%' : '—';
+      const avgRR = g.rr && g.rr.length ? (g.rr.reduce((s, r) => s + r, 0) / g.rr.length) : null;
+      const bw = _bestWorst(g.setupMap);
       const label = (typeof venueLabel === 'function') ? venueLabel(v)
                   : (v === 'mt5' ? 'MT5' : v === 'bitunix' ? 'Bitunix' : v === 'manual' ? 'Manual' : v);
-      out += `  ${label}: ${tot} trades  |  W ${g.w} / L ${g.l}  |  WR ${wr}  |  P&L ${money(g.pnl)}\n`;
+      out += `  ${label}: ${tot} trades  |  W ${g.w} / L ${g.l}  |  WR ${wr}  |  P&L ${money(g.pnl)}  |  Avg R ${avgRR != null ? fmtRR(avgRR) : '—'}\n`;
+      if (bw.best)  out += `    Best setup:  "${bw.best.name}" (${bw.best.wr.toFixed(0)}% WR, n=${bw.best.n}, ${money(bw.best.pnl)})\n`;
+      if (bw.worst && bw.worst.name !== (bw.best && bw.best.name)) {
+        out += `    Worst setup: "${bw.worst.name}" (${bw.worst.wr.toFixed(0)}% WR, n=${bw.worst.n}, ${money(bw.worst.pnl)})\n`;
+      }
     });
+    // Cross-venue insight — only when both MT5 and Bitunix have ≥3 closed
+    const m = venueMap['mt5'], b = venueMap['bitunix'];
+    if (m && b && (m.w + m.l) >= 3 && (b.w + b.l) >= 3) {
+      const mwr = (m.w / (m.w + m.l)) * 100;
+      const bwr = (b.w / (b.w + b.l)) * 100;
+      const lead = mwr >= bwr
+        ? { name: 'MT5', wr: mwr, pnl: m.pnl, other: 'Bitunix', owr: bwr, opnl: b.pnl }
+        : { name: 'Bitunix', wr: bwr, pnl: b.pnl, other: 'MT5', owr: mwr, opnl: m.pnl };
+      out += `  Cross-venue: ${lead.name} leading at ${lead.wr.toFixed(0)}% WR (${money(lead.pnl)}) vs ${lead.other} at ${lead.owr.toFixed(0)}% WR (${money(lead.opnl)})\n`;
+    }
+    out += `\n`;
+  }
+
+  // Phase 4 — Crypto-specific metrics block (Bitunix only)
+  if (cryptoTrades.length) {
+    const avgLev = cryptoLevN ? cryptoLevSum / cryptoLevN : 0;
+    out += `CRYPTO METRICS (Bitunix):\n`;
+    out += `  Avg Leverage: ${avgLev ? avgLev.toFixed(1) + 'x' : '—'}`;
+    out += `  |  Funding Paid: ${money(cryptoFunding)}`;
+    out += `  |  Trading Fees: $${d(cryptoFee)}`;
+    out += `  |  Liquidations: ${cryptoLiq}\n`;
+    // Leverage tier
+    const tierKeys = ['1-5x', '5-10x', '10x+'];
+    const tierLines = tierKeys.filter(k => cryptoLevTiers[k].n > 0).map(k => {
+      const g = cryptoLevTiers[k];
+      const tot = g.w + g.l;
+      const wr = tot ? ((g.w / tot) * 100).toFixed(0) + '%' : '—';
+      return `${k}: ${g.n} trades, WR ${wr}, P&L ${money(g.pnl)}`;
+    });
+    if (tierLines.length) out += `  By leverage: ${tierLines.join('  |  ')}\n`;
+    // Symbol breakdown
+    const symEntries = Object.entries(cryptoSymMap).sort((a, b) => b[1].pnl - a[1].pnl);
+    if (symEntries.length) {
+      out += `  By symbol:\n`;
+      symEntries.forEach(([sym, g]) => {
+        const tot = g.w + g.l;
+        const wr  = tot ? ((g.w / tot) * 100).toFixed(0) + '%' : '—';
+        const aR  = g.rr.length ? fmtRR(g.rr.reduce((s, r) => s + r, 0) / g.rr.length) : '—';
+        out += `    ${sym}: ${g.n} trades, ${g.w}W/${g.l}L (${wr}), P&L ${money(g.pnl)}, Avg R ${aR}\n`;
+      });
+    }
     out += `\n`;
   }
 
