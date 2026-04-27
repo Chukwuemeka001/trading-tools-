@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POIWatcher — Trading Journal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="components/AppData.js"></script>
+<style>
+:root {
+  --bg:    #0c0e10;
+  --s1:    #111418;
+  --s2:    #171b1f;
+  --s3:    #1e2228;
+  --s4:    #252c35;
+  --border:#252c34;
+  --border2:#303a47;
+  --t1:    #e8ecf0;
+  --t2:    #8d99a8;
+  --t3:    #4e5a6a;
+  --green: #22c55e;
+  --red:   #ef4444;
+  --amber: #f59e0b;
+  --blue:  #3b82f6;
+  --purple:#a855f7;
+  --orange: #f97316;
+  --grey-sc:#6b7280;
+  --mono:  'JetBrains Mono', monospace;
+  --sb-w:  240px;
+  --sb-w-collapsed: 58px;
+  --top-h: 52px;
+  --ses-h: 38px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--t1);font-family:'Space Grotesk',sans-serif;font-size:14px}
+input,select,textarea,button{font-family:inherit}
+select option{background:var(--s3)}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+input:focus,select:focus,textarea:focus{border-color:rgba(59,130,246,0.6)!important;outline:none;box-shadow:0 0 0 2px rgba(59,130,246,0.12)}
+textarea{resize:vertical}
+
+/* ── Layout ── */
+.app{display:grid;grid-template-rows:var(--top-h) var(--ses-h) 1fr;grid-template-columns:var(--sb-w) 1fr;height:100vh;overflow:hidden;transition:grid-template-columns 0.25s ease}
+.app.collapsed{grid-template-columns:var(--sb-w-collapsed) 1fr}
+
+/* Topbar */
+.topbar{grid-column:1/-1;grid-row:1;display:flex;align-items:center;padding:0 18px;gap:14px;background:var(--s1);border-bottom:1px solid var(--border);z-index:50}
+
+/* Session bar */
+.session-bar{grid-column:1/-1;grid-row:2;display:flex;align-items:center;padding:0 18px;gap:0;background:var(--s1);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.session-bar::-webkit-scrollbar{display:none}
+
+/* Sidebar */
+.sidebar{grid-row:3;grid-column:1;background:var(--s1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;transition:all 0.25s ease}
+
+/* Main content */
+.main-content{grid-row:3;grid-column:2;overflow-y:auto;padding:24px 28px}
+
+/* Nav items */
+.nav-item{display:flex;align-items:center;gap:11px;padding:10px 14px;margin:2px 8px;border-radius:9px;cursor:pointer;transition:all 0.15s;color:var(--t3);font-size:13.5px;font-weight:500;border:none;background:none;width:calc(100% - 16px);text-align:left;white-space:nowrap;overflow:hidden}
+.nav-item:hover{background:var(--s3);color:var(--t2)}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--blue)}
+.nav-icon{font-size:17px;width:22px;text-align:center;flex-shrink:0}
+.nav-label{opacity:1;transition:opacity 0.2s}
+.collapsed .nav-label{opacity:0;pointer-events:none}
+.badge{background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:auto;flex-shrink:0}
+
+/* Session segment */
+.ses-seg{display:flex;align-items:center;gap:8px;padding:0 18px;border-right:1px solid var(--border);height:100%;flex-shrink:0}
+.ses-dot{width:7px;height:7px;border-radius:50%}
+.ses-active .ses-dot{animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* Bottom nav — mobile only */
+.bottom-nav{display:none}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--s2);border:1px solid var(--border2);border-radius:10px;padding:12px 22px;font-size:13px;color:var(--t1);z-index:999;box-shadow:0 8px 40px rgba(0,0,0,0.6);animation:tIn 0.2s ease;white-space:nowrap}
+@keyframes tIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* Responsive */
+@media(max-width:900px){
+  :root{--sb-w:58px}
+  .nav-label{display:none}
+  .sidebar-logo span{display:none}
+  .nav-item{justify-content:center;padding:10px}
+  .collapsed .sidebar{display:none}
+}
+@media(max-width:640px){
+  .app{grid-template-rows:var(--top-h) var(--ses-h) 1fr auto;grid-template-columns:1fr}
+  .sidebar{display:none!important}
+  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;height:60px;background:var(--s1);border-top:1px solid var(--border);z-index:100;justify-content:space-around;align-items:center;padding:0 4px}
+  .main-content{grid-column:1;padding:14px 14px 72px}
+  .bn-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 8px;cursor:pointer;border-radius:8px;color:var(--t3);font-size:10px;font-weight:500;border:none;background:none;flex:1}
+  .bn-item.active{color:var(--blue)}
+  .bn-icon{font-size:20px}
+  .session-bar{padding:0 12px}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="components/Dashboard.jsx"></script>
+<script type="text/babel" src="components/Calculator.jsx"></script>
+<script type="text/babel" src="components/LogTrade.jsx"></script>
+<script type="text/babel" src="components/Journal.jsx"></script>
+<script type="text/babel" src="components/Alerts.jsx"></script>
+<script type="text/babel" src="components/LiveTab.jsx"></script>
+<script type="text/babel" src="components/Settings.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const TABS = [
+  { id:'dashboard', label:'Dashboard',  icon:'📊' },
+  { id:'log',       label:'Log Trade',  icon:'✏️' },
+  { id:'journal',   label:'Journal',    icon:'📋' },
+  { id:'alerts',    label:'Alerts',     icon:'🔔', badge:2 },
+  { id:'live',      label:'Live Trades', icon:'📡' },
+  { id:'calculator',label:'Calculator', icon:'🧮' },
+  { id:'settings',  label:'Settings',   icon:'⚙️' },
+];
+
+// ── Session clock ──────────────────────────────────────────────────
+function useClock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => { const id = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(id); }, []);
+  return now;
+}
+
+function SessionBar() {
+  const now = useClock();
+  const utcH = now.getUTCHours();
+  const utcM = now.getUTCMinutes();
+  const utcS = now.getUTCSeconds();
+
+  // Session windows (UTC)
+  const sessions = [
+    { name:'Asian',   start:22, end:7,  color:'var(--purple)', tz:'Asia/Tokyo' },
+    { name:'London',  start:7,  end:16, color:'var(--blue)',   tz:'Europe/London' },
+    { name:'NY',      start:12, end:21, color:'var(--green)',  tz:'America/New_York' },
+    { name:'Overlap', start:12, end:16, color:'var(--amber)',  tz:null },
+  ];
+
+  const isActive = (s) => {
+    if (s.name==='Overlap') return utcH>=12&&utcH<16;
+    if (s.end>s.start) return utcH>=s.start&&utcH<s.end;
+    return utcH>=s.start||utcH<s.end;
+  };
+
+  const fmt = (tz) => {
+    if (!tz) return '';
+    return now.toLocaleTimeString('en-GB',{timeZone:tz,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  };
+  const fmtUTC = () => `${String(utcH).padStart(2,'0')}:${String(utcM).padStart(2,'0')}:${String(utcS).padStart(2,'0')}`;
+
+  return (
+    <div className="session-bar">
+      {sessions.map(s => {
+        const active = isActive(s);
+        return (
+          <div key={s.name} className={`ses-seg ${active?'ses-active':''}`}
+            style={{ opacity: active?1:0.4 }}>
+            <div className="ses-dot" style={{ background:s.color }}/>
+            <span style={{ fontSize:11, fontWeight:600, color:s.color, letterSpacing:'0.04em' }}>{s.name}</span>
+            {s.tz && <span style={{ fontFamily:'var(--mono)', fontSize:11, color:'var(--t3)' }}>{fmt(s.tz)}</span>}
+          </div>
+        );
+      })}
+      <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:16 }}>
+        <div className="ses-seg" style={{ border:'none', paddingRight:0 }}>
+          <span style={{ fontSize:10, color:'var(--t3)', letterSpacing:'0.08em' }}>UTC</span>
+          <span style={{ fontFamily:'var(--mono)', fontSize:12, color:'var(--t2)', fontWeight:600 }}>{fmtUTC()}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MT5 status chip ────────────────────────────────────────────────
+function ConnectionChips() {
+  return (
+    <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 11px',
+        borderRadius:20, border:'1px solid rgba(239,68,68,0.25)', background:'rgba(239,68,68,0.06)' }}>
+        <span style={{ width:5, height:5, borderRadius:'50%', background:'var(--red)' }}/>
+        <span style={{ fontSize:11, color:'var(--red)', fontWeight:600, fontFamily:'var(--mono)' }}>MT5 Offline</span>
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 11px',
+        borderRadius:20, border:'1px solid rgba(249,115,22,0.3)', background:'rgba(249,115,22,0.07)' }}>
+        <span style={{ width:5, height:5, borderRadius:'50%', background:'var(--orange)' }}/>
+        <span style={{ fontSize:11, color:'var(--orange)', fontWeight:600, fontFamily:'var(--mono)' }}>Bitunix Live</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Toast ──────────────────────────────────────────────────────────
+function Toast({ msg, onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 2500); return () => clearTimeout(t); }, []);
+  return <div className="toast">✓ {msg}</div>;
+}
+
+// ── App ────────────────────────────────────────────────────────────
+function App() {
+  const storedOpen = localStorage.getItem('sb_open');
+  const [sidebarOpen, setSidebarOpen] = useState(storedOpen === null ? true : storedOpen === 'true');
+  const [tab, setTab] = useState('dashboard');
+  const [toast, setToast] = useState(null);
+
+  const toggleSidebar = () => {
+    setSidebarOpen(v => {
+      localStorage.setItem('sb_open', String(!v));
+      return !v;
+    });
+  };
+
+  const goTab = (id) => {
+    setTab(id);
+    // On mobile auto-close anything
+  };
+
+  const PAGE = {
+    dashboard: <Dashboard />,
+    log:       <LogTrade onSaved={() => setToast('Trade saved to journal')} />,
+    journal:   <Journal />,
+    alerts:    <Alerts />,
+    live:      <LiveTab />,
+    calculator:<Calculator />,
+    settings:  <Settings />,
+  };
+
+  const PAGE_TITLE = {
+    dashboard:'Performance Dashboard', log:'Log New Trade', journal:'Trade Journal',
+    alerts:'Price Alerts', live:'Live Trades — MT5 & Bitunix', calculator:'Position Calculator', settings:'Settings',
+  };
+
+  return (
+    <>
+      <div className={`app ${sidebarOpen?'':'collapsed'}`}>
+
+        {/* ── Topbar ── */}
+        <header className="topbar">
+          <button onClick={toggleSidebar} style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:20, lineHeight:1, padding:4, borderRadius:6, display:'flex', alignItems:'center' }}>☰</button>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ width:30, height:30, borderRadius:8, background:'var(--blue)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>📈</div>
+            <span style={{ fontWeight:700, fontSize:16, color:'var(--t1)', letterSpacing:'-0.02em' }}>POIWatcher</span>
+          </div>
+          <div style={{ flex:1 }}/>
+          <ConnectionChips/>
+          <button onClick={() => goTab('log')} style={{
+            padding:'8px 18px', borderRadius:8, border:'none', background:'var(--blue)',
+            color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', gap:6
+          }}>
+            ✏️ Log Trade
+          </button>
+        </header>
+
+        {/* ── Session bar ── */}
+        <SessionBar/>
+
+        {/* ── Sidebar ── */}
+        <nav className="sidebar">
+          <div style={{ padding:'14px 8px 8px', borderBottom:'1px solid var(--border)', marginBottom:6 }}>
+            <div className="sidebar-logo" style={{ display:'flex', alignItems:'center', gap:10, padding:'4px 6px 10px' }}>
+              <div style={{ width:30, height:30, borderRadius:8, background:'var(--blue)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, flexShrink:0 }}>📈</div>
+              <span className="nav-label" style={{ fontWeight:700, fontSize:14, color:'var(--t1)' }}>POIWatcher</span>
+            </div>
+          </div>
+          {TABS.map(t => (
+            <button key={t.id} className={`nav-item ${tab===t.id?'active':''}`} onClick={() => goTab(t.id)}>
+              <span className="nav-icon">{t.icon}</span>
+              <span className="nav-label">{t.label}</span>
+              {t.badge && <span className="badge nav-label">{t.badge}</span>}
+            </button>
+          ))}
+          <div style={{ marginTop:'auto', padding:'10px 8px', borderTop:'1px solid var(--border)' }}>
+            <div style={{ padding:'4px 14px' }}>
+              <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--red)', display:'inline-block', marginRight:8 }}/>
+              <span className="nav-label" style={{ fontSize:11, color:'var(--t3)' }}>MT5 offline</span>
+            </div>
+            <div style={{ padding:'4px 14px' }}>
+              <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--orange)', display:'inline-block', marginRight:8 }}/>
+              <span className="nav-label" style={{ fontSize:11, color:'var(--t3)' }}>Bitunix live</span>
+            </div>
+          </div>
+        </nav>
+
+        {/* ── Content ── */}
+        <main className="main-content">
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:22 }}>
+            <div>
+              <div style={{ fontSize:20, fontWeight:700, color:'var(--t1)', letterSpacing:'-0.02em' }}>{PAGE_TITLE[tab]}</div>
+              <div style={{ fontSize:12, color:'var(--t3)', marginTop:2 }}>
+                {tab==='dashboard'&&'All time · 9 trades tracked'}
+                {tab==='log'&&'Fill in your pre-trade analysis'}
+                {tab==='journal'&&'Review and manage all your trades'}
+                {tab==='calculator'&&'Position sizing for Forex and BTC/USDT'}
+                {tab==='alerts'&&'Price level monitoring'}
+                {tab==='live'&&'MT5 Forex · Bitunix Crypto · Paper mode active'}
+                {tab==='settings'&&'App configuration and account settings'}
+              </div>
+            </div>
+            {tab==='journal' && (
+              <button onClick={() => goTab('log')} style={{ padding:'9px 18px', borderRadius:8, border:'none', background:'var(--blue)', color:'#fff', fontWeight:600, fontSize:13, cursor:'pointer' }}>+ Log Trade</button>
+            )}
+            {tab==='alerts' && (
+              <button style={{ padding:'9px 18px', borderRadius:8, border:'none', background:'var(--blue)', color:'#fff', fontWeight:600, fontSize:13, cursor:'pointer' }}>+ Add Alert</button>
+            )}
+          </div>
+          <div key={tab}>{PAGE[tab]}</div>
+        </main>
+      </div>
+
+      {/* Mobile bottom nav */}
+      <nav className="bottom-nav">
+        {TABS.slice(0,5).map(t => (
+          <button key={t.id} className={`bn-item ${tab===t.id?'active':''}`} onClick={() => goTab(t.id)}>
+            <span className="bn-icon" style={{ position:'relative' }}>
+              {t.icon}
+              {t.badge && <span style={{ position:'absolute', top:-4, right:-6, background:'var(--red)', color:'#fff', borderRadius:8, padding:'1px 4px', fontSize:9, fontWeight:700 }}>{t.badge}</span>}
+            </span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {toast && <Toast msg={toast} onDone={() => setToast(null)}/>}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
