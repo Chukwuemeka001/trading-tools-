@@ -1976,16 +1976,29 @@
           <option value="failed">Failed/Rejected</option>
           <option value="paper">Paper only</option>
           <option value="limit">Limit orders</option>
-          <option value="approved">Approved</option>
-          <option value="executed">Executed</option>
-          <option value="paper_executed">Paper executed</option>
-          <option value="execution_failed">Execution failed</option>
-          <option value="rejected">Rejected</option>
-          <option value="cancelled">Cancelled</option>
-          <option value="limit_order_placed">Limit placed</option>
-          <option value="limit_order_filled">Limit filled</option>
-          <option value="limit_order_expired">Limit expired</option>
-          <option value="limit_order_cancelled">Limit cancelled</option>
+          <optgroup label="MT5 / shared">
+            <option value="approved">Approved</option>
+            <option value="executed">Executed</option>
+            <option value="paper_executed">Paper executed</option>
+            <option value="execution_failed">Execution failed</option>
+            <option value="rejected">Rejected</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="limit_order_placed">Limit placed</option>
+            <option value="limit_order_filled">Limit filled</option>
+            <option value="limit_order_expired">Limit expired</option>
+            <option value="limit_order_cancelled">Limit cancelled</option>
+          </optgroup>
+          <optgroup label="Bitunix events">
+            <option value="bitunix_all">Bitunix \u2014 all</option>
+            <option value="bitunix_approved">Bitunix approved</option>
+            <option value="bitunix_executed">Bitunix executed</option>
+            <option value="bitunix_limit_placed">Bitunix limit placed</option>
+            <option value="bitunix_limit_filled">Bitunix limit filled</option>
+            <option value="bitunix_limit_expired">Bitunix limit expired</option>
+            <option value="bitunix_be_set">Bitunix BE set</option>
+            <option value="bitunix_closed">Bitunix closed</option>
+            <option value="bitunix_cancelled">Bitunix cancelled</option>
+          </optgroup>
           <option value="test_passed">Test passed</option>
           <option value="test_failed">Test failed</option>
         </select>
@@ -3826,7 +3839,7 @@ function renderJournal() {
     const plural = reviewQueue.length === 1 ? 'trade' : 'trades';
     const verb   = reviewQueue.length === 1 ? 'is' : 'are';
     reviewBannerHtml = `
-      <div onclick="openModal('${firstId}')" style="
+      <div onclick="openModal('${firstId}', { focusReview: true })" style="
         cursor:pointer;
         background:linear-gradient(135deg, rgba(56,139,253,0.15), rgba(46,160,67,0.10));
         border:1px solid rgba(56,139,253,0.40);
@@ -3852,6 +3865,42 @@ function renderJournal() {
         <span style="color:#58a6ff;font-size:1.1rem;">\u203A</span>
       </div>`;
   }
+
+  // ── Bitunix auto-close review banner (orange) ─────────────────────
+  const bitunixReviewQueue = trades.filter(t => t && t.bitunixAutoClose && t.reviewNeeded);
+  let bitunixBannerHtml = '';
+  if (bitunixReviewQueue.length) {
+    const firstId = bitunixReviewQueue[0].id;
+    const plural = bitunixReviewQueue.length === 1 ? 'trade' : 'trades';
+    const verb   = bitunixReviewQueue.length === 1 ? 'is' : 'are';
+    bitunixBannerHtml = `
+      <div onclick="openModal('${firstId}', { focusReview: true })" style="
+        cursor:pointer;
+        background:linear-gradient(135deg, rgba(247,147,26,0.18), rgba(247,147,26,0.06));
+        border:1px solid rgba(247,147,26,0.45);
+        border-left:4px solid #f7931a;
+        border-radius:8px;
+        padding:12px 16px;
+        margin-bottom:14px;
+        display:flex;
+        align-items:center;
+        gap:12px;
+        font-size:0.9rem;
+        color:#e6edf3;
+      ">
+        <span style="font-size:1.4rem;">\u{1F7E7}</span>
+        <div style="flex:1;">
+          <div style="font-weight:600;color:#f7931a;">
+            Bitunix closed ${bitunixReviewQueue.length} ${plural} \u2014 review and complete your post-trade analysis
+          </div>
+          <div style="font-size:0.78rem;color:#8b949e;margin-top:2px;">
+            ${bitunixReviewQueue.length} ${plural} ${verb} waiting for your review. Click to open the first one.
+          </div>
+        </div>
+        <span style="color:#f7931a;font-size:1.1rem;">\u203A</span>
+      </div>`;
+  }
+  reviewBannerHtml = bitunixBannerHtml + reviewBannerHtml;
 
   if (!list.length) {
     el.innerHTML = reviewBannerHtml +
@@ -3939,9 +3988,10 @@ function renderJournal() {
 let modalRating = 0;
 let modalExecRating = 5;
 
-function openModal(id) {
+function openModal(id, opts) {
   const t = trades.find(x => x.id === id);
   if (!t) return;
+  const focusReview = !!(opts && opts.focusReview);
   modalRating = t.rating || 0;
   modalExecRating = t.executionRating || 5;
   postImgData = '';
@@ -4378,7 +4428,7 @@ function openModal(id) {
     if (hasReview) {
       reviewDisplay = `
         <hr class="section-divider">
-        <div class="collapsible-header open" onclick="toggleCollapsible(this)">
+        <div id="modalReviewDisplay" class="collapsible-header open" onclick="toggleCollapsible(this)">
           <div class="card-title" style="margin:0;">Post-Trade Review</div>
           <span class="arrow">▶</span>
         </div>
@@ -4403,14 +4453,18 @@ function openModal(id) {
   let mt5ReviewForm = '';
   if (t.status === 'closed' && t.reviewNeeded) {
     const _ratingInit = t.executionRating || 5;
+    const _reviewVenue = t.bitunixAutoClose ? 'bitunix' : (t.mt5AutoClose ? 'mt5' : 'manual');
+    const _reviewAccent = _reviewVenue === 'bitunix' ? '#f7931a' : '#58a6ff';
+    const _reviewAccentRGB = _reviewVenue === 'bitunix' ? '247,147,26' : '56,139,253';
+    const _reviewVenueLabel = _reviewVenue === 'bitunix' ? 'Bitunix' : 'MT5';
     mt5ReviewForm = `
       <hr class="section-divider">
-      <div style="background:rgba(56,139,253,0.10);border:1px solid rgba(56,139,253,0.35);border-radius:8px;padding:14px 16px;margin-bottom:14px;">
+      <div id="modalReviewSection" style="background:rgba(${_reviewAccentRGB},0.10);border:1px solid rgba(${_reviewAccentRGB},0.35);border-radius:8px;padding:14px 16px;margin-bottom:14px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
           <span style="font-size:1.2rem;">\u{1F4DD}</span>
           <div style="flex:1;">
-            <div style="font-weight:600;color:#58a6ff;font-size:0.95rem;">Complete your post-trade review to finish this trade entry</div>
-            <div style="font-size:0.78rem;color:#8b949e;margin-top:2px;">MT5 already filled in the close data \u2014 add your reflection below.</div>
+            <div style="font-weight:600;color:${_reviewAccent};font-size:0.95rem;">Complete your post-trade review to finish this trade entry</div>
+            <div style="font-size:0.78rem;color:#8b949e;margin-top:2px;">${_reviewVenueLabel} already filled in the close data \u2014 add your reflection below.</div>
           </div>
         </div>
         <div class="form-grid">
@@ -4541,6 +4595,27 @@ function openModal(id) {
   }
 
   overlay.classList.add('open');
+
+  // Auto-scroll to + expand the post-trade review section when opening
+  // from a venue auto-close banner (MT5 or Bitunix)
+  if (focusReview) {
+    setTimeout(() => {
+      // The "Complete Post-Trade Review" form sits inside #modalReviewSection
+      // when reviewNeeded is set. Fall back to the closeReviewSection on closed
+      // trades that were already reviewed.
+      const target =
+        document.getElementById('modalReviewSection')
+        || document.getElementById('modalReviewDisplay')
+        || document.querySelector('#modalBody [data-section="review"]');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Pulse-flash to draw the eye
+        target.style.transition = 'box-shadow 0.4s ease';
+        target.style.boxShadow = '0 0 0 3px rgba(247,147,26,0.45)';
+        setTimeout(() => { target.style.boxShadow = ''; }, 1200);
+      }
+    }, 250);
+  }
 
   // Load chart images from IndexedDB asynchronously
   async function loadModalCharts() {
@@ -5933,8 +6008,11 @@ async function refreshExecutionLog() {
   }
   const filter = (document.getElementById('execLogFilter') || {}).value || 'all';
   const venueFlt = (document.getElementById('execLogVenue') || {}).value || '';
+  // "bitunix_all" is a client-side synthetic group — fetch everything, filter below.
+  const isBitunixAll = filter === 'bitunix_all';
+  const apiStatus = isBitunixAll ? 'all' : filter;
   try {
-    const url = backendUrl + '/api/execution/log?limit=50&status=' + encodeURIComponent(filter);
+    const url = backendUrl + '/api/execution/log?limit=50&status=' + encodeURIComponent(apiStatus);
     const resp = await fetch(url, { headers: { 'X-Execution-Key': execKey } });
     if (!resp.ok) {
       panel.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">Log fetch failed (HTTP ' + resp.status + ')</div>';
@@ -5942,6 +6020,9 @@ async function refreshExecutionLog() {
     }
     const data = await resp.json();
     let log = data.log || [];
+    if (isBitunixAll) {
+      log = log.filter(e => (e.status || '').toLowerCase().startsWith('bitunix_'));
+    }
     // Client-side venue filter — works with any backend by inferring venue
     // from the symbol (USDT → bitunix, otherwise mt5) and from the source/venue
     // fields when present.
@@ -5949,6 +6030,8 @@ async function refreshExecutionLog() {
       log = log.filter(e => {
         const v = (e.venue || '').toLowerCase();
         if (v) return v === venueFlt;
+        const status = (e.status || '').toLowerCase();
+        if (status.startsWith('bitunix_')) return venueFlt === 'bitunix';
         const sym = (e.symbol || '').toUpperCase();
         const inferred = /USDT$/.test(sym) ? 'bitunix' : 'mt5';
         return inferred === venueFlt;
@@ -5959,12 +6042,26 @@ async function refreshExecutionLog() {
       return;
     }
     const colorFor = (s) => {
-      if (['executed','paper_executed','test_passed','approved','limit_order_filled'].includes(s)) return '#3fb950';
-      if (['execution_failed','test_failed','rejected'].includes(s))                               return '#f85149';
-      if (['cancelled','limit_order_cancelled'].includes(s))                                       return '#8b949e';
-      if (['limit_order_expired'].includes(s))                                                     return '#d29922'; // amber
-      if (['limit_order_placed'].includes(s))                                                      return '#58a6ff'; // blue
+      // Bitunix events get the venue's orange (#f7931a) but specific outcomes
+      // still override (success → green, fail → red, expired → amber, etc.)
+      if (['executed','paper_executed','test_passed','approved','limit_order_filled',
+           'bitunix_executed','bitunix_limit_filled','bitunix_closed'].includes(s)) return '#3fb950';
+      if (['execution_failed','test_failed','rejected'].includes(s))                return '#f85149';
+      if (['cancelled','limit_order_cancelled','bitunix_cancelled'].includes(s))    return '#8b949e';
+      if (['limit_order_expired','bitunix_limit_expired'].includes(s))               return '#d29922'; // amber
+      if (['limit_order_placed'].includes(s))                                        return '#58a6ff'; // MT5 blue
+      if (['bitunix_approved','bitunix_limit_placed','bitunix_be_set'].includes(s))  return '#f7931a'; // Bitunix orange
+      if ((s || '').startsWith('bitunix_'))                                          return '#f7931a';
       return '#ffa657';
+    };
+    const venueChip = (e) => {
+      const v = (e.venue || '').toLowerCase();
+      const status = (e.status || '').toLowerCase();
+      const isBx = v === 'bitunix' || status.startsWith('bitunix_');
+      const isMt5 = v === 'mt5' || (!isBx && (status === 'executed' || status === 'paper_executed' || status.startsWith('limit_order_')));
+      if (isBx)  return `<span style="display:inline-block;margin-right:6px;padding:1px 6px;border-radius:8px;background:rgba(247,147,26,0.18);border:1px solid rgba(247,147,26,0.45);color:#f7931a;font-size:0.6rem;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;">BITUNIX</span>`;
+      if (isMt5) return `<span style="display:inline-block;margin-right:6px;padding:1px 6px;border-radius:8px;background:rgba(56,139,253,0.18);border:1px solid rgba(56,139,253,0.45);color:#58a6ff;font-size:0.6rem;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;">MT5</span>`;
+      return '';
     };
     let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.72rem;">';
     html += '<thead><tr style="color:#8b949e;border-bottom:1px solid #21262d;">'
@@ -5980,12 +6077,13 @@ async function refreshExecutionLog() {
       const slip = e.slippage != null ? (e.slippage > 0 ? '+' : '') + e.slippage : '';
       const planActual = e.actual_entry != null ? `${e.planned_entry||''} → ${e.actual_entry} (${slip})` : (e.planned_entry || '');
       const tag = (e.paper ? '📄 ' : '') + (e.test ? '🧪 ' : '');
+      const ticket = e.mt4_ticket ? '#'+e.mt4_ticket : (e.bitunix_order_id ? '#'+String(e.bitunix_order_id).slice(0,10) : '');
       html += `<tr style="border-bottom:1px solid #161b22;">
         <td style="padding:5px 8px;color:#8b949e;white-space:nowrap;">${escHtml(ts)}</td>
-        <td style="padding:5px 8px;color:#e6edf3;">${tag}${escHtml(e.symbol||'')} ${escHtml(e.direction||'')}</td>
+        <td style="padding:5px 8px;color:#e6edf3;">${venueChip(e)}${tag}${escHtml(e.symbol||'')} ${escHtml(e.direction||'')}</td>
         <td style="padding:5px 8px;color:${colorFor(e.status)};font-weight:600;">${escHtml(e.status||'')}</td>
         <td style="padding:5px 8px;color:#e6edf3;">${escHtml(planActual)}</td>
-        <td style="padding:5px 8px;color:#8b949e;">${e.mt4_ticket ? '#'+e.mt4_ticket : ''}</td>
+        <td style="padding:5px 8px;color:#8b949e;">${ticket}</td>
         <td style="padding:5px 8px;color:#8b949e;">${escHtml(e.reason||'')}</td>
       </tr>`;
     });
