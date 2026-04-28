@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trade Journal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     /* ================================================================
        POIWatcher v3 design system — tokens
@@ -11,41 +14,62 @@
        Semantic: green #4ade80 · red #ef4444 · amber #f59e0b · blue #3b82f6
        ================================================================ */
     :root {
-      --bg-base: #0d0f11;
-      --bg-card: #111418;
-      --bg-inset: #0d0f11;
-      --bg-hover: #1e2126;
-      --border: #1e2126;
-      --border-strong: #2a2d31;
-      --text: #e8eaed;
-      --text-2: #8b9099;
-      --text-muted: #5a6070;
-      --green: #4ade80;
-      --green-bg: #0d1f0d;
-      --green-border: #1a3d1a;
-      --red: #ef4444;
-      --red-bg: #1f0d0d;
-      --red-border: #3d1a1a;
-      --amber: #f59e0b;
-      --amber-bg: #1f1200;
-      --amber-border: #3d2600;
-      --blue: #3b82f6;
-      --blue-bg: #0f1f3d;
-      --blue-border: #1a3d6d;
-      --btc: #f7931a;
-      --radius-card: 10px;
-      --radius-item: 8px;
-      --radius-input: 6px;
-      --radius-pill: 20px;
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+      /* ── Phase 5 design system (POIWatcher.html) ── */
+      --bg:      #0c0e10;
+      --s1:      #111418;
+      --s2:      #171b1f;
+      --s3:      #1e2228;
+      --s4:      #252c35;
+      --border:  #252c34;
+      --border2: #303a47;
+      --t1:      #e8ecf0;
+      --t2:      #8d99a8;
+      --t3:      #4e5a6a;
+      --green:   #22c55e;
+      --red:     #ef4444;
+      --amber:   #f59e0b;
+      --blue:    #3b82f6;
+      --purple:  #a855f7;
+      --grey-sc: #6b7280;
+      --orange:  #f97316;
+      --mono:    'JetBrains Mono', 'SF Mono', Menlo, monospace;
+      /* ── Layout sizing tokens used by sidebar layout ── */
+      --sb-w:           240px;
+      --sb-w-collapsed: 58px;
+      --top-h:          52px;
+      --ses-h:          38px;
+      /* ── Legacy aliases — keep ~12k lines of existing rules resolving ── */
+      --bg-base:       var(--bg);
+      --bg-card:       var(--s2);
+      --bg-inset:      var(--bg);
+      --bg-hover:      var(--s3);
+      --border-strong: var(--border2);
+      --text:          var(--t1);
+      --text-2:        var(--t2);
+      --text-muted:    var(--t3);
+      --green-bg:      #0d1f0d;
+      --green-border:  #1a3d1a;
+      --red-bg:        #1f0d0d;
+      --red-border:    #3d1a1a;
+      --amber-bg:      #1f1200;
+      --amber-border:  #3d2600;
+      --blue-bg:       #0f1f3d;
+      --blue-border:   #1a3d6d;
+      --btc:           var(--orange);
+      --radius-card:   10px;
+      --radius-item:   8px;
+      --radius-input:  6px;
+      --radius-pill:   20px;
+      --font-sans:     'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --font-mono:     var(--mono);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: #0d1117; color: #e6edf3;
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg); color: var(--t1);
       min-height: 100vh; font-size: 14px;
+      -webkit-font-smoothing: antialiased;
     }
 
     /* ── Nav ── */
@@ -82,6 +106,163 @@
     .cloud-btn.connected { color: #3fb950; border-color: #3fb950; }
     .cloud-btn.syncing   { color: #58a6ff; border-color: #58a6ff; }
     .cloud-btn.error     { color: #f85149; border-color: #f85149; }
+
+    /* ════════════════════════════════════════════════════════════════
+       Phase 5 — App grid layout (POIWatcher.html design system)
+       3-zone grid: topbar(52) / session bar(38) / sidebar(240) + main
+       ════════════════════════════════════════════════════════════════ */
+    .app {
+      display: grid;
+      grid-template-rows: var(--top-h) var(--ses-h) 1fr;
+      grid-template-columns: var(--sb-w) 1fr;
+      min-height: 100vh;
+      transition: grid-template-columns 0.25s ease;
+    }
+    .app.collapsed { grid-template-columns: var(--sb-w-collapsed) 1fr; }
+
+    /* ── Topbar (lean) ── */
+    .topbar {
+      grid-column: 1 / -1; grid-row: 1;
+      display: flex; align-items: center; gap: 14px; padding: 0 18px;
+      background: var(--s1); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 90;
+    }
+    .topbar-toggle {
+      background: none; border: none; color: var(--t3);
+      font-size: 20px; line-height: 1; padding: 6px 8px; border-radius: 6px;
+      cursor: pointer; transition: color 0.15s, background 0.15s;
+    }
+    .topbar-toggle:hover { color: var(--t1); background: var(--s3); }
+    .topbar-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 1rem; color: var(--t1); letter-spacing: -0.02em;
+    }
+    .topbar-logo .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: var(--blue); display: flex; align-items: center; justify-content: center;
+      font-size: 15px; flex-shrink: 0;
+    }
+    .topbar-spacer { flex: 1; }
+    .topbar .btn-log-trade {
+      padding: 8px 18px; border-radius: 8px; border: none;
+      background: var(--blue); color: #fff; font-weight: 700; font-size: 13px;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+      font-family: inherit;
+    }
+    .topbar .btn-log-trade:hover { filter: brightness(1.1); }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      grid-row: 3; grid-column: 1;
+      background: var(--s1); border-right: 1px solid var(--border);
+      overflow: hidden; display: flex; flex-direction: column;
+      transition: all 0.25s ease;
+    }
+    .sidebar-header {
+      padding: 14px 8px 8px; border-bottom: 1px solid var(--border); margin-bottom: 6px;
+    }
+    .sidebar-logo {
+      display: flex; align-items: center; gap: 10px; padding: 4px 6px 10px;
+    }
+    .sidebar-logo .logo-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: var(--blue); display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0;
+    }
+    .sidebar-logo .logo-text {
+      font-weight: 700; font-size: 14px; color: var(--t1); white-space: nowrap;
+      transition: opacity 0.2s;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 11px;
+      padding: 10px 14px; margin: 2px 8px; border-radius: 9px;
+      cursor: pointer; transition: all 0.15s;
+      color: var(--t3); font-size: 13.5px; font-weight: 500;
+      border: none; background: none; width: calc(100% - 16px);
+      text-align: left; white-space: nowrap; overflow: hidden;
+      font-family: inherit;
+    }
+    .nav-item:hover { background: var(--s3); color: var(--t2); }
+    .nav-item.active { background: rgba(59,130,246,0.12); color: var(--blue); }
+    .nav-icon { font-size: 17px; width: 22px; text-align: center; flex-shrink: 0; }
+    .nav-label { transition: opacity 0.2s; }
+    .app.collapsed .nav-label { opacity: 0; pointer-events: none; }
+    .app.collapsed .sidebar-logo .logo-text { opacity: 0; pointer-events: none; }
+    .nav-badge {
+      background: var(--red); color: #fff; border-radius: 10px;
+      padding: 1px 6px; font-size: 10px; font-weight: 700; margin-left: auto;
+      flex-shrink: 0;
+    }
+    .sidebar-footer {
+      margin-top: auto; padding: 10px 8px; border-top: 1px solid var(--border);
+    }
+    .sidebar-footer-row {
+      padding: 4px 14px; display: flex; align-items: center; gap: 8px;
+      font-size: 11px; color: var(--t3);
+    }
+    .sidebar-footer-row .dot {
+      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    }
+
+    /* ── Main content ── */
+    .main-content {
+      grid-row: 3; grid-column: 2;
+      overflow-y: auto; padding: 24px 28px;
+    }
+    /* Override the legacy .page width clamp when inside main-content */
+    .main-content .page { max-width: none; margin: 0; padding: 0; }
+
+    /* ── Topbar status chips (override legacy mt4-dot/bitunix-dot inline styles) ── */
+    .topbar .mt4-dot, .topbar .bitunix-dot, .topbar .exchange-dot {
+      font-family: var(--mono); font-size: 11px;
+      padding: 4px 11px; border-radius: 20px; white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+
+    /* ── Mobile bottom nav (≤640px) ── */
+    .bottom-nav { display: none; }
+    @media (max-width: 640px) {
+      .app {
+        grid-template-rows: var(--top-h) var(--ses-h) 1fr auto;
+        grid-template-columns: 1fr;
+      }
+      .sidebar { display: none !important; }
+      .main-content { grid-column: 1; padding: 14px 14px 72px; }
+      .bottom-nav {
+        display: flex; position: fixed; bottom: 0; left: 0; right: 0;
+        height: 60px; background: var(--s1); border-top: 1px solid var(--border);
+        z-index: 100; justify-content: space-around; align-items: center;
+        padding: 0 4px;
+      }
+      .bn-item {
+        display: flex; flex-direction: column; align-items: center; gap: 3px;
+        padding: 6px 8px; cursor: pointer; border-radius: 8px;
+        color: var(--t3); font-size: 10px; font-weight: 500;
+        border: none; background: none; flex: 1; font-family: inherit;
+      }
+      .bn-item.active { color: var(--blue); }
+      .bn-icon { font-size: 20px; position: relative; }
+      .bn-badge {
+        position: absolute; top: -4px; right: -6px;
+        background: var(--red); color: #fff; border-radius: 8px;
+        padding: 1px 4px; font-size: 9px; font-weight: 700;
+      }
+    }
+    @media (max-width: 900px) and (min-width: 641px) {
+      .app { grid-template-columns: var(--sb-w-collapsed) 1fr; }
+      .nav-label, .sidebar-logo .logo-text { display: none; }
+      .nav-item { justify-content: center; padding: 10px; }
+    }
+
+    /* ── Session bar — re-anchor inside the new app grid ── */
+    .app .session-bar {
+      grid-column: 1 / -1; grid-row: 2;
+      position: static; top: auto;
+      height: var(--ses-h); padding: 0 18px;
+      background: var(--s1); border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .app .session-bar::-webkit-scrollbar { display: none; }
 
     /* ── Cloud modal ── */
     .cloud-modal-overlay {
@@ -176,14 +357,91 @@
     select { cursor: pointer; appearance: none; }
 
     /* Direction toggle */
-    .dir-toggle { display: flex; gap: 8px; }
+    .dir-toggle { display: flex; gap: 10px; }
     .dir-btn {
-      flex: 1; padding: 7px; text-align: center; border-radius: 7px;
-      font-size: 0.82rem; font-weight: 600; cursor: pointer;
-      border: 1px solid #30363d; background: #0d1117; color: #8b949e; transition: all 0.15s;
+      flex: 1; padding: 12px; text-align: center; border-radius: 9px;
+      font-size: 0.95rem; font-weight: 700; cursor: pointer;
+      border: 1px solid var(--border); background: var(--s3); color: var(--t3); transition: all 0.2s;
     }
-    .dir-btn.long.active  { background: #0a1f0f; border-color: #3fb950; color: #3fb950; }
-    .dir-btn.short.active { background: #1f0a0a; border-color: #f85149; color: #f85149; }
+    .dir-btn.long.active  { background: rgba(34,197,94,0.12); border-color: var(--green); color: var(--green); }
+    .dir-btn.short.active { background: rgba(239,68,68,0.12); border-color: var(--red); color: var(--red); }
+
+    /* ── Phase 5 — Log Trade 4-step wizard ── */
+    .wizard-progress { margin-bottom: 22px; padding: 0 6px; }
+    .wizard-steps {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      align-items: start; margin-bottom: 12px; gap: 4px;
+    }
+    .wizard-step-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      background: none; border: none; cursor: pointer; padding: 0;
+      font-family: inherit;
+    }
+    .wizard-step-circle {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--s3); border: 2px solid var(--border);
+      font-size: 12px; font-weight: 700; color: var(--t3);
+      transition: all 0.2s;
+    }
+    .wizard-step-btn.complete .wizard-step-circle {
+      background: var(--green); border-color: var(--green); color: #fff;
+    }
+    .wizard-step-btn.active .wizard-step-circle {
+      background: var(--blue); border-color: var(--blue); color: #fff;
+    }
+    .wizard-step-label {
+      font-size: 10px; color: var(--t3); font-weight: 400; white-space: nowrap;
+    }
+    .wizard-step-btn.active .wizard-step-label { color: var(--blue); font-weight: 600; }
+    .wizard-progress-bar { height: 3px; background: var(--s3); border-radius: 2px; overflow: hidden; }
+    .wizard-progress-fill {
+      height: 100%; width: 0%; background: var(--blue); border-radius: 2px;
+      transition: width 0.35s ease;
+    }
+    .wizard-step { display: none; }
+    .wizard-step.active { display: block; }
+    .wizard-nav {
+      display: flex; gap: 10px; margin-top: 18px; padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .wizard-nav .btn {
+      flex: 1; padding: 12px; border-radius: 9px;
+      font-weight: 600; font-size: 14px; cursor: pointer;
+      border: 1px solid var(--border); background: var(--s2); color: var(--t1);
+    }
+    .wizard-nav .btn.btn-primary {
+      flex: 2; border: none; background: var(--blue); color: #fff;
+    }
+    .wizard-nav .btn:disabled { color: var(--t3); cursor: not-allowed; opacity: 0.6; }
+    .wizard-venue-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 600;
+    }
+    .wizard-venue-badge.mt5     { background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.30); color: var(--blue); }
+    .wizard-venue-badge.bitunix { background: rgba(247,147,26,0.10); border: 1px solid rgba(247,147,26,0.30); color: var(--orange); }
+    .wizard-score-ring {
+      display: flex; align-items: center; gap: 16px;
+      padding: 14px 18px; background: var(--s3); border-radius: 12px;
+      border: 1px solid var(--border); margin-bottom: 14px;
+    }
+    .wizard-score-ring .score-num {
+      font-family: var(--mono); font-size: 32px; font-weight: 800; line-height: 1;
+    }
+    .wizard-score-ring .score-num small { font-size: 16px; color: var(--t3); }
+    .wizard-score-ring .score-label { font-size: 13px; font-weight: 600; margin-top: 4px; }
+    .wizard-summary {
+      display: flex; flex-direction: column; gap: 6px;
+      margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+    }
+    .wizard-summary-row {
+      display: flex; justify-content: space-between;
+      padding: 6px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .wizard-summary-row .k { color: var(--t3); }
+    .wizard-summary-row .v { color: var(--t1); font-family: var(--mono); font-weight: 500; }
 
     /* SL/TP mode toggle (journal form) */
     .jrn-mode-toggle { display: inline-flex; border: 1px solid #30363d; border-radius: 5px; overflow: hidden; margin-left: 6px; vertical-align: middle; }
@@ -278,6 +536,37 @@
 
     /* ── Journal trade rows ── */
     .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+    /* Phase 5 — Exec log venue pill tabs */
+    .execlog-vtab {
+      padding: 4px 12px; border-radius: 20px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--t3); font-size: 11px; font-weight: 500;
+      cursor: pointer; transition: all 0.15s; font-family: inherit;
+    }
+    .execlog-vtab:hover { color: var(--t1); }
+    .execlog-vtab.active                   { color: var(--t1); border-color: var(--border2); background: var(--s3); }
+    .execlog-vtab[data-venue="mt5"].active     { color: var(--blue);   border-color: var(--blue);   background: rgba(59,130,246,0.12); }
+    .execlog-vtab[data-venue="bitunix"].active { color: var(--orange); border-color: var(--orange); background: rgba(247,147,26,0.12); }
+    /* Phase 5 — Journal pill filter row */
+    .jrn-pill {
+      padding: 5px 12px; border-radius: 20px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--t3); font-size: 12px; font-weight: 400;
+      cursor: pointer; transition: all 0.15s; white-space: nowrap;
+      flex-shrink: 0; font-family: inherit;
+    }
+    .jrn-pill:hover { color: var(--t1); border-color: var(--border2); }
+    .jrn-pill.active { color: var(--blue); border-color: var(--blue); background: rgba(59,130,246,0.10); font-weight: 600; }
+    .jrn-pill-mt5.active     { color: var(--blue);   border-color: var(--blue);   background: rgba(59,130,246,0.12); }
+    .jrn-pill-bitunix.active { color: var(--orange); border-color: var(--orange); background: rgba(247,147,26,0.12); }
+    /* Confidence pip dots in trade rows */
+    .conf-pips { display: inline-flex; gap: 2px; align-items: center; vertical-align: middle; }
+    .conf-pip { width: 4px; height: 12px; border-radius: 2px; background: var(--s3); }
+    .conf-pip.lit-low  { background: var(--t3); }
+    .conf-pip.lit-mid  { background: var(--amber); }
+    .conf-pip.lit-good { background: var(--green); }
+    .conf-pip.lit-best { background: var(--green); animation: pipPulse 1.6s ease-in-out infinite; }
+    @keyframes pipPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
     .filter-select {
       padding: 5px 10px; font-size: 0.78rem; border-radius: 6px;
       border: 1px solid #30363d; background: #161b22; color: #8b949e;
@@ -675,12 +964,23 @@
     }
 
     /* ── Settings Modal ── */
-    .settings-tabs { display: flex; gap: 2px; border-bottom: 1px solid #21262d; margin-bottom: 14px; flex-wrap: wrap; }
-    .settings-tab { padding: 8px 12px; font-size: 0.75rem; cursor: pointer; color: #8b949e; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
-    .settings-tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
-    .settings-tab:hover { color: #e6edf3; }
+    /* Phase 5 — settings modal as side-nav layout (matches Settings.jsx) */
+    .settings-shell { display: grid; grid-template-columns: 200px 1fr; gap: 18px; min-height: 480px; }
+    .settings-tabs { display: flex; flex-direction: column; gap: 2px; padding: 6px; background: var(--s2); border: 1px solid var(--border); border-radius: 12px; align-self: start; position: sticky; top: 0; }
+    .settings-tab { display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-size: 0.8rem; cursor: pointer; color: var(--t3); border: none; border-radius: 8px; background: transparent; transition: all 0.15s; white-space: nowrap; font-weight: 400; text-align: left; }
+    .settings-tab:hover { color: var(--t1); background: var(--s3); }
+    .settings-tab.active { color: var(--blue); background: rgba(59,130,246,0.12); font-weight: 600; }
+    .settings-tab .tab-icon { font-size: 0.95rem; width: 20px; text-align: center; flex-shrink: 0; }
+    .settings-content { background: var(--s2); border: 1px solid var(--border); border-radius: 12px; padding: 22px 24px; overflow-y: auto; max-height: 80vh; }
     .settings-section { display: none; }
     .settings-section.active { display: block; }
+    .settings-section-title { font-weight: 700; font-size: 1.0rem; color: var(--t1); margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+    /* On narrow viewports collapse to single column */
+    @media (max-width: 720px) {
+      .settings-shell { grid-template-columns: 1fr; }
+      .settings-tabs { flex-direction: row; overflow-x: auto; flex-wrap: nowrap; }
+      .settings-tab { flex-shrink: 0; }
+    }
     .settings-field { margin-bottom: 12px; }
     .settings-field label { display: block; font-size: 0.78rem; color: #8b949e; margin-bottom: 4px; }
     .settings-field input, .settings-field select { width: 100%; background: #0d1117; border: 1px solid #30363d; border-radius: 7px; color: #e6edf3; font-size: 0.85rem; padding: 8px 10px; outline: none; font-family: inherit; }
@@ -797,16 +1097,39 @@
     .partial-close-slider { margin: 6px 0; }
     .partial-close-slider input[type="range"] { width: 100%; }
 
-    /* ── EV Headline ── */
+    /* ── EV Headline (Phase 5 — green radial glow, mono 38px) ── */
     .ev-headline {
-      background: linear-gradient(135deg, #161b22 0%, #1a2332 100%);
-      border: 1px solid #30363d; border-radius: 10px;
-      padding: 18px 22px; margin-bottom: 14px; text-align: center;
+      position: relative; overflow: hidden;
+      background: var(--s2);
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 22px 24px; margin-bottom: 16px;
     }
-    .ev-headline .ev-value { font-size: 2rem; font-weight: 700; }
-    .ev-headline .ev-sub { font-size: 0.78rem; color: #8b949e; margin-top: 4px; }
-    .ev-headline .ev-formula { font-size: 0.68rem; color: #6e7681; margin-top: 8px; font-family: monospace; }
-    .ev-headline .ev-projection { font-size: 0.82rem; color: #58a6ff; margin-top: 6px; }
+    .ev-headline::before {
+      content: ""; position: absolute; top: 0; right: 0;
+      width: 180px; height: 180px;
+      background: radial-gradient(circle at top right, rgba(34,197,94,0.08), transparent 70%);
+      pointer-events: none;
+    }
+    .ev-headline.ev-neg::before {
+      background: radial-gradient(circle at top right, rgba(239,68,68,0.08), transparent 70%);
+    }
+    .ev-headline > * { position: relative; z-index: 1; }
+    .ev-headline .ev-sub {
+      font-size: 11px; color: var(--t3); letter-spacing: 0.10em;
+      text-transform: uppercase; margin-bottom: 8px;
+    }
+    .ev-headline .ev-value {
+      font-family: var(--mono); font-size: 38px; font-weight: 700; line-height: 1;
+    }
+    .ev-headline .ev-value.green { color: var(--green); }
+    .ev-headline .ev-value.red   { color: var(--red); }
+    .ev-headline .ev-formula {
+      font-size: 12px; color: var(--t3); margin-top: 10px;
+      font-family: var(--mono);
+    }
+    .ev-headline .ev-projection {
+      font-size: 13px; color: var(--blue); margin-top: 8px;
+    }
 
     /* ── Drawdown ── */
     .dd-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
@@ -1137,44 +1460,30 @@
 </head>
 <body>
 
-<!-- Nav -->
-<nav class="nav">
-  <div class="nav-logo">Trade<span>Log</span></div>
-  <div class="nav-link active" onclick="nav('dashboard')">Dashboard</div>
-  <div class="nav-link" onclick="nav('log')">Log Trade</div>
-  <div class="nav-link" onclick="nav('journal')">Journal</div>
-  <div class="nav-link" onclick="nav('alerts')">Alerts</div>
-  <div class="nav-link" onclick="nav('live')">Live</div>
-  <div class="nav-spacer"></div>
-  <span style="position:relative;">
-    <button class="kb-help-btn" onclick="toggleKbHelp()" title="Keyboard shortcuts">?</button>
-    <div class="kb-tooltip" id="kbTooltip">
-      <h4>Keyboard Shortcuts</h4>
-      <div class="kb-row"><span class="kb-desc">Save trade / draft</span><span class="kb-key">Ctrl+S</span></div>
-      <div class="kb-row"><span class="kb-desc">Log Trade tab</span><span class="kb-key">Ctrl+L</span></div>
-      <div class="kb-row"><span class="kb-desc">Dashboard tab</span><span class="kb-key">Ctrl+D</span></div>
-      <div class="kb-row"><span class="kb-desc">Journal tab</span><span class="kb-key">Ctrl+J</span></div>
-      <div class="kb-row"><span class="kb-desc">Open Calculator</span><span class="kb-key">Ctrl+K</span></div>
-      <div class="kb-row"><span class="kb-desc">Copy for Claude AI</span><span class="kb-key">Ctrl+E</span></div>
-    </div>
-  </span>
+<!-- ═══════════════════════════════════════════════════════
+     Phase 5 — App shell: topbar + sidebar + main-content
+════════════════════════════════════════════════════════ -->
+<div class="app" id="appShell">
+
+<!-- Topbar (lean) -->
+<header class="topbar">
+  <button class="topbar-toggle" onclick="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar">&#9776;</button>
+  <div class="topbar-logo">
+    <div class="logo-mark">📈</div>
+    <span>POIWatcher</span>
+  </div>
+  <div class="topbar-spacer"></div>
   <span id="exchangeDot" class="exchange-dot" title="Exchange Connection"><span class="dot grey" id="exchangeDotIcon"></span> <span id="exchangeDotText">Exchange</span></span>
   <span id="mt4Dot" class="mt4-dot off" title="MT5 Connection">&#9899; MT5</span>
-  <span id="bitunixDot" class="bitunix-dot off" title="Bitunix Futures" style="font-size:0.71rem;font-weight:600;letter-spacing:0.02em;padding:3px 8px;border-radius:6px;background:rgba(247,147,26,0.10);color:#7a4a00;border:1px solid rgba(247,147,26,0.28);white-space:nowrap;display:inline-flex;align-items:center;gap:4px;cursor:default;">
+  <span id="bitunixDot" class="bitunix-dot off" title="Bitunix Futures" style="font-size:0.71rem;font-weight:600;padding:4px 11px;border-radius:20px;background:rgba(247,147,26,0.07);color:#7a4a00;border:1px solid rgba(247,147,26,0.25);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;cursor:default;">
     <span id="bitunixDotIcon" class="dot grey" style="width:6px;height:6px;border-radius:50%;background:#8b949e;display:inline-block;"></span>
     <span id="bitunixDotText">Bitunix</span>
   </span>
   <span id="syncDot" style="font-size:0.71rem;color:#8b949e;white-space:nowrap;padding:0 4px;"></span>
-  <button class="cloud-btn" onclick="openSettingsModal()" style="font-size:0.75rem;">&#9881;</button>
-  <button class="cloud-btn" onclick="openBrokerModal()" style="font-size:0.75rem;">Broker</button>
-  <button id="cloudBtn" class="cloud-btn" onclick="openCloudModal()">☁ Cloud</button>
-  <button onclick="exportTrades()" class="nav-ext" style="cursor:pointer;background:none;">Export</button>
-  <label class="nav-ext" style="cursor:pointer;" for="importFile">Import</label>
-  <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importTrades(event)">
-  <a class="nav-ext" href="forex-calculator.html">Calculator ↗</a>
-</nav>
+  <button class="btn-log-trade" onclick="nav('log')">✏️ Log Trade</button>
+</header>
 
-<!-- Session Monitor Bar -->
+<!-- Session Monitor Bar (row 2 of grid) -->
 <div class="session-bar" id="sessionBar">
   <div class="session-clocks">
     <span><span class="clock-label">UTC</span> <span id="clockUTC">--:--</span></span>
@@ -1189,6 +1498,47 @@
   </div>
   <div class="overlap-banner" id="overlapBanner"></div>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════
+     Sidebar nav (row 3, col 1)
+════════════════════════════════════════════════════════ -->
+<nav class="sidebar" id="appSidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <div class="logo-mark">📈</div>
+      <span class="logo-text nav-label">POIWatcher</span>
+    </div>
+  </div>
+  <button class="nav-item active" data-tab="dashboard" onclick="nav('dashboard')"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></button>
+  <button class="nav-item" data-tab="log" onclick="nav('log')"><span class="nav-icon">✏️</span><span class="nav-label">Log Trade</span></button>
+  <button class="nav-item" data-tab="journal" onclick="nav('journal')"><span class="nav-icon">📋</span><span class="nav-label">Journal</span></button>
+  <button class="nav-item" data-tab="alerts" onclick="nav('alerts')"><span class="nav-icon">🔔</span><span class="nav-label">Alerts</span><span id="alertsBadge" class="nav-badge nav-label" style="display:none;">0</span></button>
+  <button class="nav-item" data-tab="live" onclick="nav('live')"><span class="nav-icon">📡</span><span class="nav-label">Live MT5</span></button>
+  <button class="nav-item" data-tab="calculator" onclick="nav('calculator')"><span class="nav-icon">🧮</span><span class="nav-label">Calculator</span></button>
+  <button class="nav-item" data-tab="settings" onclick="nav('settings')"><span class="nav-icon">⚙️</span><span class="nav-label">Settings</span></button>
+  <div class="sidebar-footer">
+    <div class="sidebar-footer-row">
+      <span class="dot" style="background:var(--red);"></span>
+      <span class="nav-label">Backend offline</span>
+    </div>
+    <button class="nav-item" onclick="toggleKbHelp()" style="margin-top:4px;" title="Keyboard shortcuts">
+      <span class="nav-icon">?</span><span class="nav-label">Shortcuts</span>
+    </button>
+    <div class="kb-tooltip" id="kbTooltip" style="position:relative;">
+      <h4>Keyboard Shortcuts</h4>
+      <div class="kb-row"><span class="kb-desc">Save trade / draft</span><span class="kb-key">Ctrl+S</span></div>
+      <div class="kb-row"><span class="kb-desc">Log Trade tab</span><span class="kb-key">Ctrl+L</span></div>
+      <div class="kb-row"><span class="kb-desc">Dashboard tab</span><span class="kb-key">Ctrl+D</span></div>
+      <div class="kb-row"><span class="kb-desc">Journal tab</span><span class="kb-key">Ctrl+J</span></div>
+      <div class="kb-row"><span class="kb-desc">Open Calculator</span><span class="kb-key">Ctrl+K</span></div>
+      <div class="kb-row"><span class="kb-desc">Copy for Claude AI</span><span class="kb-key">Ctrl+E</span></div>
+    </div>
+  </div>
+</nav>
+
+<!-- Main content (row 3, col 2) — wraps every #page-* and the import file input -->
+<main class="main-content">
+<input type="file" id="importFile" accept=".json" style="display:none;" onchange="importTrades(event)">
 
 <!-- ═══════════════════════════════════════════════════════
      DASHBOARD
@@ -1330,6 +1680,29 @@
     <button type="button" onclick="applySync()" style="font-size:0.73rem;padding:4px 11px;background:#1f6feb;border:none;border-radius:5px;color:#fff;cursor:pointer;white-space:nowrap;">Apply Risk $</button>
   </div>
 
+  <!-- Phase 5 — 4-step wizard progress (visual wrapper around existing fields) -->
+  <div class="wizard-progress" id="wizardProgress">
+    <div class="wizard-steps">
+      <button type="button" class="wizard-step-btn active" data-wstep="1" onclick="setLogStep(1)">
+        <div class="wizard-step-circle">1</div>
+        <span class="wizard-step-label">Instrument</span>
+      </button>
+      <button type="button" class="wizard-step-btn" data-wstep="2" onclick="setLogStep(2)">
+        <div class="wizard-step-circle">2</div>
+        <span class="wizard-step-label">Confluence</span>
+      </button>
+      <button type="button" class="wizard-step-btn" data-wstep="3" onclick="setLogStep(3)">
+        <div class="wizard-step-circle">3</div>
+        <span class="wizard-step-label">Levels</span>
+      </button>
+      <button type="button" class="wizard-step-btn" data-wstep="4" onclick="setLogStep(4)">
+        <div class="wizard-step-circle">4</div>
+        <span class="wizard-step-label">Score &amp; Review</span>
+      </button>
+    </div>
+    <div class="wizard-progress-bar"><div class="wizard-progress-fill" id="wizardProgressFill" style="width:0%;"></div></div>
+  </div>
+
   <form id="tradeForm" onsubmit="submitTrade(event)">
 
     <!-- ═══════════════════════════════════════════════════
@@ -1342,6 +1715,8 @@
       </div>
       <div class="form-section-body open">
 
+        <!-- Phase 5 wizard step 1 — Instrument & Setup -->
+        <div class="wizard-step active" data-step="1">
         <!-- Instrument & Setup -->
         <div class="card-title" style="margin-top:0;">Instrument & Setup</div>
         <div class="form-grid">
@@ -1405,8 +1780,17 @@
           <input type="text" id="f_setupOther" placeholder="Describe your setup type">
         </div>
 
+        <div class="wizard-nav" data-step-nav="1">
+          <button type="button" class="btn" disabled>← Back</button>
+          <button type="button" class="btn btn-primary" onclick="setLogStep(2)">Continue → Confluence</button>
+        </div>
+        </div><!-- /wizard-step 1 -->
+
+        <!-- Phase 5 wizard step 2 — Confluence Analysis -->
+        <div class="wizard-step" data-step="2">
         <!-- Structure & Confluence -->
-        <div class="card-title" style="margin-top:16px;">Structure & Confluence Analysis</div>
+        <div class="card-title" style="margin-top:16px;">Confluence Factors <span style="color:#6e7681;font-weight:400;text-transform:none;letter-spacing:normal;font-size:0.7rem;">(visual reference — not scored)</span></div>
+        <div style="font-size:0.7rem;color:#6e7681;margin-bottom:8px;">These chips help you read the structure. The <strong style="color:#58a6ff;">8-item System Alignment Score</strong> uses a different subset (HTF · $$ Liq · Entry Conf · Dist+Mom · Not Chasing · Mentor · My System · DXY).</div>
         <div class="form-grid confluence-grid">
           <div class="field">
             <label>HTF Bias (Daily) *</label>
@@ -1525,6 +1909,14 @@
           </div>
         </div>
 
+        <div class="wizard-nav" data-step-nav="2">
+          <button type="button" class="btn" onclick="setLogStep(1)">← Back</button>
+          <button type="button" class="btn btn-primary" onclick="setLogStep(3)">Continue → Trade Levels</button>
+        </div>
+        </div><!-- /wizard-step 2 -->
+
+        <!-- Phase 5 wizard step 3 — Trade Levels -->
+        <div class="wizard-step" data-step="3">
         <!-- Trade Levels -->
         <div class="card-title" style="margin-top:16px;">Trade Levels</div>
         <div class="form-grid-3">
@@ -1561,6 +1953,26 @@
         <div class="jrn-risk-warn" id="f_risk_warn"><span class="rw-ico">⚠</span><span id="f_risk_warn_msg"></span></div>
 
         <!-- Confidence, Rationale, Chart -->
+        <div class="wizard-nav" data-step-nav="3">
+          <button type="button" class="btn" onclick="setLogStep(2)">← Back</button>
+          <button type="button" class="btn btn-primary" onclick="setLogStep(4)">Continue → Score &amp; Review</button>
+        </div>
+        </div><!-- /wizard-step 3 -->
+
+        <!-- Phase 5 wizard step 4 — Score & Review -->
+        <div class="wizard-step" data-step="4">
+        <!-- System Alignment Score widget (visible read-out of calcAlignmentScore-equivalent against form fields) -->
+        <div class="wizard-score-ring" id="wizardScoreCard" style="display:none;">
+          <div style="flex:1;">
+            <div class="score-num"><span id="wizardScoreNum" style="color:var(--blue);">0</span><small>/8</small></div>
+            <div class="score-label" id="wizardScoreLabel" style="color:var(--blue);">Fill in fields to score</div>
+          </div>
+          <div style="font-size:0.7rem; color:var(--t3); max-width:240px; line-height:1.5;">
+            8-item System Alignment — HTF · Liq · Entry Conf · Dist+Mom · Not Chasing · Mentor · My System · DXY.<br>
+            Open the Pre-Trade Checklist to fill in the psych items.
+          </div>
+        </div>
+
         <div class="card-title" style="margin-top:16px;">Pre-Trade Analysis</div>
         <div class="field">
           <label>Confidence Level</label>
@@ -1609,6 +2021,12 @@
           </div>
         </div>
 
+        <div class="wizard-nav" data-step-nav="4">
+          <button type="button" class="btn" onclick="setLogStep(3)">← Back</button>
+          <!-- Save button is the form's existing submit at the bottom; this label hints at venue. -->
+          <button type="button" class="btn btn-primary" id="wizardSaveBtn" onclick="document.getElementById('tradeForm').requestSubmit()">💾 Save &amp; Queue</button>
+        </div>
+        </div><!-- /wizard-step 4 -->
       </div><!-- end Section A body -->
     </div><!-- end Section A card -->
 
@@ -1757,7 +2175,25 @@
     <button class="btn btn-primary" onclick="nav('log')" style="padding:7px 14px; font-size:0.8rem;">+ Log Trade</button>
   </div>
 
-  <div class="filters">
+  <!-- Phase 5 — pill filter row drives the same selects via setJournalPill(). -->
+  <div id="journalPills" style="display:flex; gap:6px; align-items:center; flex-wrap:nowrap; overflow-x:auto; margin-bottom:10px; padding-bottom:4px;">
+    <button type="button" class="jrn-pill active" data-flt="status" data-val=""        onclick="setJournalPill(this)">All</button>
+    <button type="button" class="jrn-pill"        data-flt="status" data-val="open"    onclick="setJournalPill(this)">Open</button>
+    <button type="button" class="jrn-pill"        data-flt="status" data-val="closed"  onclick="setJournalPill(this)">Closed</button>
+    <button type="button" class="jrn-pill"        data-flt="outcome" data-val="win"   onclick="setJournalPill(this)">Wins</button>
+    <button type="button" class="jrn-pill"        data-flt="outcome" data-val="loss"  onclick="setJournalPill(this)">Losses</button>
+    <button type="button" class="jrn-pill"        data-flt="outcome" data-val="be"    onclick="setJournalPill(this)">BE</button>
+    <span style="width:1px; height:18px; background:var(--border); flex-shrink:0;"></span>
+    <button type="button" class="jrn-pill jrn-pill-mt5"     data-flt="venue" data-val="mt5"     onclick="setJournalPill(this)">MT5</button>
+    <button type="button" class="jrn-pill jrn-pill-bitunix" data-flt="venue" data-val="bitunix" onclick="setJournalPill(this)">Bitunix</button>
+    <span style="width:1px; height:18px; background:var(--border); flex-shrink:0;"></span>
+    <button type="button" class="jrn-pill"        data-flt="poi"     data-val="Primary"   onclick="setJournalPill(this)">Primary POI</button>
+    <button type="button" class="jrn-pill"        data-flt="session" data-val="London Session" onclick="setJournalPill(this)">London</button>
+    <button type="button" class="jrn-pill"        data-flt="session" data-val="NY Session"     onclick="setJournalPill(this)">NY</button>
+  </div>
+
+  <!-- Existing select-based filters kept hidden — pills mutate these and dispatch change. -->
+  <div class="filters" style="display:none;" aria-hidden="true">
     <select class="filter-select" id="fltStatus" onchange="onFilterChange()">
       <option value="">All Status</option>
       <option value="open">Open</option>
@@ -1977,7 +2413,14 @@
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
       <div class="card-title" style="margin:0;">Execution Log</div>
       <div style="display:flex;gap:6px;align-items:center;">
-        <select id="execLogVenue" onchange="refreshExecutionLog()" style="background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:5px;padding:4px 8px;font-size:0.72rem;" title="Filter by venue">
+        <!-- Phase 5 — venue pill tabs replace the legacy <select>. The select stays
+             hidden so refreshExecutionLog() reads its .value as before. -->
+        <div id="execLogVenueTabs" style="display:inline-flex; gap:4px;">
+          <button type="button" class="execlog-vtab active" data-venue=""        onclick="setExecLogVenue('')">All</button>
+          <button type="button" class="execlog-vtab"        data-venue="mt5"     onclick="setExecLogVenue('mt5')">MT5</button>
+          <button type="button" class="execlog-vtab"        data-venue="bitunix" onclick="setExecLogVenue('bitunix')">Bitunix</button>
+        </div>
+        <select id="execLogVenue" onchange="refreshExecutionLog()" style="display:none;" aria-hidden="true">
           <option value="">All venues</option>
           <option value="mt5">MT5 only</option>
           <option value="bitunix">Bitunix only</option>
@@ -2086,6 +2529,19 @@
     </div>
   </div>
 </div>
+
+</main><!-- /.main-content -->
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav">
+  <button class="bn-item active" data-tab="dashboard" onclick="nav('dashboard')"><span class="bn-icon">📊</span><span>Dashboard</span></button>
+  <button class="bn-item" data-tab="log"     onclick="nav('log')"><span class="bn-icon">✏️</span><span>Log</span></button>
+  <button class="bn-item" data-tab="journal" onclick="nav('journal')"><span class="bn-icon">📋</span><span>Journal</span></button>
+  <button class="bn-item" data-tab="live"    onclick="nav('live')"><span class="bn-icon">📡</span><span>Live</span></button>
+  <button class="bn-item" data-tab="calculator" onclick="nav('calculator')"><span class="bn-icon">🧮</span><span>Calc</span></button>
+</nav>
+
+</div><!-- /.app -->
 
 <!-- ═══════════════════════════════════════════════════════
      MODAL: Trade Detail
@@ -2499,7 +2955,7 @@
         <div class="cl-section-title">System Alignment Score</div>
         <div id="clAlignmentScore" class="cl-alignment-score">
           <div class="cl-score-display">
-            <span class="cl-score-num" id="clScoreNum">0</span><span class="cl-score-max">/12</span>
+            <span class="cl-score-num" id="clScoreNum">0</span><span class="cl-score-max">/8</span>
           </div>
           <div class="cl-score-label" id="clScoreLabel">Answer the questions above</div>
         </div>
@@ -2529,23 +2985,31 @@
      SETTINGS MODAL
 ════════════════════════════════════════════════════════ -->
 <div class="cloud-modal-overlay" id="settingsOverlay" onclick="maybeCloseSettings(event)">
-  <div class="cloud-modal" style="max-width:560px; max-height:90vh; overflow-y:auto;">
+  <div class="cloud-modal" style="max-width:920px; max-height:90vh; overflow-y:auto;">
     <div class="cloud-modal-header">
       <h2>Settings</h2>
       <button class="modal-close" onclick="closeSettingsModal()">✕</button>
     </div>
     <div class="cloud-modal-body">
 
-      <div class="settings-tabs" id="settingsTabs">
-        <div class="settings-tab active" onclick="setSettingsTab('profile')">Profile</div>
-        <div class="settings-tab" onclick="setSettingsTab('display')">Display</div>
-        <div class="settings-tab" onclick="setSettingsTab('sharing')">Sharing</div>
-        <div class="settings-tab" onclick="setSettingsTab('export')">Export</div>
-        <div class="settings-tab" onclick="setSettingsTab('danger')">Danger Zone</div>
-      </div>
+      <div class="settings-shell">
+        <div class="settings-tabs" id="settingsTabs">
+          <button class="settings-tab active" onclick="setSettingsTab('profile')"><span class="tab-icon">👤</span>Profile</button>
+          <button class="settings-tab" onclick="setSettingsTab('risk')"><span class="tab-icon">⚠️</span>Risk Limits</button>
+          <button class="settings-tab" onclick="setSettingsTab('connections')"><span class="tab-icon">🔌</span>Connections</button>
+          <button class="settings-tab" onclick="setSettingsTab('execution')"><span class="tab-icon">⚡</span>Execution</button>
+          <button class="settings-tab" onclick="setSettingsTab('display')"><span class="tab-icon">🖥️</span>Display</button>
+          <button class="settings-tab" onclick="setSettingsTab('sync')"><span class="tab-icon">☁️</span>Cloud Sync</button>
+          <button class="settings-tab" onclick="setSettingsTab('sharing')"><span class="tab-icon">🔗</span>Sharing</button>
+          <button class="settings-tab" onclick="setSettingsTab('export')"><span class="tab-icon">📤</span>Export</button>
+          <button class="settings-tab" onclick="setSettingsTab('danger')"><span class="tab-icon">🗑️</span>Danger Zone</button>
+        </div>
+
+        <div class="settings-content">
 
       <!-- PROFILE -->
       <div class="settings-section active" id="settSec_profile">
+        <div class="settings-section-title">Profile</div>
         <div class="settings-field">
           <label>Trader Name</label>
           <input type="text" id="sett_name" placeholder="Your name" onchange="saveSettingsFromForm()">
@@ -2564,20 +3028,6 @@
         </div>
         <div class="settings-grid">
           <div class="settings-field">
-            <label>Default Risk %</label>
-            <input type="number" id="sett_riskPct" placeholder="1" step="0.1" min="0.1" max="10" onchange="saveSettingsFromForm()">
-          </div>
-          <div class="settings-field">
-            <label>Risk Cap % (max per trade)</label>
-            <input type="number" id="sett_riskCapPct" placeholder="2" step="0.5" min="0.5" max="20" onchange="saveSettingsFromForm()">
-          </div>
-        </div>
-        <div class="settings-grid">
-          <div class="settings-field">
-            <label>Break Even Trigger (R:R)</label>
-            <input type="number" id="sett_beTriggerRR" placeholder="1.5" step="0.5" min="1.0" max="10.0" onchange="saveSettingsFromForm()">
-          </div>
-          <div class="settings-field">
             <label>Timezone Preference</label>
             <select id="sett_tz" onchange="saveSettingsFromForm()">
               <option value="local">Local (browser)</option>
@@ -2586,23 +3036,52 @@
               <option value="Europe/London">London</option>
             </select>
           </div>
-        </div>
-        <div class="settings-grid">
           <div class="settings-field">
             <label>Default Timeframe</label>
             <select id="sett_tf" onchange="saveSettingsFromForm()">
               <option>M1</option><option>M5</option><option selected>M15</option><option>H1</option><option>H4</option><option>D1</option><option>W1</option>
             </select>
           </div>
+        </div>
+        <div class="settings-grid">
           <div class="settings-field">
             <label>Default Market</label>
             <select id="sett_market" onchange="saveSettingsFromForm()">
               <option value="Forex">Forex</option><option value="BTC/USDT">BTC/USDT</option><option value="Crypto">Other Crypto</option><option value="Indices">Indices</option><option value="Commodities">Commodities</option>
             </select>
           </div>
+          <div class="settings-field"><!-- spacer --></div>
         </div>
-        <div style="margin-top:12px; padding-top:12px; border-top:1px solid #21262d;">
-          <div style="font-size:0.78rem; font-weight:600; margin-bottom:8px; color:#8b949e;">Drawdown Limits</div>
+      </div>
+
+      <!-- RISK LIMITS -->
+      <div class="settings-section" id="settSec_risk">
+        <div class="settings-section-title">Risk Limits</div>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label>Default Risk % / Trade</label>
+            <input type="number" id="sett_riskPct" placeholder="1" step="0.1" min="0.1" max="10" onchange="saveSettingsFromForm()">
+          </div>
+          <div class="settings-field">
+            <label>Risk Cap % (hard max)</label>
+            <input type="number" id="sett_riskCapPct" placeholder="2" step="0.5" min="0.5" max="20" onchange="saveSettingsFromForm()">
+          </div>
+        </div>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label>Break Even Trigger (R:R)</label>
+            <input type="number" id="sett_beTriggerRR" placeholder="5" step="0.5" min="1.0" max="10.0" onchange="saveSettingsFromForm()">
+            <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">Auto-move SL to entry once price hits this R:R. Default 5.</div>
+          </div>
+          <div class="settings-field">
+            <label>Max Trades / Day &mdash; <span id="sett_maxTradesVal" style="color:#58a6ff;font-weight:600;">3</span></label>
+            <input type="range" id="sett_maxTrades" min="1" max="10" step="1" value="3"
+              oninput="document.getElementById('sett_maxTradesVal').textContent=this.value; saveSettingsFromForm()">
+            <div style="display:flex; justify-content:space-between; font-size:0.6rem; color:#6e7681; margin-top:2px;"><span>1</span><span>3</span><span>5</span><span>7</span><span>10</span></div>
+          </div>
+        </div>
+        <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
+          <div style="font-size:0.78rem; font-weight:600; margin-bottom:8px; color:var(--t2);">Drawdown Limits</div>
           <div class="settings-grid">
             <div class="settings-field">
               <label>Daily Drawdown Limit %</label>
@@ -2618,59 +3097,48 @@
               <label>Monthly Drawdown Limit %</label>
               <input type="number" id="sett_ddMonthly" placeholder="25" step="1" min="1" max="100" onchange="saveSettingsFromForm()">
             </div>
+            <div class="settings-field"><!-- spacer --></div>
           </div>
+          <div style="font-size:0.65rem; color:#6e7681; margin-top:6px;">Limits are account-wide — MT5 + Bitunix share the same caps.</div>
         </div>
-        <div style="margin-top:12px; padding-top:12px; border-top:1px solid #21262d;">
-          <div style="font-size:0.78rem; font-weight:600; margin-bottom:8px; color:#8b949e;">MT5 Execution Pipeline</div>
-          <div class="settings-grid">
-            <div class="settings-field">
-              <label>Execution API Key</label>
-              <input type="password" id="sett_execKey" placeholder="Set in Render env vars" onchange="localStorage.setItem('tj_executionKey', this.value)">
-              <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">Required for Send to MT5. Must match EXECUTION_API_KEY on your backend. Stored locally only — never synced to Gist.</div>
+      </div>
+
+      <!-- CONNECTIONS -->
+      <div class="settings-section" id="settSec_connections">
+        <div class="settings-section-title">Connections</div>
+
+        <!-- MT5 ConnCard -->
+        <div style="background:rgba(59,130,246,0.05); border:1px solid rgba(59,130,246,0.25); border-radius:12px; padding:18px 20px; margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:30px; height:30px; border-radius:8px; background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3); display:flex; align-items:center; justify-content:center; font-size:14px;">📊</div>
+              <span style="font-weight:700; font-size:0.95rem; color:var(--t1);">MT5 (POIWatcher EA)</span>
             </div>
           </div>
-          <div class="settings-grid" style="margin-top:8px;">
-            <div class="settings-field">
-              <label>Auto-Execution Mode</label>
-              <select id="sett_execMode" onchange="saveSettingsFromForm()">
-                <option value="manual">Manual approval only (recommended)</option>
-                <option value="autoHigh">Auto-approve trades with score &ge; threshold</option>
-                <option value="autoAll">Auto-approve all trades (not recommended)</option>
-              </select>
-            </div>
-            <div class="settings-field">
-              <label>Min System Alignment Score (1-10)</label>
-              <input type="range" id="sett_execMinScore" min="1" max="10" step="1" oninput="document.getElementById('sett_execMinScoreVal').textContent=this.value; saveSettingsFromForm()">
-              <div style="font-size:0.7rem; color:#8b949e; margin-top:3px;">Threshold: <span id="sett_execMinScoreVal">7</span>/10 &mdash; trades below this get a warning before approval.</div>
-            </div>
+          <div class="settings-field">
+            <label>Execution API Key</label>
+            <input type="password" id="sett_execKey" placeholder="Set in Render env vars" onchange="localStorage.setItem('tj_executionKey', this.value)">
+            <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">Required for Send to MT5. Must match EXECUTION_API_KEY on your backend. Stored locally only — never synced to Gist.</div>
           </div>
-          <div class="settings-row" style="margin-top:6px;">
-            <div><div class="settings-row-label">Require pre-trade checklist</div><div class="settings-row-sub">Block approval if pre-trade analysis fields are missing</div></div>
-            <button class="stoggle on" id="sett_execRequireChecklist" onclick="toggleSetting(this,'execRequireChecklist')"></button>
-          </div>
-          <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-ghost" onclick="openGoLiveChecklist()" style="padding:6px 12px;font-size:0.74rem;color:#3fb950;border-color:#1a3a22;">✓ Go-Live Checklist</button>
-            <button class="btn btn-ghost" onclick="emergencyStopConfirm()" style="padding:6px 12px;font-size:0.74rem;color:#f85149;border-color:#5c1616;">🛑 Emergency Stop</button>
-          </div>
-          <div style="font-size:0.65rem; color:#6e7681; margin-top:6px;">Run through the 9-item checklist before flipping <code>PAPER_TRADING_MODE=false</code> on Render.</div>
         </div>
 
-        <!-- ── Bitunix Futures (crypto venue) ────────────────────── -->
-        <div style="margin-top:18px; padding-top:14px; border-top:1px solid #21262d;">
-          <div style="font-size:0.78rem; font-weight:600; margin-bottom:8px; color:#f7931a;display:flex;align-items:center;gap:8px;">
-            🟧 Bitunix Futures (Crypto Venue)
+        <!-- Bitunix ConnCard -->
+        <div style="background:rgba(247,147,26,0.05); border:1px solid rgba(247,147,26,0.25); border-radius:12px; padding:18px 20px; margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:30px; height:30px; border-radius:8px; background:rgba(247,147,26,0.15); border:1px solid rgba(247,147,26,0.3); display:flex; align-items:center; justify-content:center; font-size:14px;">🟧</div>
+              <span style="font-weight:700; font-size:0.95rem; color:var(--t1);">Bitunix (Crypto Futures)</span>
+            </div>
             <span id="sett_bitunixStatus" style="font-size:0.65rem;font-weight:600;padding:2px 8px;border-radius:10px;background:#21262d;color:#8b949e;">Checking…</span>
           </div>
           <div class="settings-grid">
             <div class="settings-field">
               <label>Bitunix API Key (local cookie only)</label>
               <input type="password" id="sett_bitunixKey" placeholder="Stored in cookie, never in Gist" autocomplete="off">
-              <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">Optional. The backend already has its own key; this field is for local reference only and is NEVER synced to Gist or exported.</div>
             </div>
             <div class="settings-field">
               <label>Bitunix API Secret (local cookie only)</label>
               <input type="password" id="sett_bitunixSecret" placeholder="Stored in cookie, never in Gist" autocomplete="off">
-              <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">Same — cookie storage, never sent to backend, never exported.</div>
             </div>
           </div>
           <div class="settings-grid" style="margin-top:8px;">
@@ -2682,7 +3150,6 @@
                 <option value="25">25×</option><option value="50">50×</option><option value="75">75×</option>
                 <option value="100">100×</option>
               </select>
-              <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">Applied per trade unless overridden in the approval modal.</div>
             </div>
             <div class="settings-field">
               <label>Default Margin Mode</label>
@@ -2690,7 +3157,6 @@
                 <option value="CROSS" selected>CROSS</option>
                 <option value="ISOLATION">ISOLATION</option>
               </select>
-              <div style="font-size:0.65rem; color:#6e7681; margin-top:3px;">CROSS uses your full balance as margin. ISOLATION limits risk to the position margin only.</div>
             </div>
           </div>
           <div class="settings-row" style="margin-top:6px;">
@@ -2698,16 +3164,54 @@
             <button class="stoggle on" id="sett_bitunixNotify" onclick="toggleSetting(this,'bitunixNotify')"></button>
           </div>
           <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-ghost" onclick="testBitunixConnection()" style="padding:6px 12px;font-size:0.74rem;color:#f7931a;border-color:#5a3a08;">🔌 Test Connection</button>
-            <button class="btn btn-ghost" onclick="bitunixEmergencyStopConfirm()" style="padding:6px 12px;font-size:0.74rem;color:#f85149;border-color:#5c1616;">🛑 Bitunix Kill Switch</button>
+            <button class="btn btn-ghost" onclick="testBitunixConnection()" style="padding:6px 12px;font-size:0.74rem;color:#f7931a;border-color:#5a3a08;">🔌 Test Bitunix API</button>
+            <button class="btn btn-ghost" onclick="bitunixEmergencyStopConfirm()" style="padding:6px 12px;font-size:0.74rem;color:#f85149;border-color:#5c1616;">🟧 Close All Positions</button>
           </div>
           <div id="sett_bitunixTestOut" style="display:none;margin-top:10px;padding:8px 12px;border-radius:6px;font-size:0.74rem;"></div>
-          <div style="font-size:0.65rem; color:#6e7681; margin-top:6px;">Bitunix kill switch only stops crypto auto-execution — MT5 stays untouched.</div>
         </div>
+
+        <div style="font-size:0.7rem; color:#6e7681; padding:8px 12px; background:var(--s3); border-radius:8px;">
+          ℹ️ Credentials are stored in your browser only and never included in exports or cloud sync.
+        </div>
+      </div>
+
+      <!-- EXECUTION -->
+      <div class="settings-section" id="settSec_execution">
+        <div class="settings-section-title">Execution Pipeline</div>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label>Auto-Execution Mode</label>
+            <select id="sett_execMode" onchange="saveSettingsFromForm()">
+              <option value="manual">Manual approval only (recommended)</option>
+              <option value="autoHigh">Auto-approve trades with score &ge; threshold</option>
+              <option value="autoAll">Auto-approve all trades (not recommended)</option>
+            </select>
+          </div>
+          <div class="settings-field">
+            <label>Min System Alignment Score (1-8)</label>
+            <input type="range" id="sett_execMinScore" min="1" max="8" step="1" oninput="document.getElementById('sett_execMinScoreVal').textContent=this.value; saveSettingsFromForm()">
+            <div style="font-size:0.7rem; color:#8b949e; margin-top:3px;">Threshold: <span id="sett_execMinScoreVal">6</span>/8 &mdash; trades below this get a warning before approval.</div>
+            <div style="display:flex;justify-content:space-between;font-size:0.6rem;margin-top:4px;">
+              <span style="color:#f85149;">0&ndash;2 don't trade</span>
+              <span style="color:#f0883e;">3&ndash;5 review</span>
+              <span style="color:#3fb950;">6&ndash;8 proceed</span>
+            </div>
+          </div>
+        </div>
+        <div class="settings-row" style="margin-top:6px;">
+          <div><div class="settings-row-label">Require pre-trade checklist</div><div class="settings-row-sub">Block approval if pre-trade analysis fields are missing</div></div>
+          <button class="stoggle on" id="sett_execRequireChecklist" onclick="toggleSetting(this,'execRequireChecklist')"></button>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-ghost" onclick="openGoLiveChecklist()" style="padding:6px 12px;font-size:0.74rem;color:#3fb950;border-color:#1a3a22;">✓ Go-Live Checklist</button>
+          <button class="btn btn-ghost" onclick="emergencyStopConfirm()" style="padding:6px 12px;font-size:0.74rem;color:#f85149;border-color:#5c1616;">🛑 MT5 Emergency Stop</button>
+        </div>
+        <div style="font-size:0.65rem; color:#6e7681; margin-top:6px;">Run through the 9-item checklist before flipping <code>PAPER_TRADING_MODE=false</code> on Render. The Bitunix kill switch lives in Connections → Bitunix card.</div>
       </div>
 
       <!-- DISPLAY -->
       <div class="settings-section" id="settSec_display">
+        <div class="settings-section-title">Display</div>
         <div class="settings-row">
           <div><div class="settings-row-label">Show session monitor</div><div class="settings-row-sub">Clock bar below navigation</div></div>
           <button class="stoggle on" id="sett_showSession" onclick="toggleSetting(this,'showSession')"></button>
@@ -2718,8 +3222,21 @@
         </div>
       </div>
 
+      <!-- CLOUD SYNC -->
+      <div class="settings-section" id="settSec_sync">
+        <div class="settings-section-title">Cloud Sync</div>
+        <p style="font-size:0.78rem; color:#8b949e; margin-bottom:14px; line-height:1.6;">Sync your journal + settings to a private GitHub Gist. Token only needed for write operations — pulls are anonymous if the Gist is public.</p>
+        <div id="cloudStatusBarSettings" style="background:var(--s3); border:1px solid var(--border); border-radius:8px; padding:10px 13px; margin-bottom:14px; font-size:0.78rem; color:var(--t2);">Open the Cloud Sync modal to manage your token &mdash; it stays mirrored here.</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="openCloudModal()" style="padding:9px 16px;font-size:0.82rem;">☁ Open Cloud Sync</button>
+          <button class="btn btn-ghost" onclick="gistPullConfirm && gistPullConfirm()" style="padding:9px 16px;font-size:0.82rem;">↻ Pull from Cloud</button>
+        </div>
+        <div style="font-size:0.65rem; color:#6e7681; margin-top:14px;">Trades, settings and review notes sync. Credentials (MT5/Bitunix API keys, Telegram tokens) are NEVER included.</div>
+      </div>
+
       <!-- SHARING -->
       <div class="settings-section" id="settSec_sharing">
+        <div class="settings-section-title">Sharing</div>
         <div class="settings-row">
           <div><div class="settings-row-label">Public profile</div><div class="settings-row-sub">Share your stats publicly</div></div>
           <button class="stoggle" id="sett_publicProfile" onclick="toggleSetting(this,'publicProfile')"></button>
@@ -2754,6 +3271,7 @@
 
       <!-- EXPORT -->
       <div class="settings-section" id="settSec_export">
+        <div class="settings-section-title">Export</div>
         <div class="settings-row">
           <div><div class="settings-row-label">Include trader name in exports</div></div>
           <button class="stoggle on" id="sett_exportName" onclick="toggleSetting(this,'exportName')"></button>
@@ -2772,6 +3290,7 @@
 
       <!-- DANGER ZONE -->
       <div class="settings-section" id="settSec_danger">
+        <div class="settings-section-title">Danger Zone</div>
         <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;margin-bottom:14px;">
           <div style="font-size:0.78rem;font-weight:600;color:#8b949e;margin-bottom:8px;">Storage Usage</div>
           <div id="storageIndicator" style="font-size:0.78rem;color:#e6edf3;">Calculating...</div>
@@ -2785,6 +3304,9 @@
           <button class="danger-btn destructive" onclick="settingsClearTrades()">Clear all trades</button>
         </div>
       </div>
+
+        </div><!-- /.settings-content -->
+      </div><!-- /.settings-shell -->
 
     </div>
   </div>
@@ -3079,14 +3601,27 @@ function hasUnsavedFormData() {
 function nav(view) {
   // Guard: warn if leaving Log Trade with unsaved data
   const logPage = document.getElementById('page-log');
-  if (logPage && logPage.classList.contains('active') && view !== 'log' && hasUnsavedFormData()) {
+  if (logPage && logPage.classList.contains('active') && view !== 'log' && view !== 'calculator' && view !== 'settings' && hasUnsavedFormData()) {
     if (!confirm('You have unsaved trade data. Leave anyway?')) return;
   }
+  // Phase 5 — calculator and settings are not full pages; treat them as
+  // shortcuts. Calculator opens the standalone tool in a new tab; settings
+  // opens the modal over whatever page is currently active.
+  if (view === 'calculator') {
+    window.open('forex-calculator.html', '_blank', 'noopener');
+    return;
+  }
+  if (view === 'settings') {
+    if (typeof openSettingsModal === 'function') openSettingsModal();
+    return;
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-  document.getElementById('page-' + view).classList.add('active');
-  const idx = ['dashboard','log','journal','alerts','live'].indexOf(view);
-  if (idx >= 0) document.querySelectorAll('.nav-link')[idx].classList.add('active');
+  // Sidebar nav items + mobile bottom nav both use data-tab matching the view id.
+  document.querySelectorAll('.sidebar .nav-item, .bottom-nav .bn-item, .nav-link').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('[data-tab="' + view + '"]').forEach(l => l.classList.add('active'));
+  const target = document.getElementById('page-' + view);
+  if (target) target.classList.add('active');
+  // Legacy .nav-link selector kept harmlessly for any old call sites.
   if (view === 'dashboard') renderDashboard();
   if (view === 'journal')   { restoreJournalFilters(); renderJournal(); }
   if (view === 'log')       initForm();
@@ -3095,8 +3630,33 @@ function nav(view) {
     refreshLiveTrades(); refreshPendingLimitOrders(); refreshExecutionQueue(); refreshExecutionHealth(); refreshExecutionLog();
     refreshBitunixLiveTrades(); refreshBitunixPendingOrders(); refreshBitunixHealth(); refreshBitunixEventLog();
   }
+  // Scroll the main-content scroller, not the window — page is sticky-grid
+  const main = document.querySelector('.main-content');
+  if (main) main.scrollTo({ top: 0, behavior: 'instant' });
   window.scrollTo(0, 0);
 }
+
+// Phase 5 — sidebar collapse + persistence
+function toggleSidebar() {
+  const app = document.getElementById('appShell');
+  if (!app) return;
+  const collapsed = app.classList.toggle('collapsed');
+  try { localStorage.setItem('sb_open', String(!collapsed)); } catch {}
+}
+// Restore sidebar state on first paint
+(function restoreSidebar() {
+  try {
+    const stored = localStorage.getItem('sb_open');
+    if (stored === 'false') {
+      const apply = () => { const el = document.getElementById('appShell'); if (el) el.classList.add('collapsed'); };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', apply, { once: true });
+      } else {
+        apply();
+      }
+    }
+  } catch {}
+})();
 
 // ═══════════════════════════════════════════════════════
 // FORM
@@ -3113,7 +3673,99 @@ function initForm() {
   updateRR();
   readSync();
   toggleSetupOther();
+  // Phase 5 — open the wizard at step 1 on every form open
+  setLogStep(1);
+  updateWizardScore();
 }
+
+// Phase 5 — Log Trade 4-step wizard. Steps are visual only — the underlying
+// <form> is one element so submitTrade reads every field regardless of which
+// step is currently shown.
+function setLogStep(n) {
+  const total = 4;
+  n = Math.max(1, Math.min(total, parseInt(n, 10) || 1));
+  document.querySelectorAll('#tradeForm .wizard-step[data-step]').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.step, 10) === n);
+  });
+  document.querySelectorAll('.wizard-step-btn').forEach(btn => {
+    const stepN = parseInt(btn.dataset.wstep, 10);
+    btn.classList.remove('active', 'complete');
+    if (stepN < n) btn.classList.add('complete');
+    if (stepN === n) btn.classList.add('active');
+  });
+  const fill = document.getElementById('wizardProgressFill');
+  if (fill) fill.style.width = (((n - 1) / (total - 1)) * 100) + '%';
+  // On step 4 — refresh score + venue-aware save button
+  if (n === 4) {
+    updateWizardScore();
+    updateWizardSaveBtn();
+  }
+}
+
+// Phase 5 — venue-aware save button label on step 4
+function updateWizardSaveBtn() {
+  const btn = document.getElementById('wizardSaveBtn');
+  if (!btn) return;
+  const sym = (document.getElementById('f_pair')?.value || '').toUpperCase();
+  const dropdown = document.getElementById('f_venue')?.value || 'auto';
+  const venue = (typeof resolveVenueForTrade === 'function')
+    ? resolveVenueForTrade(sym, dropdown)
+    : 'mt5';
+  if (venue === 'bitunix') {
+    btn.style.background = 'var(--orange)';
+    btn.innerHTML = '💾 Save &amp; Queue → 🟧 Bitunix';
+  } else {
+    btn.style.background = 'var(--blue)';
+    btn.innerHTML = '💾 Save &amp; Queue → 📊 MT5';
+  }
+}
+
+// Phase 5 — read-only mirror of calcAlignmentScore that reads the FORM's
+// f_* fields plus the cl_* psych fields if the user opened the modal. This
+// gives the wizard a live preview of the score the saved trade will get.
+function updateWizardScore() {
+  const card = document.getElementById('wizardScoreCard');
+  if (!card) return;
+  const v = id => (document.getElementById(id)?.value || '');
+  let score = 0;
+  // 1. HTF aligned — form has f_htfBias (Bullish/Bearish/Neutral)
+  if (v('f_htfBias') === 'Bullish' || v('f_htfBias') === 'Bearish') score++;
+  // 2. $$ Liquidity taken
+  if (v('f_liqTaken') === 'Yes') score++;
+  // 3. Entry confirmation
+  const ec = v('f_entryConf');
+  if (ec.startsWith('HH+HL') || ec.startsWith('LL+LH')) score++;
+  // 4. Distance & momentum
+  if (v('f_distMomentum') === 'Strong' || v('f_distMomentum') === 'Moderate') score++;
+  // 5. Not chasing — only via cl_chasing modal field
+  if (v('cl_chasing') === 'Waiting for confirmation') score++;
+  // 6. Mentor check
+  if (v('cl_mentorCheck') === 'Yes') score++;
+  // 7. My system
+  if (v('cl_systemCheck') === 'My system') score++;
+  // 8. DXY confirms direction
+  if (v('f_dxyConfirms') === 'Yes aligned') score++;
+
+  const num = document.getElementById('wizardScoreNum');
+  const lbl = document.getElementById('wizardScoreLabel');
+  let color, label;
+  if (score >= 6)      { color = 'var(--green)'; label = 'Strong setup — proceed'; }
+  else if (score >= 3) { color = 'var(--amber)'; label = 'Weak setup — review before trading'; }
+  else                 { color = 'var(--red)';   label = 'Do not take this trade'; }
+  if (num) { num.textContent = score; num.style.color = color; }
+  if (lbl) { lbl.textContent = label; lbl.style.color = color; }
+  card.style.display = '';
+}
+
+// Refresh wizard score whenever a scored field changes
+document.addEventListener('change', (e) => {
+  if (!e.target || !e.target.id) return;
+  const watched = ['f_htfBias','f_liqTaken','f_entryConf','f_distMomentum','f_dxyConfirms','f_pair','f_venue','cl_chasing','cl_mentorCheck','cl_systemCheck'];
+  if (watched.includes(e.target.id)) {
+    if (typeof updateWizardScore === 'function') updateWizardScore();
+    if (typeof updateWizardSaveBtn === 'function') updateWizardSaveBtn();
+  }
+});
 
 function autoFillSessionChips() {
   const activeLabels = getActiveSessionChips();
@@ -3545,6 +4197,11 @@ function submitTrade(e) {
     dxyBias:          document.getElementById('f_dxyBias').value,
     gbpChecked:       document.getElementById('f_gbpChecked').value,
     corrNotes:        document.getElementById('f_corrNotes').value,
+    // Phase 5 — psych fields from the pre-trade checklist modal so the
+    // 8-item System Alignment Score can read them off the saved trade.
+    notChasing:  document.getElementById('cl_chasing')?.value || '',
+    mentorCheck: document.getElementById('cl_mentorCheck')?.value || '',
+    mySystem:    document.getElementById('cl_systemCheck')?.value || '',
     // Section B — During/After
     postTVLink:       document.getElementById('f_postTVLink').value.trim(),
     // Section C — Extended HTF Context
@@ -3668,6 +4325,41 @@ function restoreJournalFilters() {
 }
 
 function onFilterChange() { journalPage = 0; renderJournal(); }
+
+// Phase 5 — Journal pill filter row.
+// status/outcome/venue pills mirror the underlying <select> values so existing
+// filter logic in renderJournal() still drives the result. The poi+session
+// pills layer ON TOP via _journalPoiPill / _journalSessionPill globals which
+// renderJournal() consults.
+let _journalPoiPill = '';
+let _journalSessionPill = '';
+function setJournalPill(btn) {
+  if (!btn) return;
+  const flt = btn.dataset.flt;
+  const val = btn.dataset.val || '';
+  const wasActive = btn.classList.contains('active');
+  // Within the same filter group, only one pill at a time. Click again to clear.
+  document.querySelectorAll(`.jrn-pill[data-flt="${flt}"]`).forEach(p => p.classList.remove('active'));
+  if (!wasActive) btn.classList.add('active');
+  // The implicit "All" pill (status="" first one) — mirror selection
+  const noneActive = !document.querySelector(`.jrn-pill[data-flt="${flt}"].active`);
+  if (flt === 'status') {
+    document.getElementById('fltStatus').value  = wasActive ? '' : val;
+  } else if (flt === 'outcome') {
+    document.getElementById('fltOutcome').value = wasActive ? '' : val;
+    if (!wasActive) document.getElementById('fltStatus').value = 'closed';
+  } else if (flt === 'venue') {
+    document.getElementById('fltVenue').value   = wasActive ? '' : val;
+  } else if (flt === 'poi') {
+    _journalPoiPill = wasActive ? '' : val;
+  } else if (flt === 'session') {
+    _journalSessionPill = wasActive ? '' : val;
+  }
+  if (noneActive && flt === 'status') {
+    document.querySelector('.jrn-pill[data-flt="status"][data-val=""]')?.classList.add('active');
+  }
+  onFilterChange();
+}
 
 function renderExecBadge(t) {
   if (!t.execStatus) return '';
@@ -3837,6 +4529,13 @@ function renderJournal() {
   if (market)  list = list.filter(t => t.market === market);
   if (venue)   list = list.filter(t => venueForRow(t) === venue);
   if (setup)   list = list.filter(t => setup === 'Other' ? t.setup?.startsWith('Other') : t.setup === setup);
+  // Phase 5 — pill filters layered on top of the dropdowns
+  if (typeof _journalPoiPill === 'string' && _journalPoiPill) {
+    list = list.filter(t => (t.poiType || '') === _journalPoiPill);
+  }
+  if (typeof _journalSessionPill === 'string' && _journalSessionPill) {
+    list = list.filter(t => (t.conditions || []).includes(_journalSessionPill));
+  }
 
   const el = document.getElementById('tradeList');
 
@@ -3963,6 +4662,18 @@ function renderJournal() {
     if (t.market)    setupBits.push(escHtml(t.market));
     const setupLine = setupBits.join('<span class="dot-sep">·</span>');
 
+    // Phase 5 — confidence pip strip (10 dots, color thresholds 1-2 grey / 3-5 amber / 6-8 green / 9-10 pulse)
+    const cv = Number(t.confidence) || 0;
+    let pipsHtml = '';
+    if (cv > 0) {
+      const tier = cv >= 9 ? 'lit-best' : cv >= 6 ? 'lit-good' : cv >= 3 ? 'lit-mid' : 'lit-low';
+      let pipDots = '';
+      for (let i = 1; i <= 10; i++) {
+        pipDots += `<span class="conf-pip ${i <= cv ? tier : ''}"></span>`;
+      }
+      pipsHtml = `<span class="conf-pips" title="Confidence ${cv}/10">${pipDots}</span>`;
+    }
+
     return `<div class="trade-row ${rowClass}" onclick="openModal('${t.id}')">
       <span class="trade-badge badge-${t.direction}">${dirLabel}</span>
       <span class="trade-symbol">${escHtml(t.pair || '')}</span>
@@ -3973,6 +4684,7 @@ function renderJournal() {
       ${execBadge}
       <span class="trade-rr ${rrCls}">${rrStr}</span>
       <span class="trade-pnl ${pnlClass}">${pnlStr}</span>
+      ${pipsHtml}
       <span class="trade-date">${dateStr}</span>
     </div>`;
   }).join('');
@@ -5233,26 +5945,35 @@ function getExecBackendUrl() {
       || '';
 }
 
+// Phase 5 — 8-item System Alignment Score over a saved trade row.
+// Returns a raw 0-8 integer (not scaled to /10). The 8 checks mirror
+// calcAlignmentScore() exactly so the form score and post-save score
+// agree. Psych fields (notChasing/mentorCheck/mySystem) are read off
+// the trade row if they were captured on save; otherwise they read 0.
 function calcSystemScore(t) {
-  // Counts the system-alignment fields the trader filled "Yes" / aligned values for
-  let score = 0; let max = 0;
+  let score = 0;
   const checks = [
+    // 1. HTF Aligned
     { v: t.htfBias, good: ['Bullish','Bearish'] },
+    // 2. $$ Liquidity taken
     { v: t.liqTaken, good: ['Yes'] },
-    { v: t.mbmsConfirmed, good: ['Yes'] },
-    { v: t.scVisible, good: ['Yes'] },
-    { v: t.entryConfirmation, good: v => v && v !== 'None' && v !== '' },
-    { v: t.distMomentum, good: v => v && v !== '' },
-    { v: t.poiLevel, good: v => v && v !== '' },
-    { v: t.trustedBOS, good: ['Yes'] },
-    { v: t.dxyConfirms, good: ['Yes aligned'] },
-    { v: t.confidence, good: v => Number(v) >= 7 },
+    // 3. Entry confirmation
+    { v: t.entryConfirmation, good: v => typeof v === 'string' && (v.startsWith('HH+HL') || v.startsWith('LL+LH')) },
+    // 4. Distance & Momentum (Strong or Moderate)
+    { v: t.distMomentum, good: ['Strong','Moderate'] },
+    // 5. Not chasing
+    { v: t.notChasing,   good: ['Waiting for confirmation','Waiting'] },
+    // 6. Mentor check
+    { v: t.mentorCheck,  good: ['Yes'] },
+    // 7. My system (not improvising)
+    { v: t.mySystem,     good: ['Yes','My system'] },
+    // 8. DXY confirms direction
+    { v: t.dxyConfirms,  good: ['Yes aligned'] },
   ];
   checks.forEach(c => {
-    max++;
     if (typeof c.good === 'function' ? c.good(c.v) : (c.v && c.good.includes(c.v))) score++;
   });
-  return Math.round((score / max) * 10);
+  return score; // 0..8
 }
 
 function checklistComplete(t) {
@@ -5277,7 +5998,7 @@ function approveForMT4(tradeId) {
   }
 
   const sett = getSettings();
-  const exec = sett.execution || { mode: 'manual', minScore: 7, requireChecklist: true };
+  const exec = sett.execution || { mode: 'manual', minScore: 6, requireChecklist: true };
 
   // Pre-flight checks
   if (exec.requireChecklist && !checklistComplete(t)) {
@@ -5301,14 +6022,14 @@ function approveForMT4(tradeId) {
   const riskAmt = capital * (riskPct / 100);
 
   let scoreWarning = '';
-  if (sysScore < (exec.minScore || 7)) {
+  if (sysScore < (exec.minScore || 6)) {
     scoreWarning = `<div style="margin-top:10px;padding:8px 10px;background:#3a2a16;border:1px solid #f0883e;border-radius:6px;color:#ffa657;font-size:0.78rem;">
-      ⚠ System alignment score is <strong>${sysScore}/10</strong> &mdash; below your threshold of ${exec.minScore}. Consider re-checking your setup before sending.
+      ⚠ System alignment score is <strong>${sysScore}/8</strong> &mdash; below your threshold of ${exec.minScore}. Consider re-checking your setup before sending.
     </div>`;
   }
 
   // Auto-execution shortcut
-  if (exec.mode === 'autoAll' || (exec.mode === 'autoHigh' && sysScore >= (exec.minScore || 7))) {
+  if (exec.mode === 'autoAll' || (exec.mode === 'autoHigh' && sysScore >= (exec.minScore || 6))) {
     submitTradeApproval(tradeId);
     return;
   }
@@ -5326,7 +6047,7 @@ function approveForMT4(tradeId) {
         <div><div class="info-cell-label">TP</div><div>${t.tp} <span style="color:#6e7681;font-size:0.72rem;">(${tpPips} pips / ${tpPct}%)</span></div></div>
         <div><div class="info-cell-label">Risk</div><div>${riskPct}% ${capital ? '($' + riskAmt.toFixed(2) + ')' : ''}</div></div>
         <div><div class="info-cell-label">Lot Size</div><div>${t.size || 'auto'}</div></div>
-        <div><div class="info-cell-label">System Score</div><div style="font-weight:700;color:${sysScore>=7?'#3fb950':sysScore>=5?'#f0883e':'#f85149'};">${sysScore}/10</div></div>
+        <div><div class="info-cell-label">System Score</div><div style="font-weight:700;color:${sysScore>=6?'#3fb950':sysScore>=3?'#f0883e':'#f85149'};">${sysScore}/8</div></div>
         <div><div class="info-cell-label">Confidence</div><div>${t.confidence||'—'}/10</div></div>
       </div>
       ${scoreWarning}
@@ -5381,7 +6102,7 @@ async function submitTradeApproval(tradeId) {
         tp: t.tp,
         risk_percent: sett.profile.riskPct || 1,
         lot_size: parseFloat(t.size) || 0.01,
-        be_trigger_rr: sett.profile.beTriggerRR || 1.5,
+        be_trigger_rr: sett.profile.beTriggerRR || 5,
         journal_trade_id: t.id,
         confidence: t.confidence || 0,
         system_score: sysScore,
@@ -5471,7 +6192,7 @@ function approveForBitunix(tradeId) {
   }
 
   const sett = getSettings();
-  const exec = sett.execution || { mode: 'manual', minScore: 7, requireChecklist: true };
+  const exec = sett.execution || { mode: 'manual', minScore: 6, requireChecklist: true };
   const bitSett = sett.bitunix || {};
   const leverage   = parseInt(bitSett.leverage || 10, 10) || 10;
   const marginMode = (bitSett.marginMode || 'CROSS').toUpperCase();
@@ -5499,14 +6220,14 @@ function approveForBitunix(tradeId) {
   const requiredMargin = leverage > 0 ? (notional / leverage) : 0;
 
   let scoreWarning = '';
-  if (sysScore < (exec.minScore || 7)) {
+  if (sysScore < (exec.minScore || 6)) {
     scoreWarning = `<div style="margin-top:10px;padding:8px 10px;background:#3a2a16;border:1px solid #f0883e;border-radius:6px;color:#ffa657;font-size:0.78rem;">
-      ⚠ System alignment score is <strong>${sysScore}/10</strong> &mdash; below your threshold of ${exec.minScore}. Consider re-checking your setup before sending.
+      ⚠ System alignment score is <strong>${sysScore}/8</strong> &mdash; below your threshold of ${exec.minScore}. Consider re-checking your setup before sending.
     </div>`;
   }
 
   // Auto-execution shortcut (same rules as MT5 path)
-  if (exec.mode === 'autoAll' || (exec.mode === 'autoHigh' && sysScore >= (exec.minScore || 7))) {
+  if (exec.mode === 'autoAll' || (exec.mode === 'autoHigh' && sysScore >= (exec.minScore || 6))) {
     submitBitunixApproval(tradeId);
     return;
   }
@@ -5528,7 +6249,7 @@ function approveForBitunix(tradeId) {
         <div><div class="info-cell-label">Margin Mode</div><div>${marginMode}</div></div>
         <div><div class="info-cell-label">Notional</div><div>$${notional.toFixed(2)}</div></div>
         <div><div class="info-cell-label">Required Margin</div><div style="font-weight:700;">$${requiredMargin.toFixed(2)}</div></div>
-        <div><div class="info-cell-label">System Score</div><div style="font-weight:700;color:${sysScore>=7?'#3fb950':sysScore>=5?'#f0883e':'#f85149'};">${sysScore}/10</div></div>
+        <div><div class="info-cell-label">System Score</div><div style="font-weight:700;color:${sysScore>=6?'#3fb950':sysScore>=3?'#f0883e':'#f85149'};">${sysScore}/8</div></div>
         <div><div class="info-cell-label">Confidence</div><div>${t.confidence||'—'}/10</div></div>
       </div>
       ${scoreWarning}
@@ -5584,7 +6305,7 @@ async function submitBitunixApproval(tradeId) {
         leverage: leverage,
         margin_mode: marginMode,
         order_type: 'MARKET',
-        be_trigger_rr: sett.profile.beTriggerRR || 1.5,
+        be_trigger_rr: sett.profile.beTriggerRR || 5,
         journal_trade_id: t.id,
         confidence: t.confidence || 0,
         system_score: sysScore,
@@ -6009,6 +6730,18 @@ async function runExecutionTest() {
 }
 
 // ── Execution Log viewer ───────────────────────────────
+// Phase 5 — exec log venue pill helper. Mirrors the value into the hidden
+// <select id="execLogVenue"> so the existing refreshExecutionLog() filter
+// logic keeps working unchanged.
+function setExecLogVenue(v) {
+  document.querySelectorAll('#execLogVenueTabs .execlog-vtab').forEach(b => {
+    b.classList.toggle('active', (b.dataset.venue || '') === v);
+  });
+  const sel = document.getElementById('execLogVenue');
+  if (sel) sel.value = v || '';
+  refreshExecutionLog();
+}
+
 async function refreshExecutionLog() {
   const panel = document.getElementById('executionLogPanel');
   if (!panel) return;
@@ -6414,12 +7147,19 @@ function renderEV(closed, wins, losses, winRate) {
   const ev = (winRate/100 * avgWin) - ((100 - winRate)/100 * avgLoss);
   const evClass = ev > 0 ? 'green' : ev < 0 ? 'red' : '';
   const proj100 = ev * 100;
+  el.classList.toggle('ev-neg', ev < 0);
   el.style.display = '';
+  // Phase 5 — show wins/losses/total counts in a tidy footer row
   el.innerHTML = `
     <div class="ev-sub">Expected Value Per Trade</div>
     <div class="ev-value ${evClass}">${ev >= 0 ? '+' : ''}$${fmt(Math.abs(ev))}</div>
-    <div class="ev-formula">(${fmt(winRate,1)}% × $${fmt(avgWin)}) − (${fmt(100-winRate,1)}% × $${fmt(avgLoss)})</div>
-    ${proj100 !== 0 ? `<div class="ev-projection">100 trades = <strong>${proj100 >= 0 ? '+' : ''}$${fmt(Math.abs(proj100))}</strong></div>` : ''}
+    <div class="ev-formula">(${fmt(winRate,1)}% WR × $${fmt(avgWin)} avg win) − (${fmt(100-winRate,1)}% × $${fmt(avgLoss)} avg loss)</div>
+    <div style="display:flex;gap:18px;margin-top:14px;font-size:12px;flex-wrap:wrap;">
+      <span style="color:var(--green);">▲ ${wins.length} wins</span>
+      <span style="color:var(--red);">▼ ${losses.length} losses</span>
+      <span style="color:var(--t3);">${closed.length} closed</span>
+      ${proj100 !== 0 ? `<span style="color:var(--blue); margin-left:auto;">100-trade projection: <strong>${proj100 >= 0 ? '+' : ''}$${fmt(Math.abs(proj100))}</strong></span>` : ''}
+    </div>
   `;
 }
 
@@ -6507,6 +7247,19 @@ function renderDrawdown(allTrades) {
   };
   const m = venueShare(ddMt5), b = venueShare(ddBx), x = venueShare(ddManual);
 
+  // Phase 5 — Today's trade count vs maxTrades cap. Counts every trade
+  // *opened* today (not closed) so the cap fires the moment the user is
+  // about to take a third trade.
+  const maxTradesCap = sett.profile.maxTrades || 3;
+  const tradesTodayCount = (allTrades || []).filter(t => {
+    if (!t || !t.dateOpen) return false;
+    const d = new Date(t.dateOpen);
+    return d >= dayStart;
+  }).length;
+  const tradesColor = tradesTodayCount > maxTradesCap ? 'var(--red)'
+                    : tradesTodayCount === maxTradesCap ? 'var(--amber)'
+                    : 'var(--green)';
+
   el.innerHTML = `
     <div class="dd-grid">
       <div class="dd-card">
@@ -6522,6 +7275,11 @@ function renderDrawdown(allTrades) {
         <div class="dd-label">Peak Equity</div>
         <div class="dd-val" style="color:#3fb950;">$${fmt(peak)}</div>
         <div style="font-size:0.68rem;color:#6e7681;margin-top:2px;">Current: $${fmt(equity)}</div>
+      </div>
+      <div class="dd-card">
+        <div class="dd-label">Today</div>
+        <div class="dd-val" style="color:${tradesColor};">${tradesTodayCount} <span style="font-size:0.68rem;color:#6e7681;font-weight:400;">/ ${maxTradesCap}</span></div>
+        <div style="font-size:0.68rem;color:#6e7681;margin-top:2px;">${tradesTodayCount > maxTradesCap ? 'Over cap — pause' : tradesTodayCount === maxTradesCap ? 'At cap' : 'Trades opened today'}</div>
       </div>
     </div>
     <div class="dd-progress">
@@ -7245,8 +8003,9 @@ function renderSetupPerformance(list) {
     const avgRRnum = v.rrCount ? (v.rrSum / v.rrCount) : null;
     const avgRR    = avgRRnum != null ? fmtRR(avgRRnum) : '—';
     const avgRRcol = avgRRnum != null ? rrColor(avgRRnum) : 'var(--text-muted)';
-    const statClass = wrNum >= 55 ? '' : wrNum >= 40 ? 'warn' : 'danger';
-    const barClass  = wrNum >= 55 ? '' : wrNum >= 40 ? 'warn' : 'danger';
+    // Phase 5 — Dashboard.jsx thresholds: ≥65 green / ≥45 amber / <45 red
+    const statClass = wrNum >= 65 ? '' : wrNum >= 45 ? 'warn' : 'danger';
+    const barClass  = wrNum >= 65 ? '' : wrNum >= 45 ? 'warn' : 'danger';
     const rowClass  = k === bestKey ? ' best' : '';
     const flag      = k === bestKey ? '<span class="star">★</span>' : k === worstKey ? '<span class="down">▼</span>' : '';
     html += `<div class="setup-row${rowClass}">
@@ -8326,30 +9085,58 @@ async function refreshBitunixLiveTrades() {
       if (conn) { conn.textContent = '🟧 Bitunix connected'; conn.style.color = '#f7931a'; }
       return;
     }
+    // Phase 5 — restyled card matches LiveTab.jsx PositionCard: 3px accent
+    // border (green/red by P&L), 6-cell metric grid (Entry · Mark · TP · SL · Qty · Lev), large mono P&L.
     let html = '';
     positions.forEach(p => {
       const side = (p.side || p.positionSide || '').toUpperCase();
-      const sideCol = side === 'LONG' || side === 'BUY' ? '#3fb950' : '#f85149';
+      const isLong = side === 'LONG' || side === 'BUY';
+      const sideCol = isLong ? 'var(--green)' : 'var(--red)';
       const sym = p.symbol || '—';
       const qty = p.qty ?? p.size ?? p.positionAmt ?? '—';
       const entry = p.avgEntryPrice ?? p.entryPrice ?? '—';
       const mark = p.markPrice ?? p.lastPrice ?? '—';
+      const tp = p.takeProfit ?? p.tp ?? '—';
+      const sl = p.stopLoss ?? p.sl ?? '—';
       const lev = p.leverage || '—';
-      const margin = p.marginMode || p.margin || '—';
-      const pnl = p.unrealizedPnl ?? p.uPnl ?? p.unRealizedProfit ?? null;
-      const pnlCol = pnl == null ? '#8b949e' : Number(pnl) >= 0 ? '#3fb950' : '#f85149';
-      const pnlStr = pnl == null ? '—' : (Number(pnl) >= 0 ? '+' : '') + Number(pnl).toFixed(2);
+      const pnlNum = (p.unrealizedPnl ?? p.uPnl ?? p.unRealizedProfit);
+      const pnl = pnlNum == null ? null : Number(pnlNum);
+      const accent = pnl == null ? 'var(--t3)' : pnl > 0 ? 'var(--green)' : pnl < 0 ? 'var(--red)' : 'var(--t3)';
+      const pnlCol = accent;
+      const pnlStr = pnl == null ? '—' : (pnl >= 0 ? '+' : '') + '$' + Math.abs(pnl).toFixed(2);
+      // Signed RR vs entry/SL
+      let rrStr = '—', rrCol = 'var(--t3)';
+      const eN = parseFloat(entry), sN = parseFloat(sl), mN = parseFloat(mark);
+      if (eN && sN && mN) {
+        const slDist = Math.abs(eN - sN);
+        if (slDist > 0) {
+          const dirNum = isLong ? (mN - eN) : (eN - mN);
+          const rr = dirNum / slDist;
+          rrStr = (rr >= 0 ? '+' : '') + rr.toFixed(2) + 'R';
+          rrCol = rr > 0 ? 'var(--green)' : rr < 0 ? 'var(--red)' : 'var(--amber)';
+        }
+      }
+      const beSet = sN && eN && Math.abs(sN - eN) / Math.max(eN, 1e-9) < 0.001;
       html += `
-        <div class="card" style="border-left:3px solid #f7931a; margin-bottom:10px; padding:10px 12px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-            <div style="font-weight:700;color:${sideCol};">${escHtml(side || '—')} <span style="color:#f7931a;">${escHtml(sym)}</span></div>
-            <div style="font-size:0.75rem;color:#8b949e;">Lev ${escHtml(String(lev))}× · ${escHtml(String(margin))}</div>
+        <div style="background:var(--s2); border:1px solid var(--border); border-left:3px solid ${accent}; border-radius:10px; padding:14px 16px; margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-family:var(--mono); font-weight:700; font-size:1rem; color:var(--t1);">${escHtml(sym)}</span>
+              <span style="font-size:10px; padding:2px 8px; border-radius:4px; font-weight:700; letter-spacing:0.04em; background:rgba(247,147,26,0.15); color:var(--orange); border:1px solid rgba(247,147,26,0.30);">BITUNIX</span>
+              <span style="font-size:12px; padding:3px 10px; border-radius:5px; font-weight:600; background:${isLong?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)'}; color:${sideCol};">${isLong?'▲':'▼'} ${escHtml(side || '—')}</span>
+              ${beSet ? '<span style="font-size:10px; padding:2px 8px; border-radius:4px; font-weight:600; background:rgba(59,130,246,0.12); color:var(--blue); border:1px solid rgba(59,130,246,0.30);">🔒 BE — risk free</span>' : ''}
+            </div>
+            <div style="text-align:right;">
+              <div style="font-family:var(--mono); font-weight:700; font-size:1.1rem; color:${pnlCol};">${pnlStr}</div>
+              <div style="font-size:10px; color:var(--t3);">Unrealized P&amp;L · <span style="color:${rrCol};font-weight:600;">${rrStr}</span></div>
+            </div>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px 10px;margin-top:6px;font-size:0.78rem;">
-            <div><div class="info-cell-label">Qty</div><div>${escHtml(String(qty))}</div></div>
-            <div><div class="info-cell-label">Entry</div><div>${escHtml(String(entry))}</div></div>
-            <div><div class="info-cell-label">Mark</div><div>${escHtml(String(mark))}</div></div>
-            <div><div class="info-cell-label">uPnL</div><div style="color:${pnlCol};font-weight:600;">$${pnlStr}</div></div>
+          <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px;">
+            ${[['Entry',entry,'var(--t1)'],['Mark',mark,'var(--t1)'],['TP',tp,'var(--green)'],['SL',sl,'var(--red)'],['Qty',qty,'var(--t1)'],['Lev',lev+'×','var(--orange)']].map(([k,v,c]) => `
+              <div style="background:var(--s3); border-radius:7px; padding:8px 10px;">
+                <div style="font-size:10px; color:var(--t3); margin-bottom:3px;">${k}</div>
+                <div style="font-family:var(--mono); font-size:13px; font-weight:600; color:${c};">${escHtml(String(v))}</div>
+              </div>`).join('')}
           </div>
         </div>`;
     });
@@ -8637,7 +9424,7 @@ async function refreshLiveTrades() {
         }
 
         // BE status
-        const beRR = getSettings().profile.beTriggerRR || 1.5;
+        const beRR = getSettings().profile.beTriggerRR || 5;
         const isBeSet = sl && Math.abs(sl - entry) < 0.01;
         let beStatus = '';
         let beStatusClass = '';
@@ -9087,50 +9874,46 @@ function calcChecklistRR() {
   rrEl.value = '1 : ' + (reward / risk).toFixed(2);
 }
 
+// Phase 5 — 8-item System Alignment Score (was 12).
+// The 4 dropped items (mbms, SC, riskCap, dxyChecked) remain as visual
+// reference fields in the confluence grid; they're just not scored.
+// Scoring: 6-8 green/proceed · 3-5 amber/review · 0-2 red/skip.
 function calcAlignmentScore() {
   let score = 0;
   const g = id => (document.getElementById(id)?.value || '');
 
   // 1. HTF aligned (Yes all bullish or Yes all bearish)
   if (g('cl_htfAlign').startsWith('Yes')) score++;
-  // 2. Liquidity taken = Yes
+  // 2. $$ Liquidity taken before entry
   if (g('cl_liqTaken') === 'Yes') score++;
-  // 3. mbms confirmed = Yes
-  if (g('cl_mbmsConf') === 'Yes') score++;
-  // 4. SC visible = Yes
-  if (g('cl_scVisible') === 'Yes') score++;
-  // 5. Entry confirmation = HH+HL or LL+LH
+  // 3. Entry confirmation visible (HH+HL or LL+LH)
   if (g('cl_entryConf') === 'HH+HL' || g('cl_entryConf') === 'LL+LH') score++;
-  // 6. Distance & momentum = Strong or Moderate
+  // 4. Distance & momentum (Strong or Moderate)
   if (g('cl_distMom') === 'Strong' || g('cl_distMom') === 'Moderate') score++;
-  // 7. 2% risk cap = Yes
-  if (g('cl_riskCap') === 'Yes') score++;
-  // 8. Not chasing
+  // 5. Not chasing (waiting for confirmation)
   if (g('cl_chasing') === 'Waiting for confirmation') score++;
-  // 9. Mentor check = Yes
+  // 6. Mentor check
   if (g('cl_mentorCheck') === 'Yes') score++;
-  // 10. My system (not improvising)
+  // 7. My system (not improvising)
   if (g('cl_systemCheck') === 'My system') score++;
-  // 11. DXY checked
-  if (g('cl_dxyChecked') === 'Yes') score++;
-  // 12. DXY confirms trade
+  // 8. DXY confirms trade direction
   if (g('cl_dxyConfirms') === 'Yes aligned') score++;
 
   const numEl = document.getElementById('clScoreNum');
   const labelEl = document.getElementById('clScoreLabel');
   const wrapEl = document.getElementById('clAlignmentScore');
-  numEl.textContent = score;
-  wrapEl.classList.remove('green', 'amber', 'red');
+  if (numEl) numEl.textContent = score;
+  if (wrapEl) wrapEl.classList.remove('green', 'amber', 'red');
 
-  if (score >= 10) {
-    wrapEl.classList.add('green');
-    labelEl.textContent = 'Strong setup — proceed';
-  } else if (score >= 6) {
-    wrapEl.classList.add('amber');
-    labelEl.textContent = 'Weak setup — review';
+  if (score >= 6) {
+    if (wrapEl) wrapEl.classList.add('green');
+    if (labelEl) labelEl.textContent = 'Strong setup — proceed';
+  } else if (score >= 3) {
+    if (wrapEl) wrapEl.classList.add('amber');
+    if (labelEl) labelEl.textContent = 'Weak setup — review before trading';
   } else {
-    wrapEl.classList.add('red');
-    labelEl.textContent = 'Do not take this trade';
+    if (wrapEl) wrapEl.classList.add('red');
+    if (labelEl) labelEl.textContent = 'Do not take this trade';
   }
 }
 
@@ -9139,17 +9922,15 @@ function getAlignmentData() {
   let score = 0;
   if (g('cl_htfAlign').startsWith('Yes')) score++;
   if (g('cl_liqTaken') === 'Yes') score++;
-  if (g('cl_mbmsConf') === 'Yes') score++;
-  if (g('cl_scVisible') === 'Yes') score++;
   if (g('cl_entryConf') === 'HH+HL' || g('cl_entryConf') === 'LL+LH') score++;
   if (g('cl_distMom') === 'Strong' || g('cl_distMom') === 'Moderate') score++;
-  if (g('cl_riskCap') === 'Yes') score++;
   if (g('cl_chasing') === 'Waiting for confirmation') score++;
   if (g('cl_mentorCheck') === 'Yes') score++;
   if (g('cl_systemCheck') === 'My system') score++;
-  if (g('cl_dxyChecked') === 'Yes') score++;
   if (g('cl_dxyConfirms') === 'Yes aligned') score++;
-  const assessment = score >= 10 ? 'Strong setup — proceed' : score >= 6 ? 'Weak setup — review' : 'Do not take this trade';
+  const assessment = score >= 6 ? 'Strong setup — proceed'
+                   : score >= 3 ? 'Weak setup — review before trading'
+                   : 'Do not take this trade';
   return { score, assessment };
 }
 
@@ -9202,7 +9983,7 @@ function copyChecklist() {
   txt += 'Mentor Check: ' + g('cl_mentorCheck') + '\n';
   txt += 'My System: ' + g('cl_systemCheck') + '\n\n';
 
-  txt += 'SYSTEM ALIGNMENT: ' + align.score + '/12\n';
+  txt += 'SYSTEM ALIGNMENT: ' + align.score + '/8\n';
   txt += 'ASSESSMENT: ' + align.assessment + '\n';
   txt += '================================\n';
 
@@ -9606,11 +10387,11 @@ function renderSessionPerformance(filtered) {
 // ═══════════════════════════════════════════════════════
 const SETTINGS_KEY = 'tradeJournal_settings';
 const DEFAULT_SETTINGS = {
-  profile: { name: '', currency: 'USD', capital: 0, riskPct: 1, riskCapPct: 2, beTriggerRR: 1.5, tz: 'local', tf: 'M15', market: 'Forex', ddDaily: 2, ddWeekly: 10, ddMonthly: 25 },
+  profile: { name: '', currency: 'USD', capital: 0, riskPct: 1, riskCapPct: 2, beTriggerRR: 5, maxTrades: 3, tz: 'local', tf: 'M15', market: 'Forex', ddDaily: 2, ddWeekly: 10, ddMonthly: 25 },
   display: { showSession: true, showEquity: true },
   sharing: { publicProfile: false, publicUser: '', sharePnL: false, shareWR: false, shareSetups: false, shareCharts: false, inviteCode: '' },
   export: { exportName: true, exportBalance: true, exportPeriod: 'all' },
-  execution: { mode: 'manual', minScore: 7, requireChecklist: true },
+  execution: { mode: 'manual', minScore: 6, requireChecklist: true },
   // Bitunix: leverage + marginMode + notify-on-disconnect are Gist-synced.
   // API key/secret are NEVER persisted here — they live in cookies only via setCookie().
   bitunix: { leverage: 10, marginMode: 'CROSS', bitunixNotify: true }
@@ -9662,7 +10443,10 @@ function closeSettingsModal() { document.getElementById('settingsOverlay').class
 function maybeCloseSettings(e) { if (e.target === e.currentTarget) closeSettingsModal(); }
 
 function setSettingsTab(tab) {
-  const tabs = ['profile','display','sharing','export','danger'];
+  // Phase 5 — 9 sections (Profile / Risk / Connections / Execution / Display /
+  // Sync / Sharing / Export / Danger). Order MUST match the buttons in the
+  // settings sidebar markup.
+  const tabs = ['profile','risk','connections','execution','display','sync','sharing','export','danger'];
   document.querySelectorAll('#settingsTabs .settings-tab').forEach((t, i) => {
     t.classList.toggle('active', tabs[i] === tab);
   });
@@ -9679,7 +10463,13 @@ function populateSettingsForm() {
   document.getElementById('sett_capital').value = s.profile.capital || '';
   document.getElementById('sett_riskPct').value = s.profile.riskPct || '';
   document.getElementById('sett_riskCapPct').value = s.profile.riskCapPct || 2;
-  document.getElementById('sett_beTriggerRR').value = s.profile.beTriggerRR || 1.5;
+  document.getElementById('sett_beTriggerRR').value = s.profile.beTriggerRR || 5;
+  const mtEl = document.getElementById('sett_maxTrades');
+  if (mtEl) {
+    mtEl.value = s.profile.maxTrades || 3;
+    const mtLbl = document.getElementById('sett_maxTradesVal');
+    if (mtLbl) mtLbl.textContent = s.profile.maxTrades || 3;
+  }
   document.getElementById('sett_tz').value = s.profile.tz;
   document.getElementById('sett_tf').value = s.profile.tf;
   document.getElementById('sett_market').value = s.profile.market;
@@ -9688,8 +10478,8 @@ function populateSettingsForm() {
   document.getElementById('sett_ddMonthly').value = s.profile.ddMonthly || 25;
   document.getElementById('sett_execKey').value = localStorage.getItem('tj_executionKey') || '';
   document.getElementById('sett_execMode').value = s.execution.mode || 'manual';
-  document.getElementById('sett_execMinScore').value = s.execution.minScore || 7;
-  document.getElementById('sett_execMinScoreVal').textContent = s.execution.minScore || 7;
+  document.getElementById('sett_execMinScore').value = s.execution.minScore || 6;
+  document.getElementById('sett_execMinScoreVal').textContent = s.execution.minScore || 6;
   document.getElementById('sett_execRequireChecklist').classList.toggle('on', s.execution.requireChecklist !== false);
   // Bitunix
   const bit = s.bitunix || {};
@@ -9729,7 +10519,9 @@ function saveSettingsFromForm() {
   s.profile.capital = parseFloat(document.getElementById('sett_capital').value) || 0;
   s.profile.riskPct = parseFloat(document.getElementById('sett_riskPct').value) || 1;
   s.profile.riskCapPct = parseFloat(document.getElementById('sett_riskCapPct').value) || 2;
-  s.profile.beTriggerRR = parseFloat(document.getElementById('sett_beTriggerRR').value) || 1.5;
+  s.profile.beTriggerRR = parseFloat(document.getElementById('sett_beTriggerRR').value) || 5;
+  const mtEl2 = document.getElementById('sett_maxTrades');
+  if (mtEl2) s.profile.maxTrades = parseInt(mtEl2.value, 10) || 3;
   s.profile.tz = document.getElementById('sett_tz').value;
   s.profile.tf = document.getElementById('sett_tf').value;
   s.profile.market = document.getElementById('sett_market').value;
@@ -9739,7 +10531,7 @@ function saveSettingsFromForm() {
   const execModeEl = document.getElementById('sett_execMode');
   if (execModeEl) s.execution.mode = execModeEl.value || 'manual';
   const execMinEl = document.getElementById('sett_execMinScore');
-  if (execMinEl) s.execution.minScore = parseInt(execMinEl.value, 10) || 7;
+  if (execMinEl) s.execution.minScore = parseInt(execMinEl.value, 10) || 6;
   // Bitunix (leverage + marginMode synced; key/secret cookie-only)
   if (!s.bitunix) s.bitunix = { ...DEFAULT_SETTINGS.bitunix };
   const lvEl = document.getElementById('sett_bitunixLeverage');
