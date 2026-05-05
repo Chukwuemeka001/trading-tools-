@@ -1456,6 +1456,103 @@
     [style*="#161b22"] { background-color: var(--bg-card) !important; }
     [style*="#0d1117"] { background-color: var(--bg-inset) !important; }
     [style*="#30363d"] { border-color: var(--border-strong) !important; }
+
+    /* === CALCULATOR === */
+    /* Embedded forex-calculator.html. Every selector is scoped under
+       #page-calculator so calc tokens never bleed into the rest of the
+       journal (the journal already has its own .tab/.card definitions).
+       Color tokens flow through the legacy aliases set up in :root —
+       --bg-base/-card/-inset/-hover, --green/--red/--amber/--blue,
+       --btc/--btc-bg/--btc-border, --green-bg/--red-bg/--amber-bg etc. */
+    #page-calculator { padding: 0; }
+    #page-calculator .calc-layout {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 16px; max-width: 1100px; margin: 0 auto;
+    }
+    #page-calculator .calc-layout .calc-full { grid-column: 1 / -1; }
+    @media (max-width: 760px) {
+      #page-calculator .calc-layout { grid-template-columns: 1fr; }
+    }
+    #page-calculator .calc-tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg-card); border: 1px solid var(--border); border-radius: 7px; overflow: hidden; margin-bottom: 14px; }
+    #page-calculator .calc-tab { padding: 9px 0; text-align: center; font-size: 0.85rem; font-weight: 500; cursor: pointer; color: var(--text-muted); transition: all 0.15s; user-select: none; border: none; background: transparent; }
+    #page-calculator .calc-tab.active { background: var(--bg-hover); color: var(--text); }
+    #page-calculator .calc-tab.btc.active { color: var(--btc); }
+    #page-calculator .calc-tab.forex.active { color: var(--blue); }
+    #page-calculator .calc-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 16px 18px; margin-bottom: 12px; }
+    #page-calculator .calc-card h2 { font-size: 0.68rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 12px; }
+    #page-calculator .calc-field { margin-bottom: 12px; }
+    #page-calculator .calc-field label { display: block; font-size: 0.70rem; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; }
+    #page-calculator .calc-input-wrap { position: relative; display: flex; align-items: center; }
+    #page-calculator input[type="number"], #page-calculator select {
+      width: 100%; background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius-input);
+      color: var(--text); font-size: 0.88rem; padding: 9px 44px 9px 11px; outline: none;
+      transition: border-color 0.15s; -moz-appearance: textfield;
+      font-family: var(--font-mono);
+    }
+    #page-calculator input[type="number"]::-webkit-outer-spin-button,
+    #page-calculator input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    #page-calculator input[type="number"]:focus,
+    #page-calculator select:focus { border-color: var(--blue); }
+    #page-calculator select { padding-right: 12px; cursor: pointer; appearance: none; font-family: var(--font-sans); }
+    #page-calculator .calc-unit { position: absolute; right: 11px; font-size: 0.72rem; color: var(--text-muted); pointer-events: none; text-transform: uppercase; letter-spacing: 0.03em; }
+    #page-calculator .calc-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    #page-calculator .calc-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    #page-calculator .calc-dir-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 0; background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius-input); overflow: hidden; }
+    #page-calculator .calc-dir-btn { padding: 9px 0; text-align: center; font-size: 0.85rem; font-weight: 500; cursor: pointer; border: none; background: transparent; color: var(--text-muted); transition: all 0.15s; }
+    #page-calculator .calc-dir-btn.long.active  { background: var(--green-bg); color: var(--green); }
+    #page-calculator .calc-dir-btn.short.active { background: var(--red-bg); color: var(--red); }
+    #page-calculator .calc-results-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    #page-calculator .calc-result-item { background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius-item); padding: 10px 12px; }
+    #page-calculator .calc-result-item.highlight { border-color: var(--blue); background: var(--blue-bg); }
+    #page-calculator .calc-result-item.highlight-btc { border-color: var(--btc); background: var(--btc-bg); }
+    #page-calculator .calc-result-item.green { border-color: var(--green-border); background: var(--green-bg); }
+    #page-calculator .calc-result-item.red { border-color: var(--red-border); background: var(--red-bg); }
+    #page-calculator .calc-result-label { font-size: 0.64rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; font-weight: 500; }
+    #page-calculator .calc-result-value { font-size: 1.05rem; font-weight: 600; color: var(--text); font-family: var(--font-mono); letter-spacing: -0.01em; }
+    #page-calculator .calc-result-item.highlight .calc-result-value { color: var(--blue); }
+    #page-calculator .calc-result-item.highlight-btc .calc-result-value { color: var(--btc); }
+    #page-calculator .calc-result-item.green .calc-result-value { color: var(--green); }
+    #page-calculator .calc-result-item.red .calc-result-value { color: var(--red); }
+    #page-calculator .calc-result-sub { font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; font-family: var(--font-mono); }
+    #page-calculator .calc-result-item.risk-exceeded { border-color: var(--red) !important; background: #2d0a0a !important; }
+    #page-calculator .calc-result-item.risk-exceeded .calc-result-value { color: var(--red) !important; }
+    #page-calculator .calc-result-item.risk-exceeded .calc-result-label { color: var(--red) !important; }
+    #page-calculator .calc-risk-exceeded-badge { display: inline-block; font-size: 0.64rem; font-weight: 600; color: var(--red); background: rgba(239,68,68,0.12); padding: 2px 6px; border-radius: 4px; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.03em; }
+    #page-calculator .calc-info-note { font-size: 0.72rem; color: var(--text-2); margin-top: 10px; padding: 8px 10px; background: var(--bg-inset); border-radius: var(--radius-item); border-left: 3px solid var(--blue); line-height: 1.5; }
+    #page-calculator .calc-info-note.btc-note { border-left-color: var(--btc); }
+    #page-calculator .calc-rr-bar-wrap { margin-top: 14px; }
+    #page-calculator .calc-rr-bar-labels { display: flex; justify-content: space-between; font-size: 0.70rem; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.03em; font-weight: 500; }
+    #page-calculator .calc-rr-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; display: flex; }
+    #page-calculator .calc-rr-risk   { background: var(--red); transition: width 0.3s; }
+    #page-calculator .calc-rr-reward { background: var(--green); transition: width 0.3s; }
+    #page-calculator .calc-risk-warn { display: none; padding: 9px 12px; border-radius: var(--radius-item); margin-bottom: 12px; font-size: 0.78rem; font-weight: 500; border: 1px solid; }
+    #page-calculator .calc-risk-warn.ok   { display: flex; align-items: center; gap: 8px; background: var(--green-bg); border-color: var(--green-border); color: var(--green); }
+    #page-calculator .calc-risk-warn.over { display: flex; align-items: center; gap: 8px; background: #2d0a0a; border-color: var(--red); color: var(--red); animation: calc-pulse-warn 1.5s infinite; }
+    @keyframes calc-pulse-warn { 0%,100%{ opacity:1; } 50%{ opacity:.7; } }
+    #page-calculator .calc-toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    #page-calculator .calc-toggle-label { font-size: 0.80rem; color: var(--text-2); }
+    #page-calculator .calc-toggle { width: 36px; height: 20px; background: var(--border); border-radius: 10px; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+    #page-calculator .calc-toggle.on { background: var(--blue); }
+    #page-calculator .calc-toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; background: var(--text); border-radius: 50%; transition: left 0.2s; }
+    #page-calculator .calc-toggle.on::after { left: 19px; }
+    #page-calculator .calc-split-card { background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius-item); padding: 10px 12px; margin-bottom: 8px; }
+    #page-calculator .calc-split-card-label { font-size: 0.66rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; font-weight: 500; }
+    #page-calculator .calc-be-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.80rem; padding: 6px 0; border-bottom: 1px solid var(--border); }
+    #page-calculator .calc-be-row:last-child { border: none; }
+    #page-calculator .calc-be-label { color: var(--text-muted); }
+    #page-calculator .calc-be-val { font-weight: 500; font-family: var(--font-mono); }
+    #page-calculator button.calc-reset-btn { width: 100%; padding: 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-item); color: var(--text-2); font-size: 0.84rem; cursor: pointer; transition: all 0.15s; margin-top: 2px; font-weight: 500; }
+    #page-calculator button.calc-reset-btn:hover { background: var(--bg-hover); color: var(--text); }
+    #page-calculator button.calc-send-journal-btn { width: 100%; padding: 11px; background: var(--green); border: none; border-radius: var(--radius-item); color: #0d1f0d; font-size: 0.86rem; font-weight: 600; cursor: pointer; transition: all 0.15s; margin-top: 8px; }
+    #page-calculator button.calc-send-journal-btn:hover { filter: brightness(1.05); }
+    #page-calculator button.calc-send-journal-btn:disabled { opacity: 0.35; cursor: default; }
+    #page-calculator .calc-mode-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-left: 6px; vertical-align: middle; }
+    #page-calculator .calc-mode-btn { padding: 2px 8px; font-size: 0.66rem; font-weight: 500; cursor: pointer; background: transparent; color: var(--text-muted); border: none; transition: all 0.15s; text-transform: uppercase; letter-spacing: 0.03em; }
+    #page-calculator .calc-mode-btn.active { background: var(--bg-hover); color: var(--blue); }
+    #page-calculator .calc-hidden { display: none !important; }
+    /* Toast: positioned globally, not scoped — but only injected when calc is mounted */
+    #page-calculator .calc-send-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--green-bg); border: 1px solid var(--green); color: var(--green); padding: 10px 20px; border-radius: var(--radius-item); font-size: 0.80rem; font-weight: 500; z-index: 500; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    #page-calculator .calc-send-toast.show { opacity: 1; }
   </style>
 </head>
 <body>
@@ -2530,6 +2627,359 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: Calculator (embedded forex-calculator.html)
+     The standalone page lives at forex-calculator.html for
+     backward compat. This embedded copy uses calc_-prefixed
+     globals + .calc- CSS classes to avoid collisions.
+════════════════════════════════════════════════════════ -->
+<div id="page-calculator" class="page">
+  <div class="calc-layout">
+
+    <!-- LEFT COLUMN — Inputs -->
+    <div>
+      <!-- Mode tabs (full row) -->
+      <div class="calc-tabs calc-full">
+        <div class="calc-tab forex active" onclick="calc_setMode('forex')">Forex</div>
+        <div class="calc-tab btc" onclick="calc_setMode('btc')">BTC/USDT</div>
+      </div>
+
+      <!-- Account card -->
+      <div class="calc-card">
+        <h2>Account</h2>
+        <div class="calc-grid-2">
+          <div class="calc-field">
+            <label>Capital <button type="button" id="calc_pullBitunixBtn" onclick="calc_pullBitunixBalance()" style="margin-left:6px; padding:2px 8px; font-size:0.65rem; background:rgba(247,147,26,0.10); color:var(--orange); border:1px solid var(--orange); border-radius:4px; cursor:pointer;" title="Pull live balance from your Bitunix futures account">⬇ Pull from Bitunix</button></label>
+            <div class="calc-input-wrap">
+              <input type="number" id="calc_capital" value="10000" min="0" step="100">
+              <span class="calc-unit">USDT</span>
+            </div>
+            <div id="calc_bitunixPullStatus" style="font-size:0.7rem; color:var(--text-muted); margin-top:4px; min-height:1em;"></div>
+          </div>
+          <div class="calc-field">
+            <label>Risk Per Trade</label>
+            <div class="calc-input-wrap">
+              <input type="number" id="calc_riskPct" value="2" min="0.01" max="100" step="0.1">
+              <span class="calc-unit">%</span>
+            </div>
+          </div>
+        </div>
+        <div class="calc-risk-warn" id="calc_riskWarn"></div>
+      </div>
+
+      <!-- ── FOREX PANEL ── -->
+      <div id="calc_forexPanel">
+        <div class="calc-card">
+          <h2>Forex Parameters</h2>
+          <div class="calc-field">
+            <label>Direction</label>
+            <div class="calc-dir-toggle">
+              <div class="calc-dir-btn long active" id="calc_fxBtnLong" onclick="calc_setFxDir('long')">Long</div>
+              <div class="calc-dir-btn short" id="calc_fxBtnShort" onclick="calc_setFxDir('short')">Short</div>
+            </div>
+          </div>
+          <div class="calc-field">
+            <label>Entry Price</label>
+            <div class="calc-input-wrap">
+              <input type="number" id="calc_fxEntry" value="1.2500" min="0.0001" step="0.0001">
+            </div>
+          </div>
+          <div class="calc-grid-2">
+            <div class="calc-field">
+              <label>Stop Loss <span class="calc-mode-toggle" id="calc_fxSLToggle"><button class="calc-mode-btn" onclick="calc_setFxSLMode('price')">Price</button><button class="calc-mode-btn active" onclick="calc_setFxSLMode('pips')">Pips</button></span></label>
+              <div class="calc-input-wrap">
+                <input type="number" id="calc_fxSL" value="20" step="any">
+                <span class="calc-unit" id="calc_fxSLUnit">pips</span>
+              </div>
+            </div>
+            <div class="calc-field">
+              <label>Take Profit <span class="calc-mode-toggle" id="calc_fxTPToggle"><button class="calc-mode-btn" onclick="calc_setFxTPMode('price')">Price</button><button class="calc-mode-btn active" onclick="calc_setFxTPMode('pips')">Pips</button></span></label>
+              <div class="calc-input-wrap">
+                <input type="number" id="calc_fxTP" placeholder="Auto or enter" step="any">
+                <span class="calc-unit" id="calc_fxTPUnit">pips</span>
+              </div>
+            </div>
+          </div>
+          <div class="calc-field">
+            <label>Risk : Reward</label>
+            <div class="calc-input-wrap" style="max-width:200px">
+              <input type="number" id="calc_fxRR" value="2" min="0.1" step="0.1">
+              <span class="calc-unit">R</span>
+            </div>
+          </div>
+          <div class="calc-field">
+            <label>Pair Type</label>
+            <select id="calc_pairType">
+              <option value="usd_quote">USD Quote — EUR/USD, GBP/USD, AUD/USD…</option>
+              <option value="usd_base">USD Base — USD/JPY, USD/CAD, USD/CHF…</option>
+              <option value="cross">Cross Pair — EUR/GBP, GBP/JPY, EUR/JPY…</option>
+            </select>
+          </div>
+          <div id="calc_fxNote" class="calc-info-note"></div>
+        </div>
+
+        <!-- Forex Split Entry -->
+        <div class="calc-card" id="calc_fxSplitCard">
+          <div class="calc-toggle-row">
+            <div class="calc-toggle" id="calc_fxSplitToggle" onclick="calc_toggleFxSplit()"></div>
+            <span class="calc-toggle-label">Split Entry (partial position sizing)</span>
+          </div>
+          <div id="calc_fxSplitBody" class="calc-hidden">
+            <div class="calc-grid-2" style="margin-bottom:8px;">
+              <div class="calc-field" style="margin:0;">
+                <label>Number of Entries</label>
+                <select id="calc_fxSplitCount" onchange="calc_calculate()">
+                  <option value="2">2 entries</option>
+                  <option value="3">3 entries</option>
+                </select>
+              </div>
+            </div>
+            <div class="calc-split-card">
+              <div class="calc-split-card-label">Entry 1</div>
+              <div class="calc-grid-2">
+                <div class="calc-field" style="margin:0"><label style="font-size:0.72rem">Price</label><input type="number" id="calc_fxSp1Price" step="any" placeholder="Price"></div>
+                <div class="calc-field" style="margin:0"><label style="font-size:0.72rem">% of position</label><input type="number" id="calc_fxSp1Pct" value="50" min="1" max="100" step="1"></div>
+              </div>
+            </div>
+            <div class="calc-split-card">
+              <div class="calc-split-card-label">Entry 2</div>
+              <div class="calc-grid-2">
+                <div class="calc-field" style="margin:0"><label style="font-size:0.72rem">Price</label><input type="number" id="calc_fxSp2Price" step="any" placeholder="Price"></div>
+                <div class="calc-field" style="margin:0"><label style="font-size:0.72rem">% of position</label><input type="number" id="calc_fxSp2Pct" value="50" min="1" max="100" step="1"></div>
+              </div>
+            </div>
+            <div class="calc-split-card calc-hidden" id="calc_fxSplit3Card">
+              <div class="calc-split-card-label">Entry 3</div>
+              <div class="calc-grid-2">
+                <div class="calc-field" style="margin:0"><label style="font-size:0.72rem">Price</label><input type="number" id="calc_fxSp3Price" step="any" placeholder="Price"></div>
+                <div class="calc-field" style="margin:0"><label style="font-size:0.72rem">% of position</label><input type="number" id="calc_fxSp3Pct" value="0" min="0" max="100" step="1"></div>
+              </div>
+            </div>
+            <div id="calc_fxSplitResults" style="margin-top:10px; padding:10px 12px; background:var(--bg-inset); border:1px solid var(--border); border-radius:8px; font-size:0.82rem;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span class="calc-be-label">Avg Entry Price</span><span class="calc-be-val" id="calc_fxSpAvgEntry">—</span></div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span class="calc-be-label">Total Risk</span><span class="calc-be-val" style="color:var(--red);" id="calc_fxSpTotalRisk">—</span></div>
+              <div style="display:flex; justify-content:space-between;"><span class="calc-be-label">% Allocation Check</span><span class="calc-be-val" id="calc_fxSpAllocCheck">—</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── BTC/USDT PANEL ── -->
+      <div id="calc_btcPanel" class="calc-hidden">
+        <div class="calc-card">
+          <h2>BTC/USDT Parameters</h2>
+          <div class="calc-field">
+            <label>Direction</label>
+            <div class="calc-dir-toggle">
+              <div class="calc-dir-btn long active" id="calc_btnLong" onclick="calc_setDir('long')">Long</div>
+              <div class="calc-dir-btn short" id="calc_btnShort" onclick="calc_setDir('short')">Short</div>
+            </div>
+          </div>
+          <div class="calc-grid-2">
+            <div class="calc-field">
+              <label>Entry Price</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="calc_btcEntry" value="84000" min="0.01" step="10">
+                <span class="calc-unit">USDT</span>
+              </div>
+            </div>
+            <div class="calc-field">
+              <label>Stop Loss Price</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="calc_btcSL" value="82500" min="0.01" step="10">
+                <span class="calc-unit">USDT</span>
+              </div>
+            </div>
+          </div>
+          <div class="calc-grid-2">
+            <div class="calc-field">
+              <label>Take Profit Price</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="calc_btcTP_input" placeholder="Auto or enter" step="any">
+                <span class="calc-unit">USDT</span>
+              </div>
+            </div>
+            <div class="calc-field">
+              <label>Risk : Reward</label>
+              <div class="calc-input-wrap">
+                <input type="number" id="calc_btcRR" value="2" min="0.1" step="0.1">
+                <span class="calc-unit">R</span>
+              </div>
+            </div>
+          </div>
+          <div class="calc-grid-2">
+            <div class="calc-field">
+              <label>Leverage <span style="color:var(--orange); font-size:0.65rem;">(Bitunix)</span></label>
+              <div class="calc-input-wrap">
+                <select id="calc_btcLeverage">
+                  <option value="1">1x</option>
+                  <option value="2">2x</option>
+                  <option value="5">5x</option>
+                  <option value="10" selected>10x</option>
+                  <option value="20">20x</option>
+                  <option value="50">50x</option>
+                  <option value="100">100x</option>
+                </select>
+              </div>
+            </div>
+            <div class="calc-field">
+              <label>Margin Mode</label>
+              <div class="calc-input-wrap">
+                <select id="calc_btcMarginMode">
+                  <option value="CROSS" selected>Cross</option>
+                  <option value="ISOLATION">Isolated</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div id="calc_btcNote" class="calc-info-note btc-note"></div>
+        </div>
+
+        <!-- BTC Split Entry -->
+        <div class="calc-card" id="calc_splitCard">
+          <div class="calc-toggle-row">
+            <div class="calc-toggle" id="calc_splitToggle" onclick="calc_toggleSplit()"></div>
+            <span class="calc-toggle-label">Split Entry (partial position sizing)</span>
+          </div>
+          <div id="calc_splitBody" class="calc-hidden">
+            <div class="calc-grid-2" style="margin-bottom:8px;">
+              <div class="calc-field" style="margin:0;">
+                <label>Number of Entries</label>
+                <select id="calc_splitCount" onchange="calc_calculate()">
+                  <option value="2">2 entries</option>
+                  <option value="3">3 entries</option>
+                </select>
+              </div>
+            </div>
+            <div class="calc-split-card">
+              <div class="calc-split-card-label">Entry 1</div>
+              <div class="calc-grid-2">
+                <div class="calc-field" style="margin:0"><label style="font-size:0.72rem">Price</label><input type="number" id="calc_sp1Price" step="any" placeholder="Price"></div>
+                <div class="calc-field" style="margin:0"><label style="font-size:0.72rem">% of position</label><input type="number" id="calc_sp1Pct" value="50" min="1" max="100" step="1"></div>
+              </div>
+            </div>
+            <div class="calc-split-card">
+              <div class="calc-split-card-label">Entry 2</div>
+              <div class="calc-grid-2">
+                <div class="calc-field" style="margin:0"><label style="font-size:0.72rem">Price</label><input type="number" id="calc_sp2Price" step="any" placeholder="Price"></div>
+                <div class="calc-field" style="margin:0"><label style="font-size:0.72rem">% of position</label><input type="number" id="calc_sp2Pct" value="50" min="1" max="100" step="1"></div>
+              </div>
+            </div>
+            <div class="calc-split-card calc-hidden" id="calc_split3Card">
+              <div class="calc-split-card-label">Entry 3</div>
+              <div class="calc-grid-2">
+                <div class="calc-field" style="margin:0"><label style="font-size:0.72rem">Price</label><input type="number" id="calc_sp3Price" step="any" placeholder="Price"></div>
+                <div class="calc-field" style="margin:0"><label style="font-size:0.72rem">% of position</label><input type="number" id="calc_sp3Pct" value="0" min="0" max="100" step="1"></div>
+              </div>
+            </div>
+            <div id="calc_splitResults" style="margin-top:10px; padding:10px 12px; background:var(--bg-inset); border:1px solid var(--border); border-radius:8px; font-size:0.82rem;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span class="calc-be-label">Avg Entry Price</span><span class="calc-be-val" id="calc_spAvgEntry">—</span></div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span class="calc-be-label">Total Risk</span><span class="calc-be-val" style="color:var(--red);" id="calc_spTotalRisk">—</span></div>
+              <div style="display:flex; justify-content:space-between;"><span class="calc-be-label">% Allocation Check</span><span class="calc-be-val" id="calc_spAllocCheck">—</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN — Results -->
+    <div>
+      <!-- ── FOREX RESULTS ── -->
+      <div id="calc_forexResults">
+        <div class="calc-card">
+          <h2>Results</h2>
+          <div class="calc-results-grid">
+            <div class="calc-result-item red" id="calc_fxRiskItem"><div class="calc-result-label">Risk Amount</div><div class="calc-result-value" id="calc_fxRiskAmt">—</div><div class="calc-result-sub" id="calc_fxRiskPct">—</div></div>
+            <div class="calc-result-item green"><div class="calc-result-label">Reward Amount</div><div class="calc-result-value" id="calc_fxRewardAmt">—</div><div class="calc-result-sub" id="calc_fxRewardPips">—</div></div>
+            <div class="calc-result-item highlight" id="calc_fxLotItem"><div class="calc-result-label">Lot Size</div><div class="calc-result-value" id="calc_fxLotSize">—</div><div class="calc-result-sub" id="calc_fxLotType">—</div></div>
+            <div class="calc-result-item"><div class="calc-result-label">R:R Ratio</div><div class="calc-result-value" id="calc_fxRRDisplay">—</div><div class="calc-result-sub" id="calc_fxPipVal">—</div></div>
+            <div class="calc-result-item"><div class="calc-result-label">Stop Loss Price</div><div class="calc-result-value" style="color:var(--red);" id="calc_fxSLPrice">—</div><div class="calc-result-sub" id="calc_fxSLPipsSub">—</div></div>
+            <div class="calc-result-item"><div class="calc-result-label">Take Profit Price</div><div class="calc-result-value" style="color:var(--green);" id="calc_fxTPPrice">—</div><div class="calc-result-sub" id="calc_fxTPPipsSub">—</div></div>
+            <div class="calc-result-item green"><div class="calc-result-label">After Win</div><div class="calc-result-value" id="calc_fxCapWin">—</div><div class="calc-result-sub" id="calc_fxCapWinPct">—</div></div>
+            <div class="calc-result-item red"><div class="calc-result-label">After Loss</div><div class="calc-result-value" id="calc_fxCapLoss">—</div><div class="calc-result-sub" id="calc_fxCapLossPct">—</div></div>
+            <div class="calc-result-item"><div class="calc-result-label">BE Trigger Price</div><div class="calc-result-value" id="calc_fxBEResult">—</div><div class="calc-result-sub">move SL to entry</div></div>
+          </div>
+          <div style="margin-top:12px; padding:10px 12px; background:var(--bg-inset); border-radius:8px; border:1px solid var(--border);">
+            <div style="font-size:0.71rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px;">Price Levels &amp; Distances</div>
+            <div class="calc-be-row"><span class="calc-be-label">Entry</span><span class="calc-be-val" id="calc_fxLvlEntry">—</span></div>
+            <div class="calc-be-row"><span style="color:var(--red);">Stop Loss</span><span class="calc-be-val" style="color:var(--red);" id="calc_fxLvlSL">—</span></div>
+            <div class="calc-be-row"><span style="color:var(--green);">Take Profit</span><span class="calc-be-val" style="color:var(--green);" id="calc_fxLvlTP">—</span></div>
+            <div class="calc-be-row"><span class="calc-be-label">SL Distance</span><span class="calc-be-val" id="calc_fxLvlSLDist">—</span></div>
+            <div class="calc-be-row"><span class="calc-be-label">TP Distance</span><span class="calc-be-val" id="calc_fxLvlTPDist">—</span></div>
+          </div>
+          <div class="calc-rr-bar-wrap">
+            <div class="calc-rr-bar-labels"><span id="calc_fxBarL">Risk</span><span id="calc_fxBarM">R:R</span><span id="calc_fxBarR">Reward</span></div>
+            <div class="calc-rr-bar"><div class="calc-rr-risk" id="calc_fxBarRisk" style="width:33%"></div><div class="calc-rr-reward" id="calc_fxBarReward" style="width:67%"></div></div>
+          </div>
+        </div>
+        <div class="calc-card">
+          <h2 id="calc_fxBeHeader">Break Even at 1:5 R:R</h2>
+          <div style="padding:10px 12px; background:var(--bg-inset); border:1px solid var(--border); border-radius:8px;">
+            <div class="calc-be-row"><span class="calc-be-label">Move SL to BE when price reaches</span><span class="calc-be-val" style="color:var(--blue);" id="calc_fxBePrice">—</span></div>
+            <div class="calc-be-row"><span class="calc-be-label">Distance from entry to BE trigger</span><span class="calc-be-val" id="calc_fxBeDist">—</span></div>
+            <div class="calc-be-row"><span class="calc-be-label">R:R at BE trigger</span><span class="calc-be-val" style="color:var(--blue);" id="calc_fxBeRRLabel">1:5</span></div>
+            <div class="calc-be-row"><span class="calc-be-label">Capital protected at BE</span><span class="calc-be-val" style="color:var(--green);" id="calc_fxBeProtected">—</span></div>
+            <div class="calc-be-row"><span class="calc-be-label">New SL (break even) price</span><span class="calc-be-val" id="calc_fxBeNewSL">—</span></div>
+          </div>
+          <div class="calc-info-note" style="margin-top:10px;">
+            When your trade reaches your BE trigger R:R, move your stop loss to your entry price. You now have a risk-free trade with zero capital exposed. Configure the trigger in Settings → Risk Limits.
+          </div>
+        </div>
+      </div>
+
+      <!-- ── BTC RESULTS ── -->
+      <div id="calc_btcResults" class="calc-hidden">
+        <div class="calc-card">
+          <h2>Results</h2>
+          <div class="calc-results-grid">
+            <div class="calc-result-item red" id="calc_btcRiskItem"><div class="calc-result-label">Risk Amount</div><div class="calc-result-value" id="calc_btcRiskAmt">—</div><div class="calc-result-sub" id="calc_btcRiskPct">—</div></div>
+            <div class="calc-result-item green"><div class="calc-result-label">Reward Amount</div><div class="calc-result-value" id="calc_btcRewardAmt">—</div><div class="calc-result-sub" id="calc_btcRewardSub">—</div></div>
+            <div class="calc-result-item highlight-btc" id="calc_btcQtyItem"><div class="calc-result-label">Position Size</div><div class="calc-result-value" id="calc_btcQty">—</div><div class="calc-result-sub" id="calc_btcQtySub">—</div></div>
+            <div class="calc-result-item"><div class="calc-result-label">Take Profit Price</div><div class="calc-result-value" id="calc_btcTP">—</div><div class="calc-result-sub" id="calc_btcTPDist">—</div></div>
+            <div class="calc-result-item"><div class="calc-result-label">R:R Ratio</div><div class="calc-result-value" id="calc_btcRRDisplay">—</div><div class="calc-result-sub" id="calc_btcPosVal">—</div></div>
+            <div class="calc-result-item" style="border-color:var(--orange);"><div class="calc-result-label" style="color:var(--orange);">Required Margin</div><div class="calc-result-value" id="calc_btcRequiredMargin">—</div><div class="calc-result-sub" id="calc_btcRequiredMarginSub">—</div></div>
+            <div class="calc-result-item green"><div class="calc-result-label">After Win</div><div class="calc-result-value" id="calc_btcCapWin">—</div><div class="calc-result-sub" id="calc_btcCapWinPct">—</div></div>
+            <div class="calc-result-item red"><div class="calc-result-label">After Loss</div><div class="calc-result-value" id="calc_btcCapLoss">—</div><div class="calc-result-sub" id="calc_btcCapLossPct">—</div></div>
+            <div class="calc-result-item"><div class="calc-result-label">BE Trigger Price</div><div class="calc-result-value" id="calc_btcBEResult">—</div><div class="calc-result-sub">move SL to entry</div></div>
+          </div>
+          <div style="margin-top:12px; padding:10px 12px; background:var(--bg-inset); border-radius:8px; border:1px solid var(--border);">
+            <div style="font-size:0.71rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px;">Price Levels</div>
+            <div class="calc-be-row"><span class="calc-be-label">Entry</span><span class="calc-be-val" id="calc_lvlEntry">—</span></div>
+            <div class="calc-be-row"><span style="color:var(--red);">Stop Loss</span><span class="calc-be-val" style="color:var(--red);" id="calc_lvlSL">—</span></div>
+            <div class="calc-be-row"><span style="color:var(--green);">Take Profit</span><span class="calc-be-val" style="color:var(--green);" id="calc_lvlTP">—</span></div>
+            <div class="calc-be-row"><span class="calc-be-label">SL Distance</span><span class="calc-be-val" id="calc_lvlSLDist">—</span></div>
+          </div>
+          <div class="calc-rr-bar-wrap">
+            <div class="calc-rr-bar-labels"><span id="calc_btcBarL">Risk</span><span id="calc_btcBarM">R:R</span><span id="calc_btcBarR">Reward</span></div>
+            <div class="calc-rr-bar"><div class="calc-rr-risk" id="calc_btcBarRisk" style="width:33%"></div><div class="calc-rr-reward" id="calc_btcBarReward" style="width:67%"></div></div>
+          </div>
+        </div>
+        <div class="calc-card">
+          <h2 id="calc_btcBeHeader">Break Even at 1:5 R:R</h2>
+          <div style="padding:10px 12px; background:var(--bg-inset); border:1px solid var(--border); border-radius:8px;">
+            <div class="calc-be-row"><span class="calc-be-label">Move SL to BE when price reaches</span><span class="calc-be-val" style="color:var(--blue);" id="calc_bePrice">—</span></div>
+            <div class="calc-be-row"><span class="calc-be-label">Distance from entry to BE trigger</span><span class="calc-be-val" id="calc_beDist">—</span></div>
+            <div class="calc-be-row"><span class="calc-be-label">R:R at BE trigger</span><span class="calc-be-val" style="color:var(--blue);" id="calc_btcBeRRLabel">1:5</span></div>
+            <div class="calc-be-row"><span class="calc-be-label">Capital protected at BE</span><span class="calc-be-val" style="color:var(--green);" id="calc_beProtected">—</span></div>
+            <div class="calc-be-row"><span class="calc-be-label">New SL (break even) price</span><span class="calc-be-val" id="calc_beNewSL">—</span></div>
+          </div>
+          <div class="calc-info-note btc-note" style="margin-top:10px;">
+            When your trade reaches your BE trigger R:R, move your stop loss to your entry price. You now have a risk-free trade with zero capital exposed.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset + Send-to-Journal span both columns -->
+    <div class="calc-full">
+      <button class="calc-reset-btn" onclick="calc_resetAll()">Reset to Defaults</button>
+      <button class="calc-send-journal-btn" id="calc_sendJournalBtn" onclick="calc_sendToJournal()">Send to Journal →</button>
+    </div>
+
+  </div>
+  <div class="calc-send-toast" id="calc_sendToast">Trade details sent to journal ✓</div>
+</div>
+
 </main><!-- /.main-content -->
 
 <!-- Mobile bottom nav -->
@@ -3134,11 +3584,11 @@
           <div class="settings-grid">
             <div class="settings-field">
               <label>Bitunix API Key (local cookie only)</label>
-              <input type="password" id="sett_bitunixKey" placeholder="Stored in cookie, never in Gist" autocomplete="off">
+              <input type="password" id="sett_bitunixKey" placeholder="Stored in cookie, never in Gist" autocomplete="off" onchange="saveSettingsFromForm()">
             </div>
             <div class="settings-field">
               <label>Bitunix API Secret (local cookie only)</label>
-              <input type="password" id="sett_bitunixSecret" placeholder="Stored in cookie, never in Gist" autocomplete="off">
+              <input type="password" id="sett_bitunixSecret" placeholder="Stored in cookie, never in Gist" autocomplete="off" onchange="saveSettingsFromForm()">
             </div>
           </div>
           <div class="settings-grid" style="margin-top:8px;">
@@ -3164,9 +3614,11 @@
             <button class="stoggle on" id="sett_bitunixNotify" onclick="toggleSetting(this,'bitunixNotify')"></button>
           </div>
           <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="saveBitunixSettingsCreds()" style="padding:6px 12px;font-size:0.74rem;color:var(--orange);border:1px solid rgba(249,115,22,0.3);background:rgba(249,115,22,0.07);">💾 Save Credentials</button>
             <button class="btn btn-ghost" onclick="testBitunixConnection()" style="padding:6px 12px;font-size:0.74rem;color:#f7931a;border-color:#5a3a08;">🔌 Test Bitunix API</button>
             <button class="btn btn-ghost" onclick="bitunixEmergencyStopConfirm()" style="padding:6px 12px;font-size:0.74rem;color:#f85149;border-color:#5c1616;">🟧 Close All Positions</button>
           </div>
+          <div style="font-size:0.65rem; color:#6e7681; margin-top:6px;">Backend uses keys set in Render environment. These are saved locally for status display.</div>
           <div id="sett_bitunixTestOut" style="display:none;margin-top:10px;padding:8px 12px;border-radius:6px;font-size:0.74rem;"></div>
         </div>
 
@@ -3604,13 +4056,8 @@ function nav(view) {
   if (logPage && logPage.classList.contains('active') && view !== 'log' && view !== 'calculator' && view !== 'settings' && hasUnsavedFormData()) {
     if (!confirm('You have unsaved trade data. Leave anyway?')) return;
   }
-  // Phase 5 — calculator and settings are not full pages; treat them as
-  // shortcuts. Calculator opens the standalone tool in a new tab; settings
-  // opens the modal over whatever page is currently active.
-  if (view === 'calculator') {
-    window.open('forex-calculator.html', '_blank', 'noopener');
-    return;
-  }
+  // Phase 5/6 — settings is a modal shortcut, not a full page; calculator is
+  // now a real inline page (embedded from forex-calculator.html).
   if (view === 'settings') {
     if (typeof openSettingsModal === 'function') openSettingsModal();
     return;
@@ -3630,6 +4077,7 @@ function nav(view) {
     refreshLiveTrades(); refreshPendingLimitOrders(); refreshExecutionQueue(); refreshExecutionHealth(); refreshExecutionLog();
     refreshBitunixLiveTrades(); refreshBitunixPendingOrders(); refreshBitunixHealth(); refreshBitunixEventLog();
   }
+  if (view === 'calculator' && typeof calc_init === 'function') calc_init();
   // Scroll the main-content scroller, not the window — page is sticky-grid
   const main = document.querySelector('.main-content');
   if (main) main.scrollTo({ top: 0, behavior: 'instant' });
@@ -6968,6 +7416,45 @@ async function bitunixEmergencyStopConfirm() {
 }
 
 // ── Test Bitunix connection (Settings panel button) ────
+function saveBitunixSettingsCreds() {
+  // Phase 6 — explicit Save button on the Bitunix card. The two password inputs
+  // also fire saveSettingsFromForm() on change, so this is mostly for user
+  // feedback (toast + status badge) — but it also recovers when a user types
+  // and clicks Save without ever blurring the field.
+  const key    = (document.getElementById('sett_bitunixKey')?.value    || '').trim();
+  const secret = (document.getElementById('sett_bitunixSecret')?.value || '').trim();
+  const toast  = document.getElementById('settingsSavedToast');
+  const flashToast = (msg, ok) => {
+    if (!toast) return;
+    toast.textContent = msg;
+    if (!ok) {
+      toast.style.background = '#3a1216';
+      toast.style.borderColor = '#f85149';
+      toast.style.color = '#ff7b72';
+    }
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+      toast.removeAttribute('style');
+      toast.textContent = 'Settings saved ✓';
+    }, 2500);
+  };
+  if (!key || !secret) {
+    flashToast('⚠ Enter both API key and secret', false);
+    return;
+  }
+  setCookie('tj_bitunixKey',    key,    365);
+  setCookie('tj_bitunixSecret', secret, 365);
+  flashToast('✓ Bitunix credentials saved', true);
+  // Update the inline status badge so the user sees the save took effect.
+  const badge = document.getElementById('sett_bitunixStatus');
+  if (badge) {
+    badge.textContent = 'Saved';
+    badge.style.color = '#3fb950';
+    badge.style.background = 'rgba(63,185,80,0.15)';
+  }
+}
+
 async function testBitunixConnection() {
   const out = document.getElementById('sett_bitunixTestOut');
   if (!out) return;
@@ -11018,6 +11505,486 @@ function downloadAnalysisCSV() {
   a.download = `trade-export-${period}-${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════
+// CALCULATOR — embedded forex-calculator.html
+// All identifiers are calc_-prefixed; DOM IDs all use the
+// calc_ prefix; CSS classes use .calc- selectors. The
+// standalone forex-calculator.html is unchanged for backward
+// compat; this version writes the same `calcToJournal`
+// localStorage key + nav()'s straight to the log tab.
+// ═══════════════════════════════════════════════════════
+let calc_mode    = 'forex';      // 'forex' | 'btc'
+let calc_dir     = 'long';       // BTC direction
+let calc_fxDir   = 'long';
+let calc_fxSLMode = 'pips';      // 'pips' | 'price'
+let calc_fxTPMode = 'pips';
+let calc_split   = false;        // BTC split toggle
+let calc_fxSplit = false;        // Forex split toggle
+let calc_initted = false;
+
+function calc_init() {
+  // Wire input listeners exactly once. After that, calc_init() is just a
+  // recompute trigger (e.g. when the user navigates back to the tab).
+  if (!calc_initted) {
+    const inputs = [
+      'calc_capital','calc_riskPct',
+      'calc_fxEntry','calc_fxSL','calc_fxTP','calc_fxRR','calc_pairType',
+      'calc_btcEntry','calc_btcSL','calc_btcTP_input','calc_btcRR','calc_btcLeverage','calc_btcMarginMode',
+      'calc_sp1Price','calc_sp1Pct','calc_sp2Price','calc_sp2Pct','calc_sp3Price','calc_sp3Pct','calc_splitCount',
+      'calc_fxSp1Price','calc_fxSp1Pct','calc_fxSp2Price','calc_fxSp2Pct','calc_fxSp3Price','calc_fxSp3Pct','calc_fxSplitCount',
+    ];
+    inputs.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input',  calc_calculate);
+      if (el) el.addEventListener('change', calc_calculate);
+    });
+    calc_initted = true;
+  }
+  calc_calculate();
+}
+
+function calc_setMode(mode) {
+  calc_mode = mode;
+  document.querySelectorAll('#page-calculator .calc-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('#page-calculator .calc-tab.' + mode).classList.add('active');
+  document.getElementById('calc_forexPanel').classList.toggle('calc-hidden', mode !== 'forex');
+  document.getElementById('calc_btcPanel').classList.toggle('calc-hidden',   mode !== 'btc');
+  document.getElementById('calc_forexResults').classList.toggle('calc-hidden', mode !== 'forex');
+  document.getElementById('calc_btcResults').classList.toggle('calc-hidden',   mode !== 'btc');
+  calc_calculate();
+}
+
+function calc_setDir(dir) {
+  calc_dir = dir;
+  document.getElementById('calc_btnLong').classList.toggle('active',  dir === 'long');
+  document.getElementById('calc_btnShort').classList.toggle('active', dir === 'short');
+  calc_calculate();
+}
+function calc_setFxDir(dir) {
+  calc_fxDir = dir;
+  document.getElementById('calc_fxBtnLong').classList.toggle('active',  dir === 'long');
+  document.getElementById('calc_fxBtnShort').classList.toggle('active', dir === 'short');
+  calc_calculate();
+}
+
+function calc_setFxSLMode(mode) {
+  calc_fxSLMode = mode;
+  const wrap = document.getElementById('calc_fxSLToggle');
+  wrap.querySelectorAll('.calc-mode-btn').forEach((b, i) => b.classList.toggle('active', (i === 0 ? 'price' : 'pips') === mode));
+  document.getElementById('calc_fxSLUnit').textContent = mode === 'price' ? '' : 'pips';
+  calc_calculate();
+}
+function calc_setFxTPMode(mode) {
+  calc_fxTPMode = mode;
+  const wrap = document.getElementById('calc_fxTPToggle');
+  wrap.querySelectorAll('.calc-mode-btn').forEach((b, i) => b.classList.toggle('active', (i === 0 ? 'price' : 'pips') === mode));
+  document.getElementById('calc_fxTPUnit').textContent = mode === 'price' ? '' : 'pips';
+  calc_calculate();
+}
+
+function calc_toggleSplit() {
+  calc_split = !calc_split;
+  document.getElementById('calc_splitToggle').classList.toggle('on', calc_split);
+  document.getElementById('calc_splitBody').classList.toggle('calc-hidden', !calc_split);
+  calc_calculate();
+}
+function calc_toggleFxSplit() {
+  calc_fxSplit = !calc_fxSplit;
+  document.getElementById('calc_fxSplitToggle').classList.toggle('on', calc_fxSplit);
+  document.getElementById('calc_fxSplitBody').classList.toggle('calc-hidden', !calc_fxSplit);
+  calc_calculate();
+}
+
+// ── forex helpers ──────────────────────────────────────
+function calc_pipSize(entry, pairType) {
+  // JPY pairs use 0.01, everything else 0.0001 — detected by entry magnitude.
+  // For safety also consider explicit USD/JPY-ish entries.
+  return entry > 20 ? 0.01 : 0.0001;
+}
+function calc_pipValuePer1Lot(pairType, entry) {
+  // Returns approximate pip value in $ for 1.00 standard lot (100k units)
+  if (pairType === 'usd_quote') return 10;        // EUR/USD etc — exact $10/pip
+  if (pairType === 'usd_base')  return 100000 * (entry > 20 ? 0.01 : 0.0001) / entry;
+  // cross — approximation: same formula as usd_base
+  return 100000 * (entry > 20 ? 0.01 : 0.0001) / entry;
+}
+
+function calc_fmtMoney(n) { if (!isFinite(n)) return '—'; return (n >= 0 ? '+$' : '-$') + Math.abs(n).toFixed(2); }
+function calc_fmtMoneyAbs(n) { if (!isFinite(n)) return '—'; return '$' + Math.abs(n).toFixed(2); }
+function calc_fmtPct(n)   { if (!isFinite(n)) return '—'; return (n >= 0 ? '+' : '') + n.toFixed(2) + '%'; }
+function calc_fmtPrice(n, decimals) { if (!isFinite(n)) return '—'; return n.toFixed(decimals != null ? decimals : (n > 20 ? 2 : 5)); }
+
+function calc_calculate() {
+  if (calc_mode === 'forex') calc_calcForex();
+  else                       calc_calcBTC();
+}
+
+function calc_calcForex() {
+  const cap     = parseFloat(document.getElementById('calc_capital').value) || 0;
+  const riskPct = parseFloat(document.getElementById('calc_riskPct').value) || 0;
+  const entry   = parseFloat(document.getElementById('calc_fxEntry').value) || 0;
+  const slIn    = parseFloat(document.getElementById('calc_fxSL').value) || 0;
+  const tpIn    = parseFloat(document.getElementById('calc_fxTP').value);
+  const rr      = parseFloat(document.getElementById('calc_fxRR').value) || 0;
+  const pairType= document.getElementById('calc_pairType').value;
+
+  // Risk warning
+  const riskWarn = document.getElementById('calc_riskWarn');
+  const sett     = (typeof getSettings === 'function') ? getSettings() : { profile: { riskCapPct: 2 } };
+  const riskCapPct = (sett.profile && sett.profile.riskCapPct) || 2;
+  if (riskPct > riskCapPct) {
+    riskWarn.className = 'calc-risk-warn over';
+    riskWarn.textContent = `⚠ ${riskPct}% exceeds your ${riskCapPct}% risk cap`;
+  } else if (riskPct > 0) {
+    riskWarn.className = 'calc-risk-warn ok';
+    riskWarn.textContent = `✓ Within ${riskCapPct}% risk cap`;
+  } else {
+    riskWarn.className = 'calc-risk-warn';
+    riskWarn.textContent = '';
+  }
+
+  if (cap <= 0 || riskPct <= 0 || entry <= 0 || slIn <= 0) {
+    return calc_clearForexResults();
+  }
+
+  const pipSize = calc_pipSize(entry, pairType);
+  // Resolve SL → pips + price
+  let slPips, slPrice;
+  if (calc_fxSLMode === 'pips') {
+    slPips  = slIn;
+    slPrice = calc_fxDir === 'long' ? entry - slPips * pipSize : entry + slPips * pipSize;
+  } else {
+    slPrice = slIn;
+    slPips  = Math.abs(entry - slPrice) / pipSize;
+  }
+  // Resolve TP — explicit value wins; else compute from RR
+  let tpPips, tpPrice, rrUsed = rr;
+  if (isFinite(tpIn) && tpIn > 0) {
+    if (calc_fxTPMode === 'pips') {
+      tpPips  = tpIn;
+      tpPrice = calc_fxDir === 'long' ? entry + tpPips * pipSize : entry - tpPips * pipSize;
+    } else {
+      tpPrice = tpIn;
+      tpPips  = Math.abs(tpPrice - entry) / pipSize;
+    }
+    rrUsed = slPips > 0 ? tpPips / slPips : 0;
+  } else {
+    tpPips  = slPips * rr;
+    tpPrice = calc_fxDir === 'long' ? entry + tpPips * pipSize : entry - tpPips * pipSize;
+  }
+
+  const riskAmt = cap * (riskPct / 100);
+  const pipVal  = calc_pipValuePer1Lot(pairType, entry);
+  const lots    = slPips > 0 && pipVal > 0 ? riskAmt / (slPips * pipVal) : 0;
+  const rewardAmt = riskAmt * rrUsed;
+
+  // Lot type label
+  const lotLabel = lots >= 1 ? 'standard lots' : lots >= 0.1 ? 'mini lots' : 'micro lots';
+  const lotShown = lots >= 1 ? lots.toFixed(2)
+                : lots >= 0.1 ? (lots * 10).toFixed(2)
+                : (lots * 100).toFixed(2);
+
+  document.getElementById('calc_fxRiskAmt').textContent   = calc_fmtMoneyAbs(riskAmt);
+  document.getElementById('calc_fxRiskPct').textContent   = riskPct.toFixed(1) + '% of account';
+  document.getElementById('calc_fxRewardAmt').textContent = calc_fmtMoneyAbs(rewardAmt);
+  document.getElementById('calc_fxRewardPips').textContent= tpPips.toFixed(1) + ' pips';
+  document.getElementById('calc_fxLotSize').textContent   = lotShown;
+  document.getElementById('calc_fxLotType').textContent   = lotLabel;
+  document.getElementById('calc_fxRRDisplay').textContent = '1:' + rrUsed.toFixed(2);
+  document.getElementById('calc_fxPipVal').textContent    = '$' + pipVal.toFixed(2) + '/pip @1 lot';
+  document.getElementById('calc_fxSLPrice').textContent   = calc_fmtPrice(slPrice);
+  document.getElementById('calc_fxSLPipsSub').textContent = slPips.toFixed(1) + ' pips';
+  document.getElementById('calc_fxTPPrice').textContent   = calc_fmtPrice(tpPrice);
+  document.getElementById('calc_fxTPPipsSub').textContent = tpPips.toFixed(1) + ' pips';
+  document.getElementById('calc_fxCapWin').textContent    = '$' + (cap + rewardAmt).toFixed(2);
+  document.getElementById('calc_fxCapWinPct').textContent = calc_fmtPct(rewardAmt / cap * 100);
+  document.getElementById('calc_fxCapLoss').textContent   = '$' + (cap - riskAmt).toFixed(2);
+  document.getElementById('calc_fxCapLossPct').textContent= calc_fmtPct(-riskAmt / cap * 100);
+
+  // Price levels block
+  document.getElementById('calc_fxLvlEntry').textContent  = calc_fmtPrice(entry);
+  document.getElementById('calc_fxLvlSL').textContent     = calc_fmtPrice(slPrice);
+  document.getElementById('calc_fxLvlTP').textContent     = calc_fmtPrice(tpPrice);
+  document.getElementById('calc_fxLvlSLDist').textContent = slPips.toFixed(1) + ' pips';
+  document.getElementById('calc_fxLvlTPDist').textContent = tpPips.toFixed(1) + ' pips';
+
+  // R:R bar + labels
+  const total = riskAmt + rewardAmt;
+  const riskW = total > 0 ? (riskAmt / total) * 100 : 50;
+  document.getElementById('calc_fxBarRisk').style.width   = riskW + '%';
+  document.getElementById('calc_fxBarReward').style.width = (100 - riskW) + '%';
+  document.getElementById('calc_fxBarL').textContent      = calc_fmtMoneyAbs(riskAmt) + ' risk';
+  document.getElementById('calc_fxBarM').textContent      = '1:' + rrUsed.toFixed(2);
+  document.getElementById('calc_fxBarR').textContent      = calc_fmtMoneyAbs(rewardAmt) + ' reward';
+
+  // BE block — uses settings.profile.beTriggerRR (default 5)
+  const beRR = (sett.profile && sett.profile.beTriggerRR) || 5;
+  const beTriggerPips = slPips * beRR;
+  const beTriggerPrice= calc_fxDir === 'long' ? entry + beTriggerPips * pipSize : entry - beTriggerPips * pipSize;
+  document.getElementById('calc_fxBeHeader').textContent  = `Break Even at 1:${beRR} R:R`;
+  document.getElementById('calc_fxBeRRLabel').textContent = '1:' + beRR;
+  document.getElementById('calc_fxBePrice').textContent   = calc_fmtPrice(beTriggerPrice);
+  document.getElementById('calc_fxBeDist').textContent    = beTriggerPips.toFixed(1) + ' pips';
+  document.getElementById('calc_fxBeProtected').textContent = calc_fmtMoneyAbs(riskAmt);
+  document.getElementById('calc_fxBeNewSL').textContent   = calc_fmtPrice(entry);
+  document.getElementById('calc_fxBEResult').textContent  = calc_fmtPrice(beTriggerPrice);
+
+  // Pair type note
+  const note = document.getElementById('calc_fxNote');
+  const notes = {
+    'usd_quote': 'USD-quote pairs have an exact $10 per pip per standard lot.',
+    'usd_base':  'USD-base pairs have a variable pip value — recalculated using current entry price.',
+    'cross':     'Cross pairs use the entry-price approximation. Verify in your broker for the exact value.',
+  };
+  note.textContent = notes[pairType] || '';
+}
+
+function calc_clearForexResults() {
+  ['calc_fxRiskAmt','calc_fxRiskPct','calc_fxRewardAmt','calc_fxRewardPips','calc_fxLotSize','calc_fxLotType',
+   'calc_fxRRDisplay','calc_fxPipVal','calc_fxSLPrice','calc_fxSLPipsSub','calc_fxTPPrice','calc_fxTPPipsSub',
+   'calc_fxCapWin','calc_fxCapWinPct','calc_fxCapLoss','calc_fxCapLossPct',
+   'calc_fxLvlEntry','calc_fxLvlSL','calc_fxLvlTP','calc_fxLvlSLDist','calc_fxLvlTPDist',
+   'calc_fxBePrice','calc_fxBeDist','calc_fxBeProtected','calc_fxBeNewSL','calc_fxBEResult'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '—';
+  });
+}
+
+function calc_calcBTC() {
+  const cap     = parseFloat(document.getElementById('calc_capital').value) || 0;
+  const riskPct = parseFloat(document.getElementById('calc_riskPct').value) || 0;
+  const entry   = parseFloat(document.getElementById('calc_btcEntry').value) || 0;
+  const slPrice = parseFloat(document.getElementById('calc_btcSL').value) || 0;
+  const tpIn    = parseFloat(document.getElementById('calc_btcTP_input').value);
+  const rr      = parseFloat(document.getElementById('calc_btcRR').value) || 0;
+  const lev     = parseFloat(document.getElementById('calc_btcLeverage').value) || 1;
+
+  // Risk warning (shared with forex panel via #calc_riskWarn)
+  const riskWarn = document.getElementById('calc_riskWarn');
+  const sett     = (typeof getSettings === 'function') ? getSettings() : { profile: { riskCapPct: 2 } };
+  const riskCapPct = (sett.profile && sett.profile.riskCapPct) || 2;
+  if (riskPct > riskCapPct) {
+    riskWarn.className = 'calc-risk-warn over';
+    riskWarn.textContent = `⚠ ${riskPct}% exceeds your ${riskCapPct}% risk cap`;
+  } else if (riskPct > 0) {
+    riskWarn.className = 'calc-risk-warn ok';
+    riskWarn.textContent = `✓ Within ${riskCapPct}% risk cap`;
+  } else {
+    riskWarn.className = 'calc-risk-warn';
+    riskWarn.textContent = '';
+  }
+
+  if (cap <= 0 || riskPct <= 0 || entry <= 0 || slPrice <= 0) {
+    return calc_clearBTCResults();
+  }
+
+  const slDist  = Math.abs(entry - slPrice);
+  const riskAmt = cap * (riskPct / 100);
+  // Position size in BTC = risk $ / SL distance $
+  const qtyBTC  = slDist > 0 ? riskAmt / slDist : 0;
+  const posVal  = qtyBTC * entry;        // notional in USDT
+  const reqMargin = lev > 0 ? posVal / lev : posVal;
+
+  // Resolve TP price
+  let tpPrice, rrUsed = rr;
+  if (isFinite(tpIn) && tpIn > 0) {
+    tpPrice = tpIn;
+    rrUsed  = slDist > 0 ? Math.abs(tpPrice - entry) / slDist : 0;
+  } else {
+    tpPrice = calc_dir === 'long' ? entry + slDist * rr : entry - slDist * rr;
+  }
+  const tpDist    = Math.abs(tpPrice - entry);
+  const rewardAmt = qtyBTC * tpDist;
+
+  document.getElementById('calc_btcRiskAmt').textContent   = calc_fmtMoneyAbs(riskAmt);
+  document.getElementById('calc_btcRiskPct').textContent   = riskPct.toFixed(1) + '% of account';
+  document.getElementById('calc_btcRewardAmt').textContent = calc_fmtMoneyAbs(rewardAmt);
+  document.getElementById('calc_btcRewardSub').textContent = '$' + tpDist.toFixed(2) + ' move';
+  document.getElementById('calc_btcQty').textContent       = qtyBTC.toFixed(6);
+  document.getElementById('calc_btcQtySub').textContent    = 'BTC · $' + posVal.toFixed(2) + ' notional';
+  document.getElementById('calc_btcTP').textContent        = calc_fmtPrice(tpPrice, 2);
+  document.getElementById('calc_btcTPDist').textContent    = '$' + tpDist.toFixed(2) + ' from entry';
+  document.getElementById('calc_btcRRDisplay').textContent = '1:' + rrUsed.toFixed(2);
+  document.getElementById('calc_btcPosVal').textContent    = lev + 'x leverage';
+  document.getElementById('calc_btcRequiredMargin').textContent    = '$' + reqMargin.toFixed(2);
+  document.getElementById('calc_btcRequiredMarginSub').textContent = (reqMargin / cap * 100).toFixed(1) + '% of capital';
+  document.getElementById('calc_btcCapWin').textContent    = '$' + (cap + rewardAmt).toFixed(2);
+  document.getElementById('calc_btcCapWinPct').textContent = calc_fmtPct(rewardAmt / cap * 100);
+  document.getElementById('calc_btcCapLoss').textContent   = '$' + (cap - riskAmt).toFixed(2);
+  document.getElementById('calc_btcCapLossPct').textContent= calc_fmtPct(-riskAmt / cap * 100);
+
+  // Price levels
+  document.getElementById('calc_lvlEntry').textContent  = calc_fmtPrice(entry, 2);
+  document.getElementById('calc_lvlSL').textContent     = calc_fmtPrice(slPrice, 2);
+  document.getElementById('calc_lvlTP').textContent     = calc_fmtPrice(tpPrice, 2);
+  document.getElementById('calc_lvlSLDist').textContent = '$' + slDist.toFixed(2);
+
+  // R:R bar
+  const total = riskAmt + rewardAmt;
+  const riskW = total > 0 ? (riskAmt / total) * 100 : 50;
+  document.getElementById('calc_btcBarRisk').style.width   = riskW + '%';
+  document.getElementById('calc_btcBarReward').style.width = (100 - riskW) + '%';
+  document.getElementById('calc_btcBarL').textContent      = calc_fmtMoneyAbs(riskAmt) + ' risk';
+  document.getElementById('calc_btcBarM').textContent      = '1:' + rrUsed.toFixed(2);
+  document.getElementById('calc_btcBarR').textContent      = calc_fmtMoneyAbs(rewardAmt) + ' reward';
+
+  // BE block
+  const beRR = (sett.profile && sett.profile.beTriggerRR) || 5;
+  const beTriggerDist  = slDist * beRR;
+  const beTriggerPrice = calc_dir === 'long' ? entry + beTriggerDist : entry - beTriggerDist;
+  document.getElementById('calc_btcBeHeader').textContent  = `Break Even at 1:${beRR} R:R`;
+  document.getElementById('calc_btcBeRRLabel').textContent = '1:' + beRR;
+  document.getElementById('calc_bePrice').textContent      = calc_fmtPrice(beTriggerPrice, 2);
+  document.getElementById('calc_beDist').textContent       = '$' + beTriggerDist.toFixed(2);
+  document.getElementById('calc_beProtected').textContent  = calc_fmtMoneyAbs(riskAmt);
+  document.getElementById('calc_beNewSL').textContent      = calc_fmtPrice(entry, 2);
+  document.getElementById('calc_btcBEResult').textContent  = calc_fmtPrice(beTriggerPrice, 2);
+
+  // Note
+  document.getElementById('calc_btcNote').textContent =
+    `${lev}x leverage @ ${entry.toFixed(2)} → margin $${reqMargin.toFixed(2)}. ` +
+    `Liquidation buffer = SL placed ${(slDist / entry * 100).toFixed(2)}% from entry.`;
+}
+
+function calc_clearBTCResults() {
+  ['calc_btcRiskAmt','calc_btcRiskPct','calc_btcRewardAmt','calc_btcRewardSub',
+   'calc_btcQty','calc_btcQtySub','calc_btcTP','calc_btcTPDist','calc_btcRRDisplay',
+   'calc_btcPosVal','calc_btcRequiredMargin','calc_btcRequiredMarginSub',
+   'calc_btcCapWin','calc_btcCapWinPct','calc_btcCapLoss','calc_btcCapLossPct',
+   'calc_lvlEntry','calc_lvlSL','calc_lvlTP','calc_lvlSLDist',
+   'calc_bePrice','calc_beDist','calc_beProtected','calc_beNewSL','calc_btcBEResult'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '—';
+  });
+}
+
+async function calc_pullBitunixBalance() {
+  const status = document.getElementById('calc_bitunixPullStatus');
+  status.textContent = 'Fetching balance…';
+  status.style.color = 'var(--text-muted)';
+  try {
+    const url    = (typeof getBackendUrl === 'function') ? getBackendUrl() : '';
+    const execKey= localStorage.getItem('tj_executionKey') || '';
+    if (!url || !execKey) {
+      status.textContent = '⚠ Set backend URL + Execution Key in Settings first';
+      status.style.color = 'var(--red)';
+      return;
+    }
+    const r = await fetch(url + '/bitunix/account', { headers: { 'X-Execution-Key': execKey }, mode: 'cors' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const a   = await r.json();
+    const bal = (a.balance && (a.balance.total ?? a.balance.equity ?? a.balance.available)) ?? a.equity ?? a.total ?? null;
+    if (bal == null) throw new Error('Balance not in response');
+    document.getElementById('calc_capital').value = Number(bal).toFixed(2);
+    status.textContent = '✓ Pulled $' + Number(bal).toFixed(2) + ' from Bitunix';
+    status.style.color = 'var(--green)';
+    calc_calculate();
+  } catch (e) {
+    status.textContent = '⚠ Pull failed: ' + e.message;
+    status.style.color = 'var(--red)';
+  }
+}
+
+function calc_resetAll() {
+  document.getElementById('calc_capital').value     = 10000;
+  document.getElementById('calc_riskPct').value     = 2;
+  document.getElementById('calc_fxEntry').value     = 1.2500;
+  document.getElementById('calc_fxSL').value        = 20;
+  document.getElementById('calc_fxTP').value        = '';
+  document.getElementById('calc_fxRR').value        = 2;
+  document.getElementById('calc_pairType').value    = 'usd_quote';
+  document.getElementById('calc_btcEntry').value    = 84000;
+  document.getElementById('calc_btcSL').value       = 82500;
+  document.getElementById('calc_btcTP_input').value = '';
+  document.getElementById('calc_btcRR').value       = 2;
+  document.getElementById('calc_btcLeverage').value = '10';
+  document.getElementById('calc_btcMarginMode').value = 'CROSS';
+  calc_setFxDir('long');
+  calc_setDir('long');
+  calc_setFxSLMode('pips');
+  calc_setFxTPMode('pips');
+  calc_calculate();
+}
+
+function calc_sendToJournal() {
+  // Builds the same `calcToJournal` payload that the standalone
+  // forex-calculator.html writes — so checkCalcAutoFill() (already wired
+  // for the standalone case) handles the population. We then nav('log')
+  // synchronously and let it pop the localStorage on its own.
+  let payload;
+  if (calc_mode === 'forex') {
+    const entry  = parseFloat(document.getElementById('calc_fxEntry').value);
+    const rr     = parseFloat(document.getElementById('calc_fxRR').value) || 2;
+    const slIn   = parseFloat(document.getElementById('calc_fxSL').value) || 0;
+    const tpIn   = parseFloat(document.getElementById('calc_fxTP').value);
+    const pairType = document.getElementById('calc_pairType').value;
+    const pipSize  = calc_pipSize(entry, pairType);
+    let slPrice, tpPrice;
+    if (calc_fxSLMode === 'pips') {
+      slPrice = calc_fxDir === 'long' ? entry - slIn * pipSize : entry + slIn * pipSize;
+    } else { slPrice = slIn; }
+    if (isFinite(tpIn) && tpIn > 0) {
+      if (calc_fxTPMode === 'pips') {
+        tpPrice = calc_fxDir === 'long' ? entry + tpIn * pipSize : entry - tpIn * pipSize;
+      } else { tpPrice = tpIn; }
+    } else {
+      const slPips = Math.abs(entry - slPrice) / pipSize;
+      const tpPips = slPips * rr;
+      tpPrice = calc_fxDir === 'long' ? entry + tpPips * pipSize : entry - tpPips * pipSize;
+    }
+    const cap     = parseFloat(document.getElementById('calc_capital').value) || 0;
+    const riskPct = parseFloat(document.getElementById('calc_riskPct').value) || 0;
+    const riskAmt = cap * (riskPct / 100);
+    const slPips  = Math.abs(entry - slPrice) / pipSize;
+    const pipVal  = calc_pipValuePer1Lot(pairType, entry);
+    const lots    = slPips > 0 && pipVal > 0 ? riskAmt / (slPips * pipVal) : 0;
+    payload = {
+      market: 'Forex',
+      direction: calc_fxDir,
+      entry: entry,
+      sl: slPrice,
+      tp: tpPrice,
+      size: lots ? lots.toFixed(2) : '',
+      risk: riskAmt.toFixed(2),
+      venue: 'mt5',
+    };
+  } else {
+    const entry   = parseFloat(document.getElementById('calc_btcEntry').value);
+    const slPrice = parseFloat(document.getElementById('calc_btcSL').value);
+    const tpIn    = parseFloat(document.getElementById('calc_btcTP_input').value);
+    const rr      = parseFloat(document.getElementById('calc_btcRR').value) || 2;
+    const slDist  = Math.abs(entry - slPrice);
+    const tpPrice = isFinite(tpIn) && tpIn > 0
+      ? tpIn
+      : (calc_dir === 'long' ? entry + slDist * rr : entry - slDist * rr);
+    const cap     = parseFloat(document.getElementById('calc_capital').value) || 0;
+    const riskPct = parseFloat(document.getElementById('calc_riskPct').value) || 0;
+    const riskAmt = cap * (riskPct / 100);
+    const qtyBTC  = slDist > 0 ? riskAmt / slDist : 0;
+    payload = {
+      market: 'BTC/USDT',
+      pair: 'BTCUSDT',
+      direction: calc_dir,
+      entry: entry,
+      sl: slPrice,
+      tp: tpPrice,
+      size: qtyBTC.toFixed(6),
+      risk: riskAmt.toFixed(2),
+      venue: 'bitunix',
+    };
+  }
+  localStorage.setItem('calcToJournal', JSON.stringify(payload));
+  // Local toast first (so user sees confirmation even if nav fails)
+  const toast = document.getElementById('calc_sendToast');
+  if (toast) {
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  }
+  // Trigger the journal autofill — checkCalcAutoFill already calls nav('log')
+  // and pops the localStorage entry.
+  if (typeof checkCalcAutoFill === 'function') checkCalcAutoFill();
 }
 
 </script>
