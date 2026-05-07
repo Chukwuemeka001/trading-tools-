@@ -1252,26 +1252,62 @@
     return localStorage.getItem('poiwatcher_backend') || 'https://poiwatcher-backend.onrender.com';
   }
 
+  // Phase 7.1 — same stale-warm /reconnect fallback the embedded calc uses.
+  // The backend's exchange-sync loop is gated on BINANCE_API_KEY; without
+  // Binance, /bitunix/exchange/status reports `connected:false` until
+  // /bitunix/reconnect kicks an authenticated call. We do that kick once
+  // when we detect the never-warmed pattern, then use the warmed response.
   async function pullBitunixBalance(opts = {}) {
-    const silent = opts.silent === true;
+    const silent   = opts.silent === true;
     const statusEl = document.getElementById('bitunixPullStatus');
+    const btn      = document.getElementById('pullBitunixBtn');
     const setStatus = (msg, color) => { if (statusEl) { statusEl.textContent = msg; statusEl.style.color = color || '#8b949e'; } };
+    const restoreBtn = (delay) => {
+      if (!btn) return;
+      setTimeout(() => { btn.textContent = '⬇ Pull from Bitunix'; }, delay || 3000);
+    };
+
+    if (!silent && btn) btn.textContent = '⏳ Pulling...';
     if (!silent) setStatus('Pulling balance from Bitunix…', '#f7931a');
+
+    const url = getBackendUrl();
+    const fetchStatus = async () => {
+      const r = await fetch(url + '/bitunix/exchange/status', { mode: 'cors' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    };
+
     try {
-      // Public endpoint — exposes balance + connection state, no auth header.
-      const res = await fetch(getBackendUrl() + '/bitunix/exchange/status', { mode: 'cors' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
+      let data = await fetchStatus();
+      // Stale-but-not-broken pattern → kick /reconnect once, then re-fetch.
+      const looksStale = data?.api_key_set !== false && data?.api_secret_set !== false
+        && !data?.disabled && !data?.connected
+        && !data?.last_error_msg && !data?.last_error_code;
+      if (looksStale) {
+        try {
+          const rr = await fetch(url + '/bitunix/reconnect', { mode: 'cors' });
+          const rj = await rr.json().catch(() => ({}));
+          if (rj && rj.ok && rj.balance) {
+            data = await fetchStatus();
+          } else if (rj && rj.diag && rj.diag.last_error_msg) {
+            data.last_error_msg = rj.diag.last_error_msg;
+          }
+        } catch { /* fall through with original `data` */ }
+      }
+
       if (data?.api_key_set === false || data?.api_secret_set === false) {
         if (!silent) setStatus('Backend keys not set on Render — see deploy docs.', '#f85149');
+        if (!silent && btn) { btn.textContent = '✗ Not configured'; restoreBtn(2500); }
         return null;
       }
       if (data?.disabled) {
         if (!silent) setStatus('Bitunix disabled: ' + (data.last_error_msg || data.error || 'unknown'), '#f85149');
+        if (!silent && btn) { btn.textContent = '✗ Bitunix offline'; restoreBtn(2500); }
         return null;
       }
       if (!data?.connected) {
         if (!silent) setStatus('Bitunix not connected: ' + (data.last_error_msg || data.error || 'no sync yet'), '#f85149');
+        if (!silent && btn) { btn.textContent = '✗ Bitunix offline'; restoreBtn(2500); }
         return null;
       }
       // Prefer available (free margin), fall back to total balance, then equity.
@@ -1280,6 +1316,7 @@
       for (const c of candidates) { const n = Number(c); if (isFinite(n) && n > 0) { bal = n; break; } }
       if (bal == null) {
         if (!silent) setStatus('No balance returned — Bitunix sync may not have run yet.', '#f85149');
+        if (!silent && btn) { btn.textContent = '✗ No balance'; restoreBtn(2500); }
         return null;
       }
       const capInput = document.getElementById('capital');
@@ -1290,9 +1327,11 @@
       }
       const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setStatus(`✓ Pulled $${bal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} at ${t}`, '#3fb950');
+      if (!silent && btn) { btn.textContent = '✓ $' + bal.toFixed(2) + ' pulled'; restoreBtn(3000); }
       return bal;
     } catch (e) {
       if (!silent) setStatus('Pull failed — backend unreachable. ' + (e?.message || ''), '#f85149');
+      if (!silent && btn) { btn.textContent = '✗ Error'; restoreBtn(2000); }
       return null;
     }
   }

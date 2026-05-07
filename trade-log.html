@@ -9573,12 +9573,77 @@ let _bitunixInterval = null;
 // ════════════════════════════════════════════════════════════════════
 // SECTION: BITUNIX INTEGRATION
 // ════════════════════════════════════════════════════════════════════
-async function updateBitunixDot() {
+// Phase 7.1 — Shared Bitunix status fetch. The backend's exchange-sync loop
+// only runs when BINANCE_API_KEY is also set; on Bitunix-only setups, the
+// `connected` flag stays false until something actively pings the auth path.
+// This helper handles that "stale never-warmed" pattern: if `/exchange/status`
+// reports unconfigured/disabled/error → return as-is. Otherwise if `connected`
+// is false but keys are set and no error is recorded, fire `/bitunix/reconnect`
+// once to warm the cache and return its response.
+//
+// Used by updateBitunixDot, refreshBitunixHealth, and calc_pullBitunixBalance
+// so the three call sites can't drift apart.
+async function _fetchBitunixStatus() {
   const url = getBackendUrl();
+  if (!url) return { ok: false, error: 'No backend URL set' };
+  let s;
+  try {
+    const r = await fetch(url + '/bitunix/exchange/status', { mode: 'cors' });
+    if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
+    s = await r.json();
+  } catch (e) {
+    return { ok: false, error: e?.message || 'fetch error' };
+  }
+  // Definitive negatives — return immediately, don't retry.
+  if (s.api_key_set === false || s.api_secret_set === false) {
+    return { ok: true, status: s, configured: false };
+  }
+  if (s.disabled) {
+    return { ok: true, status: s, configured: true };
+  }
+  if (s.connected) {
+    return { ok: true, status: s, configured: true };
+  }
+  // Stale-but-not-broken pattern: keys set, not disabled, no error, just
+  // never authed. Kick /reconnect once to warm the cache.
+  if (!s.last_error_msg && !s.last_error_code) {
+    try {
+      const rr = await fetch(url + '/bitunix/reconnect', { mode: 'cors' });
+      const j  = await rr.json().catch(() => ({}));
+      if (j.ok && j.balance) {
+        // Re-pull status so the caller sees a single coherent shape.
+        try {
+          const r2 = await fetch(url + '/bitunix/exchange/status', { mode: 'cors' });
+          if (r2.ok) {
+            const s2 = await r2.json();
+            return { ok: true, status: s2, configured: true };
+          }
+        } catch {}
+        // Fallback: synthesise a status-like object from the reconnect response.
+        return {
+          ok: true, configured: true,
+          status: {
+            ...s,
+            connected:      true,
+            available_usdt: j.balance.available,
+            balance_usdt:   j.balance.balance,
+            equity_usdt:    j.balance.equity,
+          },
+        };
+      }
+      // /reconnect failed — surface its diag as the error if available
+      if (j.diag && j.diag.last_error_msg) s.last_error_msg = j.diag.last_error_msg;
+      if (j.error && !s.last_error_msg)    s.last_error_msg = j.error;
+    } catch { /* fall through with original `s` */ }
+  }
+  return { ok: true, status: s, configured: true };
+}
+
+async function updateBitunixDot() {
   const dot     = document.getElementById('bitunixDot');
   const dotIcon = document.getElementById('bitunixDotIcon');
   const dotText = document.getElementById('bitunixDotText');
-  if (!url || !dot || !dotIcon || !dotText) return;
+  if (!dot || !dotIcon || !dotText) return;
 
   const setDisconnected = (reason) => {
     dot.className = 'bitunix-dot off';
@@ -9590,39 +9655,28 @@ async function updateBitunixDot() {
     dot.title = '🔴 Bitunix offline' + (reason ? ' — ' + reason : '');
   };
 
-  try {
-    // Single fetch — /bitunix/exchange/status is public and already carries
-    // balance + connection state. No exec key, no second /bitunix/account call.
-    const statusResp = await fetch(url + '/bitunix/exchange/status', { mode: 'cors' });
-    if (!statusResp.ok) { setDisconnected('HTTP ' + statusResp.status); return; }
-    const status = await statusResp.json();
-    if (status.api_key_set === false || status.api_secret_set === false) {
-      setDisconnected('not configured'); return;
+  const r = await _fetchBitunixStatus();
+  if (!r.ok)              { setDisconnected(r.error); return; }
+  if (!r.configured)      { setDisconnected('not configured'); return; }
+  const s = r.status;
+  if (s.disabled)         { setDisconnected(s.last_error_msg || s.error || 'disabled'); return; }
+  if (!s.connected)       { setDisconnected(s.last_error_msg || s.error || 'not connected'); return; }
+
+  const bal = s.available_usdt ?? s.balance_usdt ?? s.equity_usdt ?? null;
+  let balText = '';
+  if (bal != null) {
+    const n = Number(bal);
+    if (isFinite(n) && n > 0) {
+      balText = ' · $' + (n >= 10000 ? Math.round(n).toLocaleString() : n.toFixed(2));
     }
-    if (status.disabled) {
-      setDisconnected(status.last_error_msg || status.error || 'disabled'); return;
-    }
-    if (!status.connected) {
-      setDisconnected(status.last_error_msg || status.error || 'not connected'); return;
-    }
-    const bal = status.available_usdt ?? status.balance_usdt ?? status.equity_usdt ?? null;
-    let balText = '';
-    if (bal != null) {
-      const n = Number(bal);
-      if (isFinite(n) && n > 0) {
-        balText = ' · $' + (n >= 10000 ? Math.round(n).toLocaleString() : n.toFixed(2));
-      }
-    }
-    dot.className = 'bitunix-dot on';
-    dot.style.background = 'rgba(247,147,26,0.18)';
-    dot.style.color = '#f7931a';
-    dot.style.border = '1px solid #f7931a';
-    dotIcon.style.background = '#f7931a';
-    dotText.textContent = 'Bitunix' + balText;
-    dot.title = '🟧 Bitunix connected' + balText;
-  } catch (e) {
-    setDisconnected(e?.message || 'fetch error');
   }
+  dot.className = 'bitunix-dot on';
+  dot.style.background = 'rgba(247,147,26,0.18)';
+  dot.style.color = '#f7931a';
+  dot.style.border = '1px solid #f7931a';
+  dotIcon.style.background = '#f7931a';
+  dotText.textContent = 'Bitunix' + balText;
+  dot.title = '🟧 Bitunix connected' + balText;
 }
 
 function startBitunixPolling() {
@@ -9811,15 +9865,12 @@ async function refreshBitunixHealth() {
 
   const execKey = localStorage.getItem('tj_executionKey') || '';
 
-  // Single fetch — both Bitunix rows derive from the same status payload.
-  // The endpoint is public (no exec key) and returns balance + connection
-  // state in one shot, so we don't double-call /bitunix/account.
-  let statusJson = null, statusErr = null;
-  try {
-    const r = await fetch(url + '/bitunix/exchange/status', { mode:'cors' });
-    if (!r.ok) statusErr = 'HTTP ' + r.status;
-    else statusJson = await r.json();
-  } catch (e) { statusErr = e.message; }
+  // Single helper call — handles the stale-warm /reconnect fallback so both
+  // Bitunix rows render coherently from one payload.
+  const sr        = await _fetchBitunixStatus();
+  const statusJson = sr.ok ? sr.status : null;
+  const statusErr  = sr.ok ? null : sr.error;
+  const configured = sr.configured !== false;
 
   const checks = [
     { label: 'Backend reachable', test: async () => {
@@ -9829,17 +9880,19 @@ async function refreshBitunixHealth() {
     { label: 'Bitunix connected', test: async () => {
       if (statusErr)            return { ok: false, detail: statusErr };
       if (!statusJson)          return { ok: false, detail: 'no response' };
-      // Backend env-vars not set?
-      if (statusJson.api_key_set === false || statusJson.api_secret_set === false) {
+      if (!configured) {
         return { ok: false, detail: 'Set BITUNIX_API_KEY/SECRET on Render' };
       }
-      // Auto-disable circuit breaker tripped — surface the actual reason
       if (statusJson.disabled) {
         return { ok: false, detail: statusJson.last_error_msg || statusJson.error || 'disabled' };
       }
-      // Live-connected per the last sync loop
-      if (statusJson.connected) return { ok: true, detail: 'connected' };
-      // Not yet synced or last attempt failed — surface the last error if we have one
+      if (statusJson.connected) {
+        // Phase 7.1 — symmetric "200" indicator like the Backend row, plus the
+        // available-balance hint so the user gets the live $ in one glance.
+        const bal = statusJson.available_usdt ?? statusJson.balance_usdt ?? statusJson.equity_usdt ?? null;
+        const tail = bal != null ? ' · $' + Number(bal).toFixed(2) + ' USDT' : '';
+        return { ok: true, detail: '200 · connected' + tail };
+      }
       return { ok: false, detail: statusJson.last_error_msg || statusJson.error || 'not connected' };
     }},
     { label: 'Account balance', test: async () => {
@@ -9847,7 +9900,11 @@ async function refreshBitunixHealth() {
       if (!statusJson.connected)  return { ok: false, detail: 'not connected' };
       const bal = statusJson.available_usdt ?? statusJson.balance_usdt ?? statusJson.equity_usdt ?? null;
       if (bal == null || isNaN(Number(bal))) return { ok: false, detail: 'no balance field' };
-      return { ok: true, detail: '$' + Number(bal).toFixed(2) + ' USDT' };
+      const eq = statusJson.equity_usdt;
+      const eqTail = (eq != null && !isNaN(Number(eq)))
+        ? ' · $' + Number(eq).toFixed(2) + ' equity'
+        : '';
+      return { ok: true, detail: '$' + Number(bal).toFixed(2) + ' USDT' + eqTail };
     }},
     { label: 'Kill switch', test: async () => {
       if (!execKey) return { ok: false, detail: 'No Execution API Key set' };
@@ -12142,35 +12199,54 @@ function calc_clearBTCResults() {
 }
 
 async function calc_pullBitunixBalance() {
-  const status = document.getElementById('calc_bitunixPullStatus');
-  status.textContent = 'Fetching balance…';
-  status.style.color = 'var(--text-muted)';
-  try {
-    const url = (typeof getBackendUrl === 'function') ? getBackendUrl() : '';
-    if (!url) {
-      status.textContent = '⚠ Set backend URL in Settings first';
-      status.style.color = 'var(--red)';
-      return;
-    }
-    // Public endpoint — no exec key needed. Carries balance + state in one shot.
-    const r = await fetch(url + '/bitunix/exchange/status', { mode: 'cors' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const s = await r.json();
-    if (s.api_key_set === false || s.api_secret_set === false) {
-      throw new Error('Backend keys not set on Render');
-    }
-    if (s.disabled)  throw new Error(s.last_error_msg || s.error || 'connection disabled');
-    if (!s.connected) throw new Error(s.last_error_msg || s.error || 'not connected');
-    const bal = s.available_usdt ?? s.balance_usdt ?? s.equity_usdt ?? null;
-    if (bal == null || isNaN(Number(bal))) throw new Error('Balance not in response');
-    document.getElementById('calc_capital').value = Number(bal).toFixed(2);
-    status.textContent = '✓ Pulled $' + Number(bal).toFixed(2) + ' from Bitunix';
-    status.style.color = 'var(--green)';
-    calc_calculate();
-  } catch (e) {
-    status.textContent = '⚠ Pull failed: ' + e.message;
-    status.style.color = 'var(--red)';
+  const statusEl = document.getElementById('calc_bitunixPullStatus');
+  const btn      = document.getElementById('calc_pullBitunixBtn');
+  const setStatus = (msg, color) => {
+    if (!statusEl) return;
+    statusEl.textContent = msg;
+    statusEl.style.color = color || 'var(--text-muted)';
+  };
+  const restoreBtn = (delay) => {
+    if (!btn) return;
+    setTimeout(() => { btn.textContent = '⬇ Pull from Bitunix'; }, delay || 3000);
+  };
+
+  if (btn) btn.textContent = '⏳ Pulling...';
+  setStatus('Fetching balance…', 'var(--text-muted)');
+
+  const r = await _fetchBitunixStatus();
+  if (!r.ok) {
+    setStatus('⚠ ' + r.error, 'var(--red)');
+    if (btn) { btn.textContent = '✗ Error'; restoreBtn(2000); }
+    return;
   }
+  if (!r.configured) {
+    setStatus('⚠ Backend keys not set on Render', 'var(--red)');
+    if (btn) { btn.textContent = '✗ Not configured'; restoreBtn(2500); }
+    return;
+  }
+  const s = r.status;
+  if (s.disabled || !s.connected) {
+    const why = s.last_error_msg || s.error || 'not connected';
+    setStatus('⚠ Pull failed: ' + why, 'var(--red)');
+    if (btn) { btn.textContent = '✗ Bitunix offline'; restoreBtn(2500); }
+    return;
+  }
+  const bal = s.available_usdt ?? s.balance_usdt ?? s.equity_usdt ?? null;
+  if (bal == null || isNaN(Number(bal))) {
+    setStatus('⚠ Balance not in response', 'var(--red)');
+    if (btn) { btn.textContent = '✗ No balance'; restoreBtn(2500); }
+    return;
+  }
+  const balStr = Number(bal).toFixed(2);
+  const cap = document.getElementById('calc_capital');
+  if (cap) {
+    cap.value = balStr;
+    cap.dispatchEvent(new Event('input'));
+  }
+  if (typeof calc_calculate === 'function') calc_calculate();
+  setStatus('✓ Pulled $' + balStr + ' from Bitunix', 'var(--green)');
+  if (btn) { btn.textContent = '✓ $' + balStr + ' pulled'; restoreBtn(3000); }
 }
 
 function calc_resetAll() {
