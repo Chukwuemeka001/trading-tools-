@@ -6829,7 +6829,11 @@ async function submitBitunixApproval(tradeId) {
         risk_percent: sett.profile.riskPct || 1,
         leverage: leverage,
         margin_mode: marginMode,
-        order_type: 'MARKET',
+        // Phase 7.2 — LIMIT parks the order at the exact entry price (matches
+        // the MT5 EA's BuyLimit/SellLimit behavior). Backend already routes
+        // LIMIT orders into _pending_limit_orders with 24h GTC + the existing
+        // bitunix_limit_filled / bitunix_limit_expired pipeline.
+        order_type: 'LIMIT',
         be_trigger_rr: sett.profile.beTriggerRR || 5,
         journal_trade_id: t.id,
         confidence: t.confidence || 0,
@@ -9924,32 +9928,47 @@ async function refreshBitunixHealth() {
 }
 
 async function runBitunixTest() {
+  // Phase 7.2 — calls the Bitunix-only dry-run endpoint /api/bitunix/execution/test.
+  // Renders the 6-step diagnostic with the same dot-style chain as runExecutionTest()
+  // but with orange Bitunix accents instead of MT5 blue. Never sends an order.
   const out = document.getElementById('bitunixTestResult');
   if (!out) return;
-  out.innerHTML = '<div style="color:#8b949e;font-size:0.78rem;padding:8px 10px;border:1px dashed #30363d;border-radius:6px;">Running paper-mode pipeline test on Bitunix…</div>';
   const url = getExecBackendUrl();
   const execKey = localStorage.getItem('tj_executionKey') || '';
   if (!url || !execKey) {
     out.innerHTML = '<div style="color:#f85149;font-size:0.78rem;">Set Execution API Key first.</div>'; return;
   }
-  // Use the existing /api/execution/test endpoint with venue=bitunix.
-  // If the backend doesn't recognize the param it will still run an MT5 test —
-  // we present the result either way.
+  out.innerHTML = '<div style="color:#8b949e;font-size:0.78rem;padding:8px 10px;border:1px dashed #5a3a08;border-radius:6px;background:rgba(247,147,26,0.05);">⏳ Running Bitunix paper-mode dry-run…</div>';
+
+  const dot = (ok) => ok === true ? '✅' : ok === false ? '❌' : '⚪';
+  const renderSteps = (steps, stage) => {
+    const headerColor = stage === 'complete' ? '#3fb950' : stage === 'failed' ? '#f85149' : '#f7931a';
+    const headerBg    = stage === 'complete' ? '#0e3a1e' : stage === 'failed' ? '#3a1216' : 'rgba(247,147,26,0.08)';
+    const headerLabel = stage === 'complete' ? '✅ All Bitunix pipeline checks passed'
+                      : stage === 'failed'   ? '❌ Bitunix pipeline check failed — see step below'
+                      : '⏳ Running Bitunix dry-run…';
+    let html = `<div style="background:${headerBg};border:1px solid ${headerColor};border-radius:6px;padding:10px 14px;font-size:0.78rem;">`;
+    html += `<div style="font-weight:600;color:${headerColor};margin-bottom:8px;">${headerLabel}</div>`;
+    (steps || []).forEach(s => {
+      const detailHtml = s.detail ? ' — <span style="color:#8b949e;">' + escHtml(s.detail) + '</span>' : '';
+      html += `<div style="margin:3px 0;color:#e6edf3;">${dot(s.ok)} ${escHtml(s.name)}${detailHtml}</div>`;
+    });
+    html += '</div>';
+    out.innerHTML = html;
+  };
+
   try {
-    const resp = await fetch(url + '/api/execution/test?venue=bitunix', {
+    const resp = await fetch(url + '/api/bitunix/execution/test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Execution-Key': execKey },
-      body: JSON.stringify({ venue: 'bitunix' }),
     });
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      out.innerHTML = '<div style="color:#f85149;font-size:0.78rem;padding:8px 10px;background:#3a1216;border:1px solid #f85149;border-radius:6px;">Test failed: ' + escHtml(data.error || ('HTTP ' + resp.status)) + '</div>';
+    if (!resp.ok && !data.steps) {
+      out.innerHTML = '<div style="color:#f85149;font-size:0.78rem;padding:8px 10px;background:#3a1216;border:1px solid #f85149;border-radius:6px;">'
+        + 'Test failed: ' + escHtml(data.error || ('HTTP ' + resp.status)) + '</div>';
       return;
     }
-    const passed = data.passed ?? data.ok ?? data.success ?? false;
-    out.innerHTML = `<div style="padding:8px 10px;background:${passed?'#0e3a1e':'#3a2a16'};border:1px solid ${passed?'#3fb950':'#f0883e'};border-radius:6px;color:${passed?'#56d364':'#ffa657'};font-size:0.78rem;">
-      ${passed ? '✅' : '⚠'} ${escHtml(data.message || (passed ? 'Test passed' : 'Test completed with warnings'))}
-    </div>`;
+    renderSteps(data.steps || [], data.stage || 'failed');
     refreshBitunixHealth();
   } catch (e) {
     out.innerHTML = '<div style="color:#f85149;font-size:0.78rem;padding:8px 10px;">' + escHtml(e.message) + '</div>';
