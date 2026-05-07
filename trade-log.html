@@ -2710,9 +2710,10 @@
           <div class="calc-field">
             <label>Pair Type</label>
             <select id="calc_pairType">
-              <option value="usd_quote">USD Quote — EUR/USD, GBP/USD, AUD/USD…</option>
-              <option value="usd_base">USD Base — USD/JPY, USD/CAD, USD/CHF…</option>
-              <option value="cross">Cross Pair — EUR/GBP, GBP/JPY, EUR/JPY…</option>
+              <option value="usd_quote">USD Quote — EUR/USD, GBP/USD, AUD/USD, NZD/USD…</option>
+              <option value="jpy">JPY Quote — USD/JPY, GBP/JPY, EUR/JPY…</option>
+              <option value="usd_base">USD Base — USD/CAD, USD/CHF (non-JPY)…</option>
+              <option value="cross">Cross Pair — EUR/GBP, AUD/NZD, EUR/CHF… (approximate)</option>
             </select>
           </div>
           <div id="calc_fxNote" class="calc-info-note"></div>
@@ -4050,6 +4051,9 @@ function hasUnsavedFormData() {
   return !!(pair || entry || preImgData);
 }
 
+// ════════════════════════════════════════════════════════════════════
+// SECTION: NAVIGATION & UI
+// ════════════════════════════════════════════════════════════════════
 function nav(view) {
   // Guard: warn if leaving Log Trade with unsaved data
   const logPage = document.getElementById('page-log');
@@ -4961,6 +4965,9 @@ function renderExecStatusBlock(t) {
   </div>`;
 }
 
+// ════════════════════════════════════════════════════════════════════
+// SECTION: TRADE LOG & JOURNAL
+// ════════════════════════════════════════════════════════════════════
 function renderJournal() {
   const status  = document.getElementById('fltStatus').value;
   const outcome = document.getElementById('fltOutcome').value;
@@ -8264,6 +8271,9 @@ function renderCryptoMetrics(allTrades) {
   el.innerHTML = html;
 }
 
+// ════════════════════════════════════════════════════════════════════
+// SECTION: DASHBOARD & ANALYTICS
+// ════════════════════════════════════════════════════════════════════
 function renderDashboard() {
   const filtered = filterByPeriod(trades, activePeriod);
   const closed   = filtered.filter(t => t.status === 'closed');
@@ -8823,6 +8833,9 @@ function saveToken(token) {
   localStorage.setItem(GIST_STORE, JSON.stringify({ ...cfg, token }));
 }
 
+// ════════════════════════════════════════════════════════════════════
+// SECTION: GIST CLOUD SYNC
+// ════════════════════════════════════════════════════════════════════
 function getGistCfg() {
   const cfg = JSON.parse(localStorage.getItem(GIST_STORE) || '{}');
   return { ...cfg, token: getToken(), gistId: cfg.gistId || DEFAULT_GIST };
@@ -9454,6 +9467,11 @@ function downloadAnalysis() {
 // Uses /mt5/... backend endpoints (route aliases of the legacy /mt4/... paths).
 // `_mt4Interval` / `mt4Dot` / `mt4-dot` identifiers kept to avoid a DOM refactor —
 // the UI labels below say MT5 because the active EA is POIWatcher.mq5.
+// ════════════════════════════════════════════════════════════════════
+// SECTION: MT5 EXECUTION PIPELINE
+// (legacy `_mt4*` identifiers kept to avoid a wide DOM/state refactor;
+// the active EA is POIWatcher.mq5 and the routes are /mt5/*)
+// ════════════════════════════════════════════════════════════════════
 let _mt4Interval = null;
 
 function updateMT4Dot() {
@@ -9482,6 +9500,9 @@ function startMT4Polling() {
 
 // ── Bitunix nav-bar indicator ──────────────────────────────────────
 let _bitunixInterval = null;
+// ════════════════════════════════════════════════════════════════════
+// SECTION: BITUNIX INTEGRATION
+// ════════════════════════════════════════════════════════════════════
 async function updateBitunixDot() {
   const url = getBackendUrl();
   const dot     = document.getElementById('bitunixDot');
@@ -10048,6 +10069,9 @@ function saveBackendUrl() {
   }).catch(() => { st.textContent = '\u2717 Failed'; st.style.color = '#f85149'; });
 }
 
+// ════════════════════════════════════════════════════════════════════
+// SECTION: ALERTS & PRICE MONITORING
+// ════════════════════════════════════════════════════════════════════
 function initAlerts() {
   const url = getBackendUrl();
   document.getElementById('backendUrl').value = url;
@@ -10382,6 +10406,9 @@ function calcChecklistRR() {
 // The 4 dropped items (mbms, SC, riskCap, dxyChecked) remain as visual
 // reference fields in the confluence grid; they're just not scored.
 // Scoring: 6-8 green/proceed · 3-5 amber/review · 0-2 red/skip.
+// ════════════════════════════════════════════════════════════════════
+// SECTION: PRE-TRADE CHECKLIST
+// ════════════════════════════════════════════════════════════════════
 function calcAlignmentScore() {
   let score = 0;
   const g = id => (document.getElementById(id)?.value || '');
@@ -10677,6 +10704,9 @@ setInterval(syncExchangeStatus, 60000);
 // SESSION MONITOR
 // ═══════════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════════════════════════
+// SECTION: SESSION BAR & CLOCKS
+// ════════════════════════════════════════════════════════════════════
 function getSessionStatus() {
   const now = new Date();
   const utcH = now.getUTCHours();
@@ -10890,6 +10920,9 @@ function renderSessionPerformance(filtered) {
 // SETTINGS
 // ═══════════════════════════════════════════════════════
 const SETTINGS_KEY = 'tradeJournal_settings';
+// ════════════════════════════════════════════════════════════════════
+// SECTION: SETTINGS & DEFAULTS
+// ════════════════════════════════════════════════════════════════════
 const DEFAULT_SETTINGS = {
   profile: { name: '', currency: 'USD', capital: 0, riskPct: 1, riskCapPct: 2, beTriggerRR: 5, maxTrades: 3, tz: 'local', tf: 'M15', market: 'Forex', ddDaily: 2, ddWeekly: 10, ddMonthly: 25 },
   display: { showSession: true, showEquity: true },
@@ -11377,9 +11410,14 @@ function checkCalcAutoFill() {
 // ═══════════════════════════════════════════════════════
 // PAGE VISIBILITY API — pause background work when hidden
 // ═══════════════════════════════════════════════════════
-let _clockInterval = null;       // 1s — ticks the UTC/ET/Local clocks
-let _sessionInterval = null;     // 10s — refreshes pill active state, countdowns, overlap banner
-let _exchangeInterval = null;
+// `var` — these are referenced inside startBackgroundTimers(), which is
+// invoked at top-level eval (line ~11141) BEFORE this declaration line
+// is reached. `let` would TDZ-throw and silently kill the timer chain;
+// `var` hoists the binding so the call resolves to undefined → falls
+// through the `if (!_clockInterval)` guard and starts the intervals.
+var _clockInterval = null;       // 1s — ticks the UTC/ET/Local clocks
+var _sessionInterval = null;     // 10s — refreshes pill active state, countdowns, overlap banner
+var _exchangeInterval = null;
 
 function startBackgroundTimers() {
   if (!_clockInterval) {
@@ -11532,14 +11570,27 @@ function downloadAnalysisCSV() {
 // compat; this version writes the same `calcToJournal`
 // localStorage key + nav()'s straight to the log tab.
 // ═══════════════════════════════════════════════════════
-let calc_mode    = 'forex';      // 'forex' | 'btc'
-let calc_dir     = 'long';       // BTC direction
-let calc_fxDir   = 'long';
-let calc_fxSLMode = 'pips';      // 'pips' | 'price'
-let calc_fxTPMode = 'pips';
-let calc_split   = false;        // BTC split toggle
-let calc_fxSplit = false;        // Forex split toggle
-let calc_initted = false;
+// ════════════════════════════════════════════════════════════════════
+// SECTION: CALCULATOR (EMBEDDED)
+// Mirror of forex-calculator.html, namespaced with `calc_` so nothing
+// collides with the journal's existing helpers. Runs inline in the
+// Calculator tab; the standalone page stays untouched for backward
+// compat with anything that links directly to it.
+// ════════════════════════════════════════════════════════════════════
+// `var` (not `let`) — these are referenced from inline onclick handlers
+// (calc_setMode etc.) and from nav('calculator') which can fire from
+// page-load restoration BEFORE this declaration line is reached during
+// script eval. `let` would throw a TDZ error ("Cannot access
+// 'calc_initted' before initialization"); `var` hoists the binding to
+// undefined so the guards in calc_init/calc_setMode work as written.
+var calc_mode    = 'forex';      // 'forex' | 'btc'
+var calc_dir     = 'long';       // BTC direction
+var calc_fxDir   = 'long';
+var calc_fxSLMode = 'pips';      // 'pips' | 'price'
+var calc_fxTPMode = 'pips';
+var calc_split   = false;        // BTC split toggle
+var calc_fxSplit = false;        // Forex split toggle
+var calc_initted = false;
 
 function calc_init() {
   // Wire input listeners exactly once. After that, calc_init() is just a
@@ -11615,17 +11666,27 @@ function calc_toggleFxSplit() {
 }
 
 // ── forex helpers ──────────────────────────────────────
+// Pip-value math matches the Myfxbook / Babypips / FXCM standard.
+//   USD-quote (EUR/USD, GBP/USD, AUD/USD, NZD/USD):
+//       pip = 0.0001, pip_value_per_std_lot = $10 (exact, fixed)
+//   JPY-quote  (USD/JPY, GBP/JPY, EUR/JPY):
+//       pip = 0.01,   pip_value = (0.01 / rate) × 100,000
+//   USD-base non-JPY (USD/CAD, USD/CHF):
+//       pip = 0.0001, pip_value = (0.0001 / rate) × 100,000
+//   Cross pair  (EUR/GBP, AUD/NZD…):
+//       requires a live USD-conversion of the quote currency. We
+//       approximate via the entry-price formula and surface a note.
 function calc_pipSize(entry, pairType) {
-  // JPY pairs use 0.01, everything else 0.0001 — detected by entry magnitude.
-  // For safety also consider explicit USD/JPY-ish entries.
+  if (pairType === 'jpy') return 0.01;
+  // entry-magnitude backstop catches users who picked usd_base for USDJPY
   return entry > 20 ? 0.01 : 0.0001;
 }
 function calc_pipValuePer1Lot(pairType, entry) {
-  // Returns approximate pip value in $ for 1.00 standard lot (100k units)
-  if (pairType === 'usd_quote') return 10;        // EUR/USD etc — exact $10/pip
-  if (pairType === 'usd_base')  return 100000 * (entry > 20 ? 0.01 : 0.0001) / entry;
-  // cross — approximation: same formula as usd_base
-  return 100000 * (entry > 20 ? 0.01 : 0.0001) / entry;
+  if (pairType === 'usd_quote') return 10;                    // exact
+  if (pairType === 'jpy')       return (0.01   / entry) * 100000;
+  if (pairType === 'usd_base')  return (0.0001 / entry) * 100000;
+  // cross — approximation using the entry price as a proxy for quote→USD
+  return (calc_pipSize(entry, pairType) / entry) * 100000;
 }
 
 function calc_fmtMoney(n) { if (!isFinite(n)) return '—'; return (n >= 0 ? '+$' : '-$') + Math.abs(n).toFixed(2); }
@@ -11751,9 +11812,10 @@ function calc_calcForex() {
   // Pair type note
   const note = document.getElementById('calc_fxNote');
   const notes = {
-    'usd_quote': 'USD-quote pairs have an exact $10 per pip per standard lot.',
-    'usd_base':  'USD-base pairs have a variable pip value — recalculated using current entry price.',
-    'cross':     'Cross pairs use the entry-price approximation. Verify in your broker for the exact value.',
+    'usd_quote': 'USD-quote pairs (EUR/USD, GBP/USD…): pip value is a fixed $10 per standard lot.',
+    'jpy':       'JPY pairs use 0.01 pip size. Pip value = (0.01 / rate) × 100,000. Recomputes with entry price.',
+    'usd_base':  'USD-base non-JPY pairs (USD/CAD, USD/CHF): pip value = (0.0001 / rate) × 100,000.',
+    'cross':     'Cross pair pip values are approximate — they require a live USD-conversion of the quote currency. Verify in your broker for the exact value.',
   };
   note.textContent = notes[pairType] || '';
 }

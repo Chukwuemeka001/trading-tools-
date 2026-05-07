@@ -241,9 +241,10 @@
       <div class="field">
         <label>Pair Type</label>
         <select id="pairType">
-          <option value="usd_quote">USD Quote — EUR/USD, GBP/USD, AUD/USD…</option>
-          <option value="usd_base">USD Base — USD/JPY, USD/CAD, USD/CHF…</option>
-          <option value="cross">Cross Pair — EUR/GBP, GBP/JPY, EUR/JPY…</option>
+          <option value="usd_quote">USD Quote — EUR/USD, GBP/USD, AUD/USD, NZD/USD…</option>
+          <option value="jpy">JPY Quote — USD/JPY, GBP/JPY, EUR/JPY…</option>
+          <option value="usd_base">USD Base — USD/CAD, USD/CHF (non-JPY)…</option>
+          <option value="cross">Cross Pair — EUR/GBP, AUD/NZD, EUR/CHF… (approximate)</option>
         </select>
       </div>
       <div id="fxNote" class="info-note"></div>
@@ -734,8 +735,16 @@
   }
 
   // ── Forex pip helpers ────────────────────────────────────
+  // Pip-value math matches Myfxbook / Babypips / FXCM standard.
+  //   usd_quote (EUR/USD, GBP/USD): fixed $10/std lot
+  //   jpy       (USD/JPY, GBP/JPY): pip 0.01 → (0.01 / rate) × 100,000
+  //   usd_base  (USD/CAD, USD/CHF): pip 0.0001 → (0.0001 / rate) × 100,000
+  //   cross     (EUR/GBP etc):       approximate — requires live USD conv
   function fxPipValue(pairType, price) {
     if (pairType === 'usd_quote') return 10;
+    if (pairType === 'jpy')       return (0.01   / price) * 100000;
+    if (pairType === 'usd_base')  return (0.0001 / price) * 100000;
+    // cross — approximation; entry-magnitude backstop catches JPY crosses
     const pipSize = price > 20 ? 0.01 : 0.0001;
     return (pipSize / price) * 100000;
   }
@@ -882,8 +891,9 @@
 
     const notes = {
       usd_quote: 'EUR/USD, GBP/USD etc. — pip value fixed $10/std lot (100k units)',
-      usd_base:  'USD/JPY, USD/CAD etc. — pip value = pip size ÷ price × 100,000',
-      cross:     'EUR/GBP, GBP/JPY etc. — pip value approximated via exchange rate'
+      jpy:       'USD/JPY, GBP/JPY etc. — pip 0.01, value = (0.01 / rate) × 100,000',
+      usd_base:  'USD/CAD, USD/CHF etc. — pip 0.0001, value = (0.0001 / rate) × 100,000',
+      cross:     'EUR/GBP, AUD/NZD etc. — pip value approximate (requires live USD conversion)'
     };
     document.getElementById('fxNote').textContent = notes[pairType];
 
