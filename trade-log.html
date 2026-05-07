@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trade Journal</title>
+  <meta name="build-id" content="phase7-2026-05-07">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -821,6 +822,52 @@
     .alert-actions button:hover { color: #e6edf3; border-color: #8b949e; }
     .alert-actions button.rearm { color: #58a6ff; border-color: #58a6ff; }
     .alert-actions button.del { color: #f85149; border-color: #f85149; }
+
+    /* ── Phase 7 alerts redesign ───────────────────────── */
+    .al-price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media(max-width:540px){ .al-price-grid { grid-template-columns: 1fr; } }
+    .al-price-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--s2); border: 1px solid var(--border); border-left: 3px solid var(--orange); border-radius: 10px; }
+    .al-price-card.eth { border-left-color: var(--blue); }
+    .al-price-icon { font-size: 1.5rem; }
+    .al-price-sym { font-size: 0.7rem; color: var(--t2); font-weight: 600; letter-spacing: 0.04em; }
+    .al-price-val { font-size: 1.4rem; font-weight: 700; color: var(--t1); font-family: var(--mono); }
+    .al-zone-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .al-zone-pill { padding: 6px 12px; border-radius: 16px; border: 1px solid; background: transparent; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 0.12s; user-select: none; }
+    .al-zone-pill.grey   { color: #9ca3af; border-color: rgba(107,114,128,0.40); }
+    .al-zone-pill.amber  { color: var(--amber); border-color: rgba(245,158,11,0.40); }
+    .al-zone-pill.blue   { color: var(--blue);  border-color: rgba(59,130,246,0.40); }
+    .al-zone-pill.purple { color: var(--purple);border-color: rgba(168,85,247,0.40); }
+    .al-zone-pill.green  { color: var(--green); border-color: rgba(34,197,94,0.40); }
+    .al-zone-pill.teal   { color: #14b8a6;      border-color: rgba(20,184,166,0.40); }
+    .al-zone-pill.red    { color: var(--red);   border-color: rgba(239,68,68,0.40); }
+    .al-zone-pill.muted  { color: var(--t3);    border-color: var(--border); }
+    .al-zone-pill.active { background: currentColor; }
+    .al-zone-pill.active.grey  { color:#fff; background:#6b7280; }
+    .al-zone-pill.active.amber { color:#1f1200; background:var(--amber); }
+    .al-zone-pill.active.blue  { color:#fff; background:var(--blue); }
+    .al-zone-pill.active.purple{ color:#fff; background:var(--purple); }
+    .al-zone-pill.active.green { color:#0d1f0d; background:var(--green); }
+    .al-zone-pill.active.teal  { color:#fff; background:#14b8a6; }
+    .al-zone-pill.active.red   { color:#fff; background:var(--red); }
+    .al-zone-pill.active.muted { color:var(--t1); background:var(--s4); }
+    .al-dir-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 0; background: var(--s1); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .al-dir-btn { padding: 10px; font-size: 0.82rem; font-weight: 600; border: none; cursor: pointer; background: transparent; color: var(--t2); transition: all 0.15s; }
+    .al-dir-btn .al-dir-sub { font-weight: 400; font-size: 0.65rem; color: inherit; opacity: 0.65; margin-left: 4px; }
+    .al-dir-btn.above.active { background: rgba(239,68,68,0.10); color: var(--red); }
+    .al-dir-btn.below.active { background: rgba(34,197,94,0.10); color: var(--green); }
+    .al-zone-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.66rem; font-weight: 600; letter-spacing: 0.02em; }
+    .al-zone-tag.grey   { background: rgba(107,114,128,0.15); color: #9ca3af; }
+    .al-zone-tag.amber  { background: rgba(245,158,11,0.15); color: var(--amber); }
+    .al-zone-tag.blue   { background: rgba(59,130,246,0.15); color: var(--blue); }
+    .al-zone-tag.purple { background: rgba(168,85,247,0.15); color: var(--purple); }
+    .al-zone-tag.green  { background: rgba(34,197,94,0.15);  color: var(--green); }
+    .al-zone-tag.teal   { background: rgba(20,184,166,0.15); color: #14b8a6; }
+    .al-zone-tag.red    { background: rgba(239,68,68,0.15);  color: var(--red); }
+    .al-zone-tag.muted  { background: var(--s3); color: var(--t2); }
+    .al-row-dist.far    { color: var(--t3); }
+    .al-row-dist.near   { color: var(--amber); }
+    .al-row-dist.close  { color: var(--red); font-weight: 700; animation: alFlash 1s infinite; }
+    @keyframes alFlash { 0%,100%{opacity:1;} 50%{opacity:0.55;} }
 
     /* AI Second Opinion */
     .ai-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
@@ -2337,114 +2384,99 @@
 ════════════════════════════════════════════════════════ -->
 <div id="page-alerts" class="page">
 
-  <!-- Backend URL config -->
+  <!-- Section 1: Live prices ─── BTCUSDT + ETHUSDT side-by-side -->
   <div class="card">
-    <div class="card-title">Backend Connection</div>
-    <div class="backend-cfg">
-      <input type="text" class="form-input" id="backendUrl" placeholder="https://your-app.onrender.com" style="font-size:0.8rem;">
-      <button class="btn btn-primary" onclick="saveBackendUrl()" style="padding:7px 12px; font-size:0.78rem;">Save</button>
-      <span id="backendStatus" style="font-size:0.72rem; color:#8b949e;"></span>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+      <div class="card-title" style="margin:0;">Live Prices</div>
+      <span id="al_priceUpdated" style="font-size:0.68rem; color:#6e7681;">—</span>
+    </div>
+    <div class="al-price-grid">
+      <div class="al-price-card btc">
+        <div class="al-price-icon">🟠</div>
+        <div>
+          <div class="al-price-sym">BTCUSDT</div>
+          <div class="al-price-val" id="al_btcPrice">—</div>
+        </div>
+      </div>
+      <div class="al-price-card eth">
+        <div class="al-price-icon">🔵</div>
+        <div>
+          <div class="al-price-sym">ETHUSDT</div>
+          <div class="al-price-val" id="al_ethPrice">—</div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Add Alert Form -->
+  <!-- Section 2: Add price alert -->
   <div class="card">
     <div class="card-title">Add Price Alert</div>
     <div class="alert-form-grid">
       <div>
         <label class="form-label">Symbol</label>
-        <input type="text" class="form-input" id="al_symbol" value="BTCUSDT" placeholder="BTCUSDT">
+        <select class="form-input" id="al_symbolSelect" onchange="alertOnSymbolChange()">
+          <option value="BTCUSDT" selected>BTCUSDT</option>
+          <option value="ETHUSDT">ETHUSDT</option>
+          <option value="EURUSD">EURUSD</option>
+          <option value="__other__">Other…</option>
+        </select>
+        <input type="text" class="form-input" id="al_symbolOther" placeholder="e.g. SOLUSDT" style="margin-top:6px; display:none;">
       </div>
       <div>
         <label class="form-label">Price Level</label>
-        <input type="number" class="form-input" id="al_price" placeholder="e.g. 65800" step="any">
-      </div>
-      <div>
-        <label class="form-label">Label / Zone Type</label>
-        <select class="form-input" id="al_label">
-          <option value="SC Zone">SC Zone</option>
-          <option value="$$ Secondary liquidity">$$ Secondary liquidity</option>
-          <option value="$$ Primary liquidity">$$ Primary liquidity</option>
-          <option value="mbms area">mbms area</option>
-          <option value="BOS level">BOS level</option>
-          <option value="MBOS level">MBOS level</option>
-          <option value="Structural low">Structural low</option>
-          <option value="Structural high">Structural high</option>
-          <option value="Custom">Custom</option>
-        </select>
-      </div>
-      <div>
-        <label class="form-label">Direction</label>
-        <select class="form-input" id="al_direction">
-          <option value="crosses_below">Price crosses below (looking for buys)</option>
-          <option value="crosses_above">Price crosses above (looking for sells)</option>
-        </select>
+        <input type="number" class="form-input" id="al_price" placeholder="e.g. 81500" step="any">
       </div>
     </div>
-    <div id="al_customWrap" style="display:none; margin-top:10px;">
-      <label class="form-label">Custom Label</label>
-      <input type="text" class="form-input" id="al_customLabel" placeholder="Your label…">
+
+    <label class="form-label" style="margin-top:14px;">Zone Type</label>
+    <div class="al-zone-pills" id="al_zonePills">
+      <button type="button" class="al-zone-pill grey   active" data-zone="SC Zone"        onclick="alertSetZone(this)">SC Zone</button>
+      <button type="button" class="al-zone-pill amber"        data-zone="$$ Liquidity"   onclick="alertSetZone(this)">$$ Liquidity</button>
+      <button type="button" class="al-zone-pill blue"         data-zone="BOS Level"      onclick="alertSetZone(this)">BOS Level</button>
+      <button type="button" class="al-zone-pill purple"       data-zone="mbms Area"      onclick="alertSetZone(this)">mbms Area</button>
+      <button type="button" class="al-zone-pill green"        data-zone="Primary POI"    onclick="alertSetZone(this)">Primary POI</button>
+      <button type="button" class="al-zone-pill teal"         data-zone="Secondary POI"  onclick="alertSetZone(this)">Secondary POI</button>
+      <button type="button" class="al-zone-pill red"          data-zone="MBOS Level"     onclick="alertSetZone(this)">MBOS Level</button>
+      <button type="button" class="al-zone-pill muted"        data-zone="Custom"         onclick="alertSetZone(this)">Custom</button>
     </div>
-    <div style="margin-top:12px;">
-      <button class="btn btn-primary" onclick="addAlert()">Save Alert</button>
+    <input type="text" class="form-input" id="al_customLabel" placeholder="Custom label…" style="margin-top:8px; display:none;">
+
+    <label class="form-label" style="margin-top:14px;">Direction</label>
+    <div class="al-dir-toggle">
+      <button type="button" class="al-dir-btn above active" id="al_dirAbove" onclick="alertSetDir('crosses_above')">▲ Crosses Above <span class="al-dir-sub">(sells)</span></button>
+      <button type="button" class="al-dir-btn below"        id="al_dirBelow" onclick="alertSetDir('crosses_below')">▼ Crosses Below <span class="al-dir-sub">(buys)</span></button>
+    </div>
+
+    <label class="form-label" style="margin-top:14px;">Notes <span style="color:#6e7681; text-transform:none; font-weight:400; font-size:0.7rem;">(optional)</span></label>
+    <input type="text" class="form-input" id="al_notes" placeholder='e.g. "Daily SC zone"'>
+
+    <div style="margin-top:14px;">
+      <button class="btn btn-primary" onclick="addAlert()">+ Add Alert</button>
     </div>
   </div>
 
-  <!-- Current Price -->
-  <div class="card" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-    <div>
-      <span style="font-size:0.72rem; color:#8b949e; text-transform:uppercase; letter-spacing:0.6px;">BTCUSDT Live Price</span>
-      <div id="livePrice" style="font-size:1.3rem; font-weight:700; margin-top:2px;">—</div>
-    </div>
-    <button class="btn btn-ghost" onclick="refreshAlertPrice()" style="padding:5px 10px; font-size:0.75rem;">Refresh</button>
-  </div>
-
-  <!-- Alert List -->
+  <!-- Section 3: Active alerts -->
   <div class="card">
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-      <div class="card-title" style="margin:0;">Your Alerts</div>
-      <button class="btn btn-ghost" onclick="loadAlerts()" style="padding:4px 10px; font-size:0.72rem;">Reload</button>
+      <div class="card-title" style="margin:0;">Your Active Alerts</div>
+      <button class="btn btn-ghost" onclick="loadAlerts()" style="padding:4px 10px; font-size:0.72rem;">↻ Reload</button>
     </div>
     <div id="alertListWrap">
-      <div style="color:#6e7681; font-size:0.82rem;">Connect backend to see alerts.</div>
+      <div style="color:#6e7681; font-size:0.82rem;">Loading…</div>
     </div>
   </div>
 
-  <!-- AI Second Opinion -->
+  <!-- Section 4: Alert history (collapsible, default closed) -->
   <div class="card">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-      <div class="card-title" style="margin:0;">&#129302; AI Second Opinion</div>
+    <div onclick="alertsToggleHistory()" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none;">
+      <div class="card-title" style="margin:0;">Alert History <span id="al_histCount" style="color:#6e7681; font-weight:400; text-transform:none; font-size:0.72rem; letter-spacing:normal; margin-left:6px;"></span></div>
+      <span id="al_histArrow" style="color:#8b949e; font-size:0.85rem;">▶</span>
     </div>
-    <div style="font-size:0.72rem; color:#6e7681; margin-bottom:12px; line-height:1.5; padding:8px 10px; border:1px solid #21262d; border-radius:6px; background:#0d1117;">
-      This is a <strong style="color:#d2a8ff;">second opinion</strong> based on your trading system rules. <strong style="color:#e6edf3;">Your analysis and judgment always takes priority.</strong>
+    <div id="al_historyWrap" style="display:none; margin-top:12px;">
+      <div style="color:#6e7681; font-size:0.82rem;">No triggered alerts yet.</div>
     </div>
-
-    <div class="alert-form-grid" style="margin-bottom:12px;">
-      <div>
-        <label class="form-label">Symbol</label>
-        <input type="text" class="form-input" id="ai_symbol" value="BTCUSDT">
-      </div>
-      <div>
-        <label class="form-label">Timeframe</label>
-        <select class="form-input" id="ai_tf">
-          <option value="1M">Monthly</option>
-          <option value="1W">Weekly</option>
-          <option value="1D" selected>Daily</option>
-          <option value="4H">4H</option>
-          <option value="1H">1H</option>
-          <option value="30min">30min</option>
-          <option value="15min">15min</option>
-          <option value="5min">5min</option>
-          <option value="3min">3min</option>
-        </select>
-      </div>
-    </div>
-    <button class="btn btn-primary" onclick="requestAILevels()" id="aiBtn" style="margin-bottom:14px;">
-      &#129302; Analyze with Your Framework
-    </button>
-
-    <div id="aiResults"></div>
   </div>
+
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
@@ -3001,7 +3033,11 @@
   <div class="modal" id="modalBox">
     <div class="modal-header">
       <h2 id="modalTitle">Trade Detail</h2>
-      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <!-- Phase 7 — AI Second Opinion lives here now. openModal() wires the click. -->
+        <button id="modalAIBtn" onclick="openModalAIAnalysis()" style="padding:6px 12px; font-size:0.74rem; background:rgba(168,85,247,0.10); color:var(--purple); border:1px solid rgba(168,85,247,0.30); border-radius:6px; cursor:pointer; font-weight:600;">🧠 AI Analysis</button>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
     </div>
     <div class="modal-body" id="modalBody"></div>
   </div>
@@ -5165,11 +5201,14 @@ function renderJournal() {
 // MODAL
 // ═══════════════════════════════════════════════════════
 let modalRating = 0;
+// Phase 7 — currently-open trade for the modal AI Analysis button. Cleared on close.
+var _modalActiveTrade = null;
 let modalExecRating = 5;
 
 function openModal(id, opts) {
   const t = trades.find(x => x.id === id);
   if (!t) return;
+  _modalActiveTrade = t;  // Phase 7 — remembered for the AI Analysis button
   const focusReview = !!(opts && opts.focusReview);
   modalRating = t.rating || 0;
   modalExecRating = t.executionRating || 5;
@@ -6389,7 +6428,38 @@ function deleteTrade(id) {
   renderJournal();
 }
 
-function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  _modalActiveTrade = null;
+}
+
+// Phase 7 — AI Second Opinion from the trade-detail modal.
+// Reuses the existing requestAILevels() flow but targets a result wrap
+// injected at the bottom of the trade-detail body, with symbol + timeframe
+// pre-filled from the active trade. The standalone alerts-tab AI flow is gone;
+// helpers requestAILevels() / renderAIComparison() / addAILevel() stay live.
+function openModalAIAnalysis() {
+  const t = _modalActiveTrade;
+  if (!t) { alert('No trade loaded.'); return; }
+  const body = document.getElementById('modalBody');
+  if (!body) return;
+  // Map the trade's timeframe (M15, H1, etc) onto the /ai-levels API shape (15min, 1H).
+  const tfMap = { 'M1':'1min','M5':'5min','M15':'15min','M30':'30min','H1':'1H','H4':'4H','D1':'1D','W1':'1W','MN':'1M','MN1':'1M' };
+  const tf = tfMap[(t.timeframe || '').toUpperCase()] || '1D';
+  // Inject the result wrap once; subsequent clicks just reuse it.
+  let wrap = document.getElementById('modalAIResults');
+  if (!wrap) {
+    body.insertAdjacentHTML('beforeend',
+      '<hr class="section-divider" style="margin-top:18px;">' +
+      '<div class="card-title" style="display:flex;align-items:center;gap:8px;">\u{1F9E0} AI Second Opinion <span style="font-weight:400;color:var(--t3);font-size:0.7rem;">(' + escHtml(t.pair || '') + ' · ' + escHtml(tf) + ')</span></div>' +
+      '<div style="font-size:0.72rem; color:var(--t3); margin-bottom:10px; padding:8px 10px; border:1px solid var(--border); border-radius:6px; background:var(--s1);">Second opinion based on your trading system rules. <strong style="color:var(--t1);">Your analysis and judgment always takes priority.</strong></div>' +
+      '<div id="modalAIResults"></div>'
+    );
+    wrap = document.getElementById('modalAIResults');
+  }
+  if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  requestAILevels({ symbol: t.pair, timeframe: tf, btnId: 'modalAIBtn', wrapId: 'modalAIResults' });
+}
 function maybeCloseModal(e) { if (e.target === document.getElementById('modalOverlay')) closeModal(); }
 
 // ── MT5 Execution Pipeline ────────────────────────────
@@ -10072,19 +10142,74 @@ function saveBackendUrl() {
 // ════════════════════════════════════════════════════════════════════
 // SECTION: ALERTS & PRICE MONITORING
 // ════════════════════════════════════════════════════════════════════
+// Phase 7 — talks to the existing backend at /alerts + /price/multi.
+// Backend URL is configured in Settings → Connections (no separate
+// per-tab config). All alert state lives in the backend's Gist.
+
+var _alertLivePrices = {};
+var _alertPriceTimer = null;
+var _alertSelectedZone = 'SC Zone';
+var _alertSelectedDir  = 'crosses_above';
+
+const AL_ZONE_COLOR = {
+  'SC Zone':       'grey',
+  '$$ Liquidity':  'amber',
+  'BOS Level':     'blue',
+  'mbms Area':     'purple',
+  'Primary POI':   'green',
+  'Secondary POI': 'teal',
+  'MBOS Level':    'red',
+  'Custom':        'muted',
+};
+function alertZoneColor(zone) { return AL_ZONE_COLOR[zone] || 'muted'; }
+
 function initAlerts() {
-  const url = getBackendUrl();
-  document.getElementById('backendUrl').value = url;
-  // Toggle custom label
-  document.getElementById('al_label').onchange = function() {
-    document.getElementById('al_customWrap').style.display = this.value === 'Custom' ? 'block' : 'none';
-  };
-  if (url) { loadAlerts(); refreshAlertPrice(); }
+  if (!getBackendUrl()) {
+    const w = document.getElementById('alertListWrap');
+    if (w) w.innerHTML = '<div style="color:#f0883e; font-size:0.82rem;">Set the backend URL in Settings → Connections to use alerts.</div>';
+    return;
+  }
+  loadAlerts();
+  refreshAlertPrices();
+  if (!_alertPriceTimer) _alertPriceTimer = setInterval(refreshAlertPrices, 30000);
+}
+
+function alertSetZone(btn) {
+  _alertSelectedZone = btn.dataset.zone;
+  document.querySelectorAll('#al_zonePills .al-zone-pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  const custom = document.getElementById('al_customLabel');
+  if (custom) custom.style.display = (_alertSelectedZone === 'Custom') ? '' : 'none';
+}
+
+function alertSetDir(dir) {
+  _alertSelectedDir = dir;
+  document.getElementById('al_dirAbove').classList.toggle('active', dir === 'crosses_above');
+  document.getElementById('al_dirBelow').classList.toggle('active', dir === 'crosses_below');
+}
+
+function alertOnSymbolChange() {
+  const sel = document.getElementById('al_symbolSelect').value;
+  document.getElementById('al_symbolOther').style.display = (sel === '__other__') ? '' : 'none';
+}
+
+function alertCurrentSymbol() {
+  const sel = document.getElementById('al_symbolSelect').value;
+  if (sel === '__other__') return (document.getElementById('al_symbolOther').value || '').trim().toUpperCase();
+  return sel;
+}
+
+function alertsToggleHistory() {
+  const wrap  = document.getElementById('al_historyWrap');
+  const arrow = document.getElementById('al_histArrow');
+  const open  = wrap.style.display !== 'none';
+  wrap.style.display = open ? 'none' : '';
+  arrow.textContent  = open ? '▶' : '▼';
 }
 
 async function apiCall(method, path, body) {
   const url = getBackendUrl();
-  if (!url) { alert('Set your backend URL first.'); return null; }
+  if (!url) { alert('Set your backend URL in Settings → Connections first.'); return null; }
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(url + path, opts);
@@ -10097,49 +10222,115 @@ async function loadAlerts() {
   try {
     alertsCache = await apiCall('GET', '/alerts') || [];
     renderAlertList();
+    renderAlertHistory();
   } catch (e) {
     wrap.innerHTML = '<div style="color:#f85149; font-size:0.8rem;">Failed to load: ' + escHtml(e.message) + '</div>';
   }
 }
 
-async function refreshAlertPrice() {
+async function refreshAlertPrices() {
   try {
-    const d = await apiCall('GET', '/price/BTCUSDT');
-    if (d) {
-      alertPrice = d.price;
-      document.getElementById('livePrice').textContent = '$' + Number(d.price).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-      renderAlertList(); // update distances
+    // Always include BTC + ETH for the live-price cards. Add every active
+    // alert symbol so distance is correct for any pair.
+    const wanted = new Set(['BTCUSDT', 'ETHUSDT']);
+    (alertsCache || []).forEach(a => { if (a.symbol) wanted.add(String(a.symbol).toUpperCase()); });
+    const qs = encodeURIComponent(Array.from(wanted).join(','));
+    const d  = await apiCall('GET', '/price/multi?symbols=' + qs);
+    if (d && d.prices) {
+      _alertLivePrices = d.prices;
+      alertPrice = d.prices.BTCUSDT || alertPrice;     // back-compat for old callers
+      const fmt = v => (v == null ? '—' : '$' + Number(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}));
+      const btcEl = document.getElementById('al_btcPrice'); if (btcEl) btcEl.textContent = fmt(d.prices.BTCUSDT);
+      const ethEl = document.getElementById('al_ethPrice'); if (ethEl) ethEl.textContent = fmt(d.prices.ETHUSDT);
+      const ts = document.getElementById('al_priceUpdated');
+      if (ts) ts.textContent = 'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      renderAlertList();
     }
-  } catch { /* silent */ }
+  } catch { /* silent — keep last good price */ }
+}
+
+// Back-compat shim — anything that still calls refreshAlertPrice() works.
+async function refreshAlertPrice() { return refreshAlertPrices(); }
+
+function _alertDistance(a) {
+  const live = _alertLivePrices[(a.symbol || '').toUpperCase()];
+  if (!live || !a.price) return null;
+  const dollars = live - a.price;
+  const pct     = (dollars / a.price) * 100;
+  const absPct  = Math.abs(pct);
+  let cls = 'far';
+  if (absPct < 1) cls = 'close';
+  else if (absPct < 2) cls = 'near';
+  return { abs: Math.abs(dollars), dollars, pct, cls };
 }
 
 function renderAlertList() {
   const wrap = document.getElementById('alertListWrap');
-  if (!alertsCache.length) {
-    wrap.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">No alerts yet. Add one above.</div>';
+  if (!wrap) return;
+  const active = (alertsCache || []).filter(a => !a.triggered);
+  if (!active.length) {
+    wrap.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">No active alerts. Add one above.</div>';
     return;
   }
-  let html = '<table class="alert-table"><thead><tr><th>Symbol</th><th>Price</th><th>Label</th><th>Direction</th><th>Status</th><th>Distance</th><th></th></tr></thead><tbody>';
-  alertsCache.forEach(a => {
-    const statusCls = a.triggered ? 'triggered' : (a.active ? 'active' : 'disabled');
-    const statusIcon = a.triggered ? '\uD83D\uDD34' : (a.active ? '\uD83D\uDFE2' : '\u26AB');
-    const statusText = a.triggered ? 'Triggered' : (a.active ? 'Active' : 'Disabled');
-    let dist = '—';
-    if (alertPrice && a.active && !a.triggered) {
-      const d = ((alertPrice - a.price) / a.price * 100);
-      dist = (d >= 0 ? '+' : '') + d.toFixed(2) + '%';
+  // Sort by distance: closest first; missing-price alerts to the bottom.
+  const decorated = active.map(a => ({ a, d: _alertDistance(a) }));
+  decorated.sort((x, y) => {
+    if (x.d == null && y.d == null) return 0;
+    if (x.d == null) return 1;
+    if (y.d == null) return -1;
+    return Math.abs(x.d.pct) - Math.abs(y.d.pct);
+  });
+
+  let html = '<table class="alert-table"><thead><tr><th>Symbol</th><th>Zone</th><th>Level</th><th>Direction</th><th>Distance</th><th>Notes</th><th></th></tr></thead><tbody>';
+  decorated.forEach(({ a, d }) => {
+    const zone   = a.zone_type || a.label || 'Custom';
+    const zCls   = alertZoneColor(zone);
+    const dirArr = a.direction === 'crosses_below' ? '\u25BC' : '\u25B2';
+    const dirCol = a.direction === 'crosses_below' ? 'var(--green)' : 'var(--red)';
+    let distHtml = '<span class="al-row-dist far">\u2014</span>';
+    if (d) {
+      const sign = d.dollars >= 0 ? '+' : '\u2212';
+      distHtml = '<span class="al-row-dist ' + d.cls + '">$' + d.abs.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' away \u00B7 ' + sign + Math.abs(d.pct).toFixed(2) + '%</span>';
     }
-    const dirText = a.direction === 'crosses_below' ? '\u2193 Below' : '\u2191 Above';
-    let actions = '<button class="del" onclick="deleteAlert(\'' + a.id + '\')">\u2717</button>';
-    if (a.triggered) actions = '<button class="rearm" onclick="rearmAlert(\'' + a.id + '\')">Re-arm</button>' + actions;
     html += '<tr>';
-    html += '<td>' + escHtml(a.symbol) + '</td>';
-    html += '<td style="font-weight:600;">$' + Number(a.price).toLocaleString() + '</td>';
-    html += '<td>' + escHtml(a.label) + '</td>';
-    html += '<td>' + dirText + '</td>';
-    html += '<td><span class="alert-status ' + statusCls + '">' + statusIcon + ' ' + statusText + '</span></td>';
-    html += '<td class="alert-dist">' + dist + '</td>';
-    html += '<td><div class="alert-actions">' + actions + '</div></td>';
+    html += '<td style="font-weight:600;">' + escHtml(a.symbol) + '</td>';
+    html += '<td><span class="al-zone-tag ' + zCls + '">' + escHtml(zone) + '</span></td>';
+    html += '<td style="font-family:var(--mono); font-weight:600;">$' + Number(a.price).toLocaleString() + '</td>';
+    html += '<td style="color:' + dirCol + '; font-weight:600;">' + dirArr + ' ' + (a.direction === 'crosses_below' ? 'Below' : 'Above') + '</td>';
+    html += '<td>' + distHtml + '</td>';
+    html += '<td style="color:var(--t2); font-size:0.74rem;">' + escHtml(a.notes || '') + '</td>';
+    html += '<td><div class="alert-actions"><button class="del" onclick="deleteAlert(\'' + a.id + '\')" title="Delete">\u{1F5D1}</button></div></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function renderAlertHistory() {
+  const wrap = document.getElementById('al_historyWrap');
+  const cnt  = document.getElementById('al_histCount');
+  if (!wrap) return;
+  const triggered = (alertsCache || []).filter(a => a.triggered)
+    .sort((x, y) => new Date(y.triggered_at || 0) - new Date(x.triggered_at || 0))
+    .slice(0, 20);
+  if (cnt) cnt.textContent = triggered.length ? '(' + triggered.length + ')' : '';
+  if (!triggered.length) {
+    wrap.innerHTML = '<div style="color:#6e7681; font-size:0.82rem;">No triggered alerts yet.</div>';
+    return;
+  }
+  let html = '<table class="alert-table"><thead><tr><th>When</th><th>Symbol</th><th>Zone</th><th>Level</th><th>Crossed</th><th></th></tr></thead><tbody>';
+  triggered.forEach(a => {
+    const zone = a.zone_type || a.label || 'Custom';
+    const zCls = alertZoneColor(zone);
+    const when = a.triggered_at ? new Date(a.triggered_at).toLocaleString([], {dateStyle:'short', timeStyle:'short'}) : '\u2014';
+    const dir  = a.direction === 'crosses_below' ? '\u25BC Below' : '\u25B2 Above';
+    html += '<tr>';
+    html += '<td style="color:var(--t2); font-size:0.74rem;">' + escHtml(when) + '</td>';
+    html += '<td style="font-weight:600;">' + escHtml(a.symbol) + '</td>';
+    html += '<td><span class="al-zone-tag ' + zCls + '">' + escHtml(zone) + '</span></td>';
+    html += '<td style="font-family:var(--mono); font-weight:600;">$' + Number(a.price).toLocaleString() + '</td>';
+    html += '<td>' + dir + '</td>';
+    html += '<td><div class="alert-actions"><button class="rearm" onclick="rearmAlert(\'' + a.id + '\')">Re-arm</button><button class="del" onclick="deleteAlert(\'' + a.id + '\')">\u{1F5D1}</button></div></td>';
     html += '</tr>';
   });
   html += '</tbody></table>';
@@ -10147,18 +10338,22 @@ function renderAlertList() {
 }
 
 async function addAlert() {
-  const symbol = document.getElementById('al_symbol').value.trim().toUpperCase();
-  const price = parseFloat(document.getElementById('al_price').value);
-  let label = document.getElementById('al_label').value;
-  const direction = document.getElementById('al_direction').value;
-  if (label === 'Custom') label = document.getElementById('al_customLabel').value.trim() || 'Custom';
+  const symbol = alertCurrentSymbol();
+  const price  = parseFloat(document.getElementById('al_price').value);
+  let zone     = _alertSelectedZone;
+  if (zone === 'Custom') zone = (document.getElementById('al_customLabel').value || '').trim() || 'Custom';
+  const notes  = (document.getElementById('al_notes').value || '').trim();
+  const direction = _alertSelectedDir;
   if (!symbol || !price) { alert('Enter symbol and price.'); return; }
   try {
-    const a = await apiCall('POST', '/alerts', { symbol, price, label, direction });
+    const a = await apiCall('POST', '/alerts', { symbol, price, zone_type: zone, label: zone, direction, notes });
     if (a) {
       alertsCache.push(a);
       renderAlertList();
+      renderAlertHistory();
       document.getElementById('al_price').value = '';
+      document.getElementById('al_notes').value = '';
+      refreshAlertPrices();
     }
   } catch (e) { alert('Failed: ' + e.message); }
 }
@@ -10169,6 +10364,7 @@ async function deleteAlert(id) {
     await apiCall('DELETE', '/alerts/' + id);
     alertsCache = alertsCache.filter(a => a.id !== id);
     renderAlertList();
+    renderAlertHistory();
   } catch (e) { alert('Failed: ' + e.message); }
 }
 
@@ -10179,35 +10375,41 @@ async function rearmAlert(id) {
       const idx = alertsCache.findIndex(a => a.id === id);
       if (idx >= 0) alertsCache[idx] = updated;
       renderAlertList();
+      renderAlertHistory();
     }
   } catch (e) { alert('Failed: ' + e.message); }
 }
 
 // ── AI Second Opinion ──
-async function requestAILevels() {
-  const btn = document.getElementById('aiBtn');
-  const wrap = document.getElementById('aiResults');
-  const symbol = document.getElementById('ai_symbol').value.trim().toUpperCase();
-  const timeframe = document.getElementById('ai_tf').value;
+async function requestAILevels(opts) {
+  // Phase 7 — accepts optional { symbol, timeframe, btnId, wrapId } so the
+  // function works from the legacy alerts-tab form (nothing passed) AND from
+  // the trade-detail modal (explicit values passed via the modal button).
+  opts = opts || {};
+  const symbolInput = document.getElementById('ai_symbol');
+  const tfInput     = document.getElementById('ai_tf');
+  const symbol    = (opts.symbol    || (symbolInput && symbolInput.value) || 'BTCUSDT').trim().toUpperCase();
+  const timeframe = (opts.timeframe || (tfInput && tfInput.value)         || '1D');
+  const btn  = document.getElementById(opts.btnId  || 'aiBtn');
+  const wrap = document.getElementById(opts.wrapId || 'aiResults');
+  if (!wrap) { console.warn('requestAILevels: result wrapper not found'); return; }
 
-  btn.disabled = true;
-  btn.textContent = 'Analyzing…';
+  if (btn) { btn.disabled = true; btn.textContent = 'Analyzing…'; }
   wrap.innerHTML = '<div class="ai-spinner"><div class="spin"></div><div style="margin-top:10px;">Analyzing ' + escHtml(symbol) + ' ' + escHtml(timeframe) + ' with your framework…</div></div>';
 
   try {
     const data = await apiCall('POST', '/ai-levels', { symbol, timeframe, candle_limit: 200 });
     if (!data || !data.levels) throw new Error('No levels returned');
-    renderAIComparison(data.levels);
+    renderAIComparison(data.levels, opts.wrapId || 'aiResults');
   } catch (e) {
     wrap.innerHTML = '<div style="color:#f85149; font-size:0.82rem;">AI analysis failed: ' + escHtml(e.message) + '</div>';
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = '\uD83E\uDD16 Analyze with Your Framework';
+    if (btn) { btn.disabled = false; btn.innerHTML = '\uD83E\uDD16 Analyze with Your Framework'; }
   }
 }
 
-function renderAIComparison(aiLevels) {
-  const wrap = document.getElementById('aiResults');
+function renderAIComparison(aiLevels, wrapId) {
+  const wrap = document.getElementById(wrapId || 'aiResults');
   const userAlerts = alertsCache.filter(a => a.active);
 
   // Compare: within 0.5% = agreement
