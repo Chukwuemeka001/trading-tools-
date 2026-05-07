@@ -1248,18 +1248,28 @@
     const setStatus = (msg, color) => { if (statusEl) { statusEl.textContent = msg; statusEl.style.color = color || '#8b949e'; } };
     if (!silent) setStatus('Pulling balance from Bitunix…', '#f7931a');
     try {
-      const res = await fetch(getBackendUrl() + '/bitunix/account', { mode: 'cors' });
+      // Public endpoint — exposes balance + connection state, no auth header.
+      const res = await fetch(getBackendUrl() + '/bitunix/exchange/status', { mode: 'cors' });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
-      // Backend returns shape like: { ok: true, balanceUsdt: 12345.67, ... } or
-      // { balance: 12345.67 } depending on version — try several common keys.
+      if (data?.api_key_set === false || data?.api_secret_set === false) {
+        if (!silent) setStatus('Backend keys not set on Render — see deploy docs.', '#f85149');
+        return null;
+      }
+      if (data?.disabled) {
+        if (!silent) setStatus('Bitunix disabled: ' + (data.last_error_msg || data.error || 'unknown'), '#f85149');
+        return null;
+      }
+      if (!data?.connected) {
+        if (!silent) setStatus('Bitunix not connected: ' + (data.last_error_msg || data.error || 'no sync yet'), '#f85149');
+        return null;
+      }
+      // Prefer available (free margin), fall back to total balance, then equity.
+      const candidates = [data?.available_usdt, data?.balance_usdt, data?.equity_usdt];
       let bal = null;
-      const candidates = [data?.balanceUsdt, data?.balance, data?.equity,
-                         data?.account?.balanceUsdt, data?.account?.balance,
-                         data?.totalEquity, data?.usdtBalance];
-      for (const c of candidates) { if (typeof c === 'number' && c > 0) { bal = c; break; } }
+      for (const c of candidates) { const n = Number(c); if (isFinite(n) && n > 0) { bal = n; break; } }
       if (bal == null) {
-        if (!silent) setStatus('No balance returned — check Bitunix Settings on the journal app.', '#f85149');
+        if (!silent) setStatus('No balance returned — Bitunix sync may not have run yet.', '#f85149');
         return null;
       }
       const capInput = document.getElementById('capital');

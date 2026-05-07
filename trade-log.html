@@ -9500,29 +9500,27 @@ async function updateBitunixDot() {
   };
 
   try {
-    const execKey = localStorage.getItem('tj_executionKey') || '';
-    // First: lightweight status check
+    // Single fetch — /bitunix/exchange/status is public and already carries
+    // balance + connection state. No exec key, no second /bitunix/account call.
     const statusResp = await fetch(url + '/bitunix/exchange/status', { mode: 'cors' });
     if (!statusResp.ok) { setDisconnected('HTTP ' + statusResp.status); return; }
     const status = await statusResp.json();
-    if (!status.configured || status.disabled) {
-      setDisconnected(status.error || (status.configured ? 'disabled' : 'not configured'));
-      return;
+    if (status.api_key_set === false || status.api_secret_set === false) {
+      setDisconnected('not configured'); return;
     }
-    // Configured + not disabled — pull balance for nav badge text
+    if (status.disabled) {
+      setDisconnected(status.last_error_msg || status.error || 'disabled'); return;
+    }
+    if (!status.connected) {
+      setDisconnected(status.last_error_msg || status.error || 'not connected'); return;
+    }
+    const bal = status.available_usdt ?? status.balance_usdt ?? status.equity_usdt ?? null;
     let balText = '';
-    if (execKey) {
-      try {
-        const acctResp = await fetch(url + '/bitunix/account', { mode: 'cors', headers: { 'X-Execution-Key': execKey } });
-        if (acctResp.ok) {
-          const a = await acctResp.json();
-          const bal = (a.balance && (a.balance.total ?? a.balance.equity ?? a.balance.available)) ?? a.equity ?? a.total ?? null;
-          if (bal != null) {
-            const n = Number(bal);
-            balText = ' · $' + (n >= 10000 ? Math.round(n).toLocaleString() : n.toFixed(2));
-          }
-        }
-      } catch {}
+    if (bal != null) {
+      const n = Number(bal);
+      if (isFinite(n) && n > 0) {
+        balText = ' · $' + (n >= 10000 ? Math.round(n).toLocaleString() : n.toFixed(2));
+      }
     }
     dot.className = 'bitunix-dot on';
     dot.style.background = 'rgba(247,147,26,0.18)';
@@ -9721,25 +9719,44 @@ async function refreshBitunixHealth() {
   panel.innerHTML = '<div style="color:#8b949e;font-size:0.78rem;">Checking…</div>';
 
   const execKey = localStorage.getItem('tj_executionKey') || '';
+
+  // Single fetch — both Bitunix rows derive from the same status payload.
+  // The endpoint is public (no exec key) and returns balance + connection
+  // state in one shot, so we don't double-call /bitunix/account.
+  let statusJson = null, statusErr = null;
+  try {
+    const r = await fetch(url + '/bitunix/exchange/status', { mode:'cors' });
+    if (!r.ok) statusErr = 'HTTP ' + r.status;
+    else statusJson = await r.json();
+  } catch (e) { statusErr = e.message; }
+
   const checks = [
     { label: 'Backend reachable', test: async () => {
       try { const r = await fetch(url + '/health', { mode:'cors' }); return { ok: r.ok, detail: r.ok ? '200' : 'HTTP ' + r.status }; }
       catch (e) { return { ok: false, detail: e.message }; }
     }},
-    { label: 'Bitunix configured', test: async () => {
-      try { const r = await fetch(url + '/bitunix/exchange/status', { mode:'cors' }); const j = await r.json();
-        if (!j.configured) return { ok: false, detail: 'Set BITUNIX_API_KEY/SECRET on Render' };
-        if (j.disabled)   return { ok: false, detail: j.error || 'disabled' };
-        return { ok: true, detail: 'reachable' };
-      } catch (e) { return { ok: false, detail: e.message }; }
+    { label: 'Bitunix connected', test: async () => {
+      if (statusErr)            return { ok: false, detail: statusErr };
+      if (!statusJson)          return { ok: false, detail: 'no response' };
+      // Backend env-vars not set?
+      if (statusJson.api_key_set === false || statusJson.api_secret_set === false) {
+        return { ok: false, detail: 'Set BITUNIX_API_KEY/SECRET on Render' };
+      }
+      // Auto-disable circuit breaker tripped — surface the actual reason
+      if (statusJson.disabled) {
+        return { ok: false, detail: statusJson.last_error_msg || statusJson.error || 'disabled' };
+      }
+      // Live-connected per the last sync loop
+      if (statusJson.connected) return { ok: true, detail: 'connected' };
+      // Not yet synced or last attempt failed — surface the last error if we have one
+      return { ok: false, detail: statusJson.last_error_msg || statusJson.error || 'not connected' };
     }},
-    { label: 'Account auth (balance)', test: async () => {
-      if (!execKey) return { ok: false, detail: 'No Execution API Key set' };
-      try { const r = await fetch(url + '/bitunix/account', { mode:'cors', headers: { 'X-Execution-Key': execKey } });
-        const j = await r.json(); if (!r.ok) return { ok: false, detail: j.error || ('HTTP ' + r.status) };
-        const bal = (j.balance && (j.balance.total ?? j.balance.equity ?? j.balance.available)) ?? null;
-        return { ok: true, detail: bal != null ? '$' + Number(bal).toFixed(2) : 'no balance field' };
-      } catch (e) { return { ok: false, detail: e.message }; }
+    { label: 'Account balance', test: async () => {
+      if (!statusJson)            return { ok: false, detail: statusErr || 'no response' };
+      if (!statusJson.connected)  return { ok: false, detail: 'not connected' };
+      const bal = statusJson.available_usdt ?? statusJson.balance_usdt ?? statusJson.equity_usdt ?? null;
+      if (bal == null || isNaN(Number(bal))) return { ok: false, detail: 'no balance field' };
+      return { ok: true, detail: '$' + Number(bal).toFixed(2) + ' USDT' };
     }},
     { label: 'Kill switch', test: async () => {
       if (!execKey) return { ok: false, detail: 'No Execution API Key set' };
@@ -11865,18 +11882,23 @@ async function calc_pullBitunixBalance() {
   status.textContent = 'Fetching balance…';
   status.style.color = 'var(--text-muted)';
   try {
-    const url    = (typeof getBackendUrl === 'function') ? getBackendUrl() : '';
-    const execKey= localStorage.getItem('tj_executionKey') || '';
-    if (!url || !execKey) {
-      status.textContent = '⚠ Set backend URL + Execution Key in Settings first';
+    const url = (typeof getBackendUrl === 'function') ? getBackendUrl() : '';
+    if (!url) {
+      status.textContent = '⚠ Set backend URL in Settings first';
       status.style.color = 'var(--red)';
       return;
     }
-    const r = await fetch(url + '/bitunix/account', { headers: { 'X-Execution-Key': execKey }, mode: 'cors' });
+    // Public endpoint — no exec key needed. Carries balance + state in one shot.
+    const r = await fetch(url + '/bitunix/exchange/status', { mode: 'cors' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    const a   = await r.json();
-    const bal = (a.balance && (a.balance.total ?? a.balance.equity ?? a.balance.available)) ?? a.equity ?? a.total ?? null;
-    if (bal == null) throw new Error('Balance not in response');
+    const s = await r.json();
+    if (s.api_key_set === false || s.api_secret_set === false) {
+      throw new Error('Backend keys not set on Render');
+    }
+    if (s.disabled)  throw new Error(s.last_error_msg || s.error || 'connection disabled');
+    if (!s.connected) throw new Error(s.last_error_msg || s.error || 'not connected');
+    const bal = s.available_usdt ?? s.balance_usdt ?? s.equity_usdt ?? null;
+    if (bal == null || isNaN(Number(bal))) throw new Error('Balance not in response');
     document.getElementById('calc_capital').value = Number(bal).toFixed(2);
     status.textContent = '✓ Pulled $' + Number(bal).toFixed(2) + ' from Bitunix';
     status.style.color = 'var(--green)';
