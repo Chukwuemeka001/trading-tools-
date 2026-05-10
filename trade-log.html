@@ -6700,7 +6700,7 @@ async function submitTradeApproval(tradeId) {
 }
 
 // ── Bitunix Approval ───────────────────────────────────────────────
-function approveForBitunix(tradeId) {
+async function approveForBitunix(tradeId) {
   const t = trades.find(x => x.id === tradeId);
   if (!t) return;
 
@@ -6736,13 +6736,35 @@ function approveForBitunix(tradeId) {
   const slPct = t.entry ? ((slDist / t.entry) * 100).toFixed(2) : '—';
   const tpPct = t.entry ? ((tpDist / t.entry) * 100).toFixed(2) : '—';
 
-  const capital = sett.profile.capital || 0;
+  // Phase 7.6 — fetch live Bitunix balance so the modal numbers match what
+  // the backend will use to size + validate. Falls back to settings.profile
+  // if Bitunix is unreachable; in that case the modal shows a warning so
+  // the user knows the displayed margin is an estimate.
+  let liveAvailable = null;
+  let balanceSource = 'settings';
+  try {
+    const sr = await _fetchBitunixStatus();
+    if (sr && sr.ok && sr.configured && sr.status && sr.status.connected) {
+      const a = sr.status.available_usdt ?? sr.status.balance_usdt;
+      if (a != null && Number(a) > 0) {
+        liveAvailable = Number(a);
+        balanceSource = 'bitunix_live';
+      }
+    }
+  } catch { /* fall through to settings.profile.capital */ }
+
+  const capital = liveAvailable != null ? liveAvailable : (sett.profile.capital || 0);
   const riskPct = sett.profile.riskPct || 1;
   const riskAmt = capital * (riskPct / 100);
   // Position size in BASE units (e.g. BTC) — matches backend formula
   const qtyEst = (slDist > 0 && riskAmt > 0) ? +(riskAmt / slDist).toFixed(4) : 0;
   const notional = qtyEst * t.entry;
   const requiredMargin = leverage > 0 ? (notional / leverage) : 0;
+  // 95% buffer matches the backend pre-flight check — leave room for funding
+  // accruals + minor slippage between approval and order acceptance.
+  const sufficientMargin = liveAvailable == null
+    ? null
+    : (requiredMargin <= liveAvailable * 0.95);
 
   let scoreWarning = '';
   if (sysScore < (exec.minScore || 6)) {
@@ -6751,11 +6773,32 @@ function approveForBitunix(tradeId) {
     </div>`;
   }
 
-  // Auto-execution shortcut (same rules as MT5 path)
+  // Auto-execution shortcut (same rules as MT5 path). Backend pre-flight
+  // still runs — if margin is insufficient, the response surfaces the error.
   if (exec.mode === 'autoAll' || (exec.mode === 'autoHigh' && sysScore >= (exec.minScore || 6))) {
     submitBitunixApproval(tradeId);
     return;
   }
+
+  // Phase 7.6 — sufficient/insufficient banner + Available row + disabled
+  // confirm button when live margin is short. Backend will hard-block too,
+  // but blocking in the UI saves a round-trip and explains the issue clearly.
+  const availableLabel = liveAvailable != null
+    ? `$${liveAvailable.toFixed(2)} <span style="color:#6e7681;font-size:0.7rem;">live · Bitunix</span>`
+    : `$${(sett.profile.capital || 0).toFixed(2)} <span style="color:#f0883e;font-size:0.7rem;">⚠ settings (Bitunix unreachable)</span>`;
+  let marginBanner = '';
+  if (sufficientMargin === true) {
+    marginBanner = `<div style="margin-top:10px;padding:9px 12px;background:#0e3a1e;border:1px solid #3fb950;border-radius:6px;color:#56d364;font-size:0.78rem;">✅ Sufficient margin — $${requiredMargin.toFixed(2)} needed, $${liveAvailable.toFixed(2)} available (95% safety buffer applied).</div>`;
+  } else if (sufficientMargin === false) {
+    const shortfall = (requiredMargin - liveAvailable).toFixed(2);
+    marginBanner = `<div style="margin-top:10px;padding:9px 12px;background:#3a1216;border:1px solid #f85149;border-radius:6px;color:#ff7b72;font-size:0.78rem;font-weight:600;">⚠️ INSUFFICIENT MARGIN — need $${requiredMargin.toFixed(2)}, have $${liveAvailable.toFixed(2)}. Short by $${shortfall}. Reduce position size or increase leverage above ${leverage}×.</div>`;
+  } else {
+    marginBanner = `<div style="margin-top:10px;padding:9px 12px;background:#2a1d10;border:1px solid #f0883e;border-radius:6px;color:#ffa657;font-size:0.78rem;">⚠ Could not verify live Bitunix balance — sizing falls back to settings.profile.capital. Backend will re-check before sending.</div>`;
+  }
+  const confirmDisabled = sufficientMargin === false;
+  const confirmBtnHtml = confirmDisabled
+    ? `<button class="btn btn-primary" id="execConfirmBtn" disabled style="background:#3a1216;color:#8b949e;cursor:not-allowed;">Insufficient Margin</button>`
+    : `<button class="btn btn-primary" id="execConfirmBtn" onclick="submitBitunixApproval('${tradeId}')" style="background:#f7931a;color:#1c1300;">Confirm — Send to Bitunix</button>`;
 
   const overlay = document.getElementById('execConfirmOverlay');
   document.getElementById('execConfirmTitle').textContent = 'Send Trade to Bitunix for Execution';
@@ -6773,10 +6816,12 @@ function approveForBitunix(tradeId) {
         <div><div class="info-cell-label">Leverage</div><div style="font-weight:700;color:#f7931a;">${leverage}×</div></div>
         <div><div class="info-cell-label">Margin Mode</div><div>${marginMode}</div></div>
         <div><div class="info-cell-label">Notional</div><div>$${notional.toFixed(2)}</div></div>
-        <div><div class="info-cell-label">Required Margin</div><div style="font-weight:700;">$${requiredMargin.toFixed(2)}</div></div>
+        <div><div class="info-cell-label">Required Margin</div><div style="font-weight:700;color:${sufficientMargin === false ? '#f85149' : '#e6edf3'};">$${requiredMargin.toFixed(2)} <span style="color:#6e7681;font-size:0.7rem;">at ${leverage}×</span></div></div>
+        <div><div class="info-cell-label">Available on Bitunix</div><div style="font-weight:700;">${availableLabel}</div></div>
         <div><div class="info-cell-label">System Score</div><div style="font-weight:700;color:${sysScore>=6?'#3fb950':sysScore>=3?'#f0883e':'#f85149'};">${sysScore}/8</div></div>
         <div><div class="info-cell-label">Confidence</div><div>${t.confidence||'—'}/10</div></div>
       </div>
+      ${marginBanner}
       ${scoreWarning}
       <div style="margin-top:10px;padding:10px 12px;background:#1a1408;border:1px solid #f7931a55;border-radius:6px;color:#f7c87a;font-size:0.76rem;">
         🟧 This will place a futures order on Bitunix at ${leverage}× leverage (${marginMode}). The risk engine validates first; in paper-trading mode no live order is sent.
@@ -6784,7 +6829,7 @@ function approveForBitunix(tradeId) {
       <div id="execConfirmStatus" style="display:none;margin-top:10px;padding:10px 12px;border-radius:6px;font-size:0.8rem;"></div>
       <div class="btn-row" style="margin-top:14px;">
         <button class="btn btn-ghost" onclick="closeExecConfirm()">Cancel</button>
-        <button class="btn btn-primary" id="execConfirmBtn" onclick="submitBitunixApproval('${tradeId}')" style="background:#f7931a;color:#1c1300;">Confirm — Send to Bitunix</button>
+        ${confirmBtnHtml}
       </div>
     </div>`;
   overlay.classList.add('open');
@@ -6854,6 +6899,29 @@ async function submitBitunixApproval(tradeId) {
     });
 
     const data = await resp.json();
+
+    // Phase 7.6 — handle the new pre-flight margin error: 400 with
+    // {approved:true, error:"Insufficient margin", required_margin, available_usdt, max_qty, suggestion}.
+    // Risk engine approved (so `approved:true`) but the live margin check
+    // blocked the order before it reached Bitunix. Route to the same UI as
+    // a regular reject but with the rich diagnostic payload.
+    if (resp.status === 400 && data.error === 'Insufficient margin') {
+      t.execStatus = 'execution_failed';
+      t.execRejectReason = `Insufficient margin: need $${data.required_margin}, have $${data.available_usdt}`;
+      save();
+      renderJournal();
+      if (statusEl) {
+        statusEl.style.background = '#3a1216';
+        statusEl.style.border = '1px solid #f85149';
+        statusEl.style.color = '#ff7b72';
+        statusEl.innerHTML = `<strong>⚠️ Insufficient Bitunix margin</strong><br>`
+          + `Need <strong>$${Number(data.required_margin).toFixed(2)}</strong> · `
+          + `available <strong>$${Number(data.available_usdt).toFixed(2)}</strong><br>`
+          + (data.suggestion ? `<em>${escHtml(data.suggestion)}</em>` : '');
+      }
+      if (btn) { btn.disabled = false; btn.textContent = 'Confirm — Send to Bitunix'; btn.style.background = '#f7931a'; btn.style.color = '#1c1300'; }
+      return;
+    }
 
     if (data.approved) {
       // Persist execution status on the trade
@@ -9663,6 +9731,42 @@ let _bitunixInterval = null;
 //
 // Used by updateBitunixDot, refreshBitunixHealth, and calc_pullBitunixBalance
 // so the three call sites can't drift apart.
+// Phase 7.6 — write live Bitunix balance back into local state on every
+// successful read. Keeps settings.profile.capital, tradingTools_sync.capital,
+// and the journal's mental model of "available capital" all aligned with
+// what Bitunix actually says we have. Eliminates the "stale calculator
+// session leaks 10000 into the position sizer" failure mode.
+let _lastBitunixBalanceSync = 0;
+function _persistBitunixBalance(available_usdt) {
+  const n = Number(available_usdt);
+  if (!isFinite(n) || n <= 0) return;
+  _lastBitunixBalanceSync = Date.now();
+  // 1. settings.profile.capital — this is the canonical capital used by
+  //    the journal's risk calc, the calculator, and the gist-pushed snapshot.
+  //    Write directly to localStorage (no toast, no DOM read) to avoid the
+  //    user-facing "Settings saved ✓" pop on every 30s polling cycle.
+  try {
+    const s = getSettings();
+    if (s && s.profile && s.profile.capital !== +n.toFixed(2)) {
+      s.profile.capital = +n.toFixed(2);
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+      // Debounced gist push picks this up (same as putSettings does)
+      if (typeof scheduleGistPush === 'function') scheduleGistPush();
+    }
+  } catch (e) { /* don't break the caller on a settings save failure */ }
+  // 2. tradingTools_sync — calculator's display cache. Tag the source so a
+  //    later "Synced from Calculator" sync bar shows it came from Bitunix.
+  try {
+    const existing = JSON.parse(localStorage.getItem(SYNC_KEY) || '{}');
+    localStorage.setItem(SYNC_KEY, JSON.stringify({
+      ...existing,
+      capital:     +n.toFixed(2),
+      lastUpdated: new Date().toISOString(),
+      source:      'bitunix_live',
+    }));
+  } catch { /* localStorage quota or JSON failure — ignore */ }
+}
+
 async function _fetchBitunixStatus() {
   const url = getBackendUrl();
   if (!url) return { ok: false, error: 'No backend URL set' };
@@ -9682,6 +9786,7 @@ async function _fetchBitunixStatus() {
     return { ok: true, status: s, configured: true };
   }
   if (s.connected) {
+    _persistBitunixBalance(s.available_usdt ?? s.balance_usdt);
     return { ok: true, status: s, configured: true };
   }
   // Stale-but-not-broken pattern: keys set, not disabled, no error, just
@@ -9691,6 +9796,7 @@ async function _fetchBitunixStatus() {
       const rr = await fetch(url + '/bitunix/reconnect', { mode: 'cors' });
       const j  = await rr.json().catch(() => ({}));
       if (j.ok && j.balance) {
+        _persistBitunixBalance(j.balance.available ?? j.balance.balance);
         // Re-pull status so the caller sees a single coherent shape.
         try {
           const r2 = await fetch(url + '/bitunix/exchange/status', { mode: 'cors' });
@@ -12266,8 +12372,25 @@ function calc_calcBTC() {
   document.getElementById('calc_btcTPDist').textContent    = '$' + tpDist.toFixed(2) + ' from entry';
   document.getElementById('calc_btcRRDisplay').textContent = '1:' + rrUsed.toFixed(2);
   document.getElementById('calc_btcPosVal').textContent    = lev + 'x leverage';
-  document.getElementById('calc_btcRequiredMargin').textContent    = '$' + reqMargin.toFixed(2);
-  document.getElementById('calc_btcRequiredMarginSub').textContent = (reqMargin / cap * 100).toFixed(1) + '% of capital';
+  // Phase 7.6 — show required margin alongside live Bitunix availability so
+  // the user can see at a glance whether the trade fits. The caller updates
+  // _calcLiveBitunixAvailable when a Pull from Bitunix succeeds; we read it
+  // here without forcing another fetch.
+  const reqMarginEl    = document.getElementById('calc_btcRequiredMargin');
+  const reqMarginSubEl = document.getElementById('calc_btcRequiredMarginSub');
+  reqMarginEl.textContent = '$' + reqMargin.toFixed(2) + ' at ' + lev + 'x';
+  const live = (typeof _calcLiveBitunixAvailable === 'number' && _calcLiveBitunixAvailable > 0)
+    ? _calcLiveBitunixAvailable : null;
+  if (live != null) {
+    const sufficient = reqMargin <= live * 0.95;
+    reqMarginSubEl.innerHTML = sufficient
+      ? `<span style="color:var(--green);">✅ Sufficient</span> · $${live.toFixed(2)} available`
+      : `<span style="color:var(--red);font-weight:700;">⚠️ INSUFFICIENT</span> · $${live.toFixed(2)} available`;
+    reqMarginEl.style.color = sufficient ? '' : 'var(--red)';
+  } else {
+    reqMarginSubEl.textContent = (reqMargin / cap * 100).toFixed(1) + '% of capital';
+    reqMarginEl.style.color = '';
+  }
   document.getElementById('calc_btcCapWin').textContent    = '$' + (cap + rewardAmt).toFixed(2);
   document.getElementById('calc_btcCapWinPct').textContent = calc_fmtPct(rewardAmt / cap * 100);
   document.getElementById('calc_btcCapLoss').textContent   = '$' + (cap - riskAmt).toFixed(2);
@@ -12364,10 +12487,20 @@ async function calc_pullBitunixBalance() {
     cap.value = balStr;
     cap.dispatchEvent(new Event('input'));
   }
+  // Phase 7.6 — remember the live balance so calc_calcBTC can render the
+  // Available + sufficient/insufficient indicator without re-fetching.
+  _calcLiveBitunixAvailable = Number(bal);
+  _calcLiveBitunixSyncTs    = Date.now();
   if (typeof calc_calculate === 'function') calc_calculate();
-  setStatus('✓ Pulled $' + balStr + ' from Bitunix', 'var(--green)');
+  setStatus('✓ Pulled $' + balStr + ' from Bitunix · ⟳ live now', 'var(--green)');
   if (btn) { btn.textContent = '✓ $' + balStr + ' pulled'; restoreBtn(3000); }
 }
+
+// Phase 7.6 — module state for the calculator's live-Bitunix display.
+// Updated by calc_pullBitunixBalance on every successful pull. Read by
+// calc_calcBTC for the "Available · ✅ Sufficient" indicator.
+var _calcLiveBitunixAvailable = null;
+var _calcLiveBitunixSyncTs    = 0;
 
 function calc_resetAll() {
   document.getElementById('calc_capital').value     = 10000;
