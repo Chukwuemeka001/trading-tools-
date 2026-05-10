@@ -8952,22 +8952,45 @@ function refreshCloudStatus() {
 }
 
 async function gistConnect() {
+  // Phase 7.5 — bidirectional sync. Save token first so gistPullRaw can read
+  // it from the cookie/localStorage chain, then PULL the latest from cloud
+  // (merges any trades from other devices into local), then PUSH the merged
+  // result back. This means clicking "Connect & Push" on a new device:
+  //   1. Saves the token
+  //   2. Pulls all existing trades from cloud → local journal populates
+  //   3. Pushes local (now identical to cloud) back so lastUpdated advances
+  // Old behaviour was push-only, which silently overwrote cloud trades on a
+  // device that didn't have them locally yet.
   const token  = document.getElementById('gistToken').value.trim();
   const gistId = document.getElementById('gistId').value.trim() || DEFAULT_GIST;
   if (!token) { alert('Please enter your GitHub Personal Access Token.'); return; }
   const bar = document.getElementById('cloudStatusBar');
-  bar.innerHTML = '<span style="color:#58a6ff;">⬤ Connecting…</span>';
+  bar.innerHTML = '<span style="color:#58a6ff;">⟳ Connecting…</span>';
+  // Save token + gistId first so gistPullRaw can see them.
+  saveToken(token);
+  saveGistCfg({ gistId, lastSync: getGistCfg().lastSync });
   try {
+    bar.innerHTML = '<span style="color:#58a6ff;">⟳ Pulling from cloud…</span>';
+    const pullResult = await gistPullRaw();
+    if (!pullResult.ok && pullResult.reason !== 'gist not found (check Gist ID)') {
+      // Real failure (auth/permission/network) — surface and bail
+      throw new Error(pullResult.reason);
+    }
+    // If pulled trades were merged, refresh the views before pushing
+    if (pullResult.ok && pullResult.added > 0) {
+      renderJournal();
+      renderDashboard();
+    }
+    bar.innerHTML = '<span style="color:#58a6ff;">⟳ Pushing to cloud…</span>';
     const newId = await gistPush(token, gistId);
-    saveToken(token);
     saveGistCfg({ gistId: newId, lastSync: new Date().toISOString() });
     document.getElementById('gistId').value = newId;
     refreshCloudStatus();
+    const addedNote = pullResult.ok && pullResult.added > 0 ? ` · ${pullResult.added} new from cloud` : '';
+    bar.innerHTML = `<span style="color:#3fb950;">✓ Synced${addedNote}</span>`;
   } catch(err) {
     bar.style.borderColor = '#f85149';
-    bar.innerHTML = `<span style="color:#f85149;">⬤ Error:</span> ${err.message}`;
-    const btn = document.getElementById('cloudBtn');
-    if (btn) { btn.className = 'cloud-btn error'; btn.textContent = '☁ Error'; }
+    bar.innerHTML = `<span style="color:#f85149;">✗ Error:</span> ${err.message}`;
   }
 }
 
@@ -8994,36 +9017,89 @@ async function gistPush(token, gistId) {
   return (await resp.json()).id;
 }
 
+// Phase 7.5 — gistPullRaw uses the authenticated GitHub API endpoint
+// (api.github.com/gists/{id}) instead of the unauthenticated raw URL.
+// The previous raw-URL path silently 404'd on private gists — and
+// gistPush writes `public: false`, so EVERY pull failed. That's why
+// new devices saw an empty journal.
+//
+// Returns a structured result `{ ok, added, total?, reason? }` so callers
+// (auto-pull on boot, manual button, bidirectional cloud button) can all
+// surface specific errors instead of swallowing them silently.
 async function gistPullRaw() {
-  const url  = `https://gist.githubusercontent.com/${GIST_OWNER}/${DEFAULT_GIST}/raw/${GIST_FILE}?t=${Date.now()}`;
-  const resp = await fetch(url);
-  if (!resp.ok) return 0;
-  const data = await resp.json();
-  const incoming = data.trades || [];
+  const cfg = getGistCfg();
+  if (!cfg.token)  return { ok: false, added: 0, reason: 'no_token' };
+  if (!cfg.gistId) return { ok: false, added: 0, reason: 'no_gist_id' };
+
+  let resp;
+  try {
+    resp = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
+      headers: {
+        'Authorization': `Bearer ${cfg.token}`,
+        'Accept':        'application/vnd.github+json',
+      },
+      cache: 'no-store',
+    });
+  } catch (e) {
+    return { ok: false, added: 0, reason: 'network: ' + (e?.message || 'unknown') };
+  }
+  if (!resp.ok) {
+    const reason = resp.status === 401 ? 'token invalid (re-auth needed)'
+                 : resp.status === 403 ? 'permission denied (token needs gist scope)'
+                 : resp.status === 404 ? 'gist not found (check Gist ID)'
+                 : `HTTP ${resp.status}`;
+    return { ok: false, added: 0, reason };
+  }
+  const env  = await resp.json();
+  const file = env.files && env.files[GIST_FILE];
+  if (!file || !file.content) {
+    return { ok: false, added: 0, reason: `file '${GIST_FILE}' missing in gist` };
+  }
+  let data;
+  try {
+    data = JSON.parse(file.content);
+  } catch (e) {
+    return { ok: false, added: 0, reason: 'gist content not valid JSON' };
+  }
+
+  // ── Merge: Gist additions only; local trades preserved ──
+  const incoming    = Array.isArray(data.trades) ? data.trades : [];
   const existingIds = new Set(trades.map(t => t.id));
-  const newTrades   = incoming.filter(t => !existingIds.has(t.id));
-  if (newTrades.length) { trades = [...trades, ...newTrades]; localStorage.setItem(STORE, JSON.stringify(trades)); }
-  // Merge settings from Gist if present and no local settings exist
+  const newTrades   = incoming.filter(t => t && t.id && !existingIds.has(t.id));
+  if (newTrades.length) {
+    trades = [...trades, ...newTrades];
+    localStorage.setItem(STORE, JSON.stringify(trades));
+  }
+  // Settings restore: only on a brand-new device (no local settings yet).
   if (data.settings && !localStorage.getItem(SETTINGS_KEY)) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings));
-    applySettings(data.settings);
+    if (typeof applySettings === 'function') applySettings(data.settings);
   }
-  return newTrades.length;
+  return { ok: true, added: newTrades.length, total: incoming.length };
 }
 
 async function gistPullUI() {
   const bar = document.getElementById('cloudStatusBar');
-  bar.innerHTML = '<span style="color:#58a6ff;">⬤ Pulling…</span>';
+  if (bar) bar.innerHTML = '<span style="color:#58a6ff;">⟳ Pulling…</span>';
+  let result;
   try {
-    const added = await gistPullRaw();
-    const cfg   = getGistCfg();
-    saveGistCfg({ ...cfg, lastSync: new Date().toISOString() });
-    refreshCloudStatus();
-    if (added) renderDashboard();
-    bar.innerHTML = `<span style="color:#3fb950;">⬤ Done — ${added} new trade(s) added.</span>`;
-  } catch(err) {
-    bar.innerHTML = `<span style="color:#f85149;">⬤ Pull failed:</span> ${err.message}`;
+    result = await gistPullRaw();
+  } catch (err) {
+    if (bar) bar.innerHTML = `<span style="color:#f85149;">✗ Pull failed:</span> ${err.message}`;
+    return;
   }
+  if (!result.ok) {
+    if (bar) bar.innerHTML = `<span style="color:#f85149;">✗ Pull failed:</span> ${result.reason}`;
+    return;
+  }
+  const cfg = getGistCfg();
+  saveGistCfg({ ...cfg, lastSync: new Date().toISOString() });
+  refreshCloudStatus();
+  if (result.added > 0) {
+    renderJournal();
+    renderDashboard();
+  }
+  if (bar) bar.innerHTML = `<span style="color:#3fb950;">✓ Synced — ${result.added} new trade(s) added.</span>`;
 }
 
 function gistDisconnect() {
@@ -11446,23 +11522,48 @@ migrateChartImages().catch(e => console.warn('Chart migration:', e));
 applySettings(getSettings());
 updateSyncDot();
 refreshCloudStatus();
-renderDashboard();
-startDraftAutoSave();
-checkDraftOnLoad();
-startBackgroundTimers();
-syncExchangeStatus();
-checkCalcAutoFill();
-resumeExecutionPolling();
+// Phase 7.5 — pull-first boot. If cloud is configured, wait up to 3s for
+// the pull to finish before the initial render so users land on a fully-
+// synced journal. Slow Gist API doesn't block forever — after 3s we render
+// with whatever we have and the pull continues in the background; on
+// completion we re-render to show the freshly pulled trades.
 (async () => {
-  try {
-    const added = await gistPullRaw();
-    if (added) {
-      const cfg = getGistCfg();
-      saveGistCfg({ ...cfg, lastSync: new Date().toISOString() });
+  const cfg = getGistCfg();
+  const cloudConfigured = !!(cfg.token && cfg.gistId);
+  const bar = document.getElementById('cloudStatusBar');
+  let pullPromise = null;
+  if (cloudConfigured) {
+    if (bar) bar.innerHTML = '<span style="color:#58a6ff;">⟳ Syncing from cloud…</span>';
+    pullPromise = gistPullRaw().catch(e => ({ ok: false, added: 0, reason: e?.message || 'unknown' }));
+    // Race the pull against a 3s timeout — first paint shouldn't hang.
+    await Promise.race([pullPromise, new Promise(r => setTimeout(r, 3000))]);
+  }
+  // First paint — uses whatever's in `trades` right now (synced or local).
+  renderDashboard();
+  startDraftAutoSave();
+  checkDraftOnLoad();
+  startBackgroundTimers();
+  syncExchangeStatus();
+  checkCalcAutoFill();
+  resumeExecutionPolling();
+  // If the pull was racing the timeout, wait for it to finish in the
+  // background and re-render only when needed.
+  if (pullPromise) {
+    pullPromise.then(result => {
+      if (!result || !result.ok) {
+        if (bar) bar.innerHTML = `<span style="color:#f85149;">✗ Sync failed: ${result?.reason || 'unknown'}</span> <button class="btn btn-ghost" onclick="gistPullUI()" style="padding:2px 8px;font-size:0.7rem;margin-left:6px;">Retry</button>`;
+        return;
+      }
+      saveGistCfg({ ...getGistCfg(), lastSync: new Date().toISOString() });
       refreshCloudStatus();
-      renderDashboard();
-    }
-  } catch { /* silent */ }
+      if (result.added > 0) {
+        // Re-render whichever views show trade data so newly pulled trades
+        // appear without a tab switch.
+        renderJournal();
+        renderDashboard();
+      }
+    }).catch(() => { /* swallow — refreshCloudStatus already gives status */ });
+  }
 })();
 window.addEventListener('resize', () => {
   if (document.getElementById('page-dashboard').classList.contains('active')) {
