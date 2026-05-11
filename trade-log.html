@@ -384,6 +384,98 @@
       .app { padding-top: var(--ticker-h); }
       .app .topbar { top: var(--ticker-h); }
     }
+
+    /* ── Phase 0 — Inspector drawer (right side, ≥1440px) ── */
+    .inspector { display: none; }
+    @media (min-width: 1440px) {
+      .app {
+        grid-template-columns: var(--sb-w) 1fr var(--insp-w);
+      }
+      .app.collapsed {
+        grid-template-columns: var(--sb-w-collapsed) 1fr var(--insp-w);
+      }
+      .inspector {
+        grid-row: 3; grid-column: 3;
+        background: var(--s1); border-left: 1px solid var(--border);
+        overflow-y: auto;
+        padding: 18px 16px calc(18px + var(--safe-bot)) 16px;
+        display: flex; flex-direction: column; gap: 14px;
+      }
+      .topbar, .session-bar { grid-column: 1 / -1; }
+    }
+    .insp-head {
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .insp-title {
+      font-weight: 700; font-size: 13px; letter-spacing: -0.01em; color: var(--t1);
+    }
+    .insp-section {
+      background: var(--s2); border: 1px solid var(--border);
+      border-radius: 11px; padding: 13px;
+    }
+    .insp-l {
+      font-size: 10px; color: var(--t3);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 8px; font-weight: 600;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .insp-l .count {
+      background: var(--s3); color: var(--t2);
+      border-radius: 10px; padding: 1px 7px; font-size: 10px; font-weight: 700;
+      letter-spacing: 0;
+    }
+    .insp-trade {
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .insp-trade:last-child { border-bottom: none; padding-bottom: 0; }
+    .insp-trade-top {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;
+    }
+    .insp-trade-pair {
+      font-family: var(--mono); font-weight: 700; font-size: 13px;
+      display: flex; align-items: center; gap: 5px; color: var(--t1);
+    }
+    .insp-trade-pnl {
+      font-family: var(--mono); font-weight: 700; font-size: 13px;
+    }
+    .insp-trade-pnl.pos { color: var(--green); }
+    .insp-trade-pnl.neg { color: var(--red); }
+    .insp-trade-pnl.neu { color: var(--t3); }
+    .insp-trade-meta { font-size: 10px; color: var(--t3); }
+    .insp-vbadge {
+      font-size: 9px; padding: 1px 5px; border-radius: 3px;
+      font-weight: 700; letter-spacing: 0.04em;
+    }
+    .insp-vbadge.mt5 { background: rgba(59,130,246,0.15); color: var(--blue); }
+    .insp-vbadge.bx  { background: rgba(249,115,22,0.15); color: var(--orange); }
+    .insp-alert {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 11px;
+    }
+    .insp-alert:last-child { border-bottom: none; padding-bottom: 0; }
+    .insp-alert-pair { font-family: var(--mono); font-weight: 600; color: var(--t1); }
+    .insp-alert-dist { font-family: var(--mono); color: var(--t2); }
+    .insp-alert-dist.close { color: var(--amber); }
+    .insp-empty {
+      font-size: 11px; color: var(--t3); text-align: center; padding: 6px 0;
+    }
+    .insp-risk-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .insp-risk-cell {
+      background: var(--s3); border-radius: 7px; padding: 8px 10px;
+    }
+    .insp-risk-l {
+      font-size: 9px; color: var(--t3);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 3px; font-weight: 600;
+    }
+    .insp-risk-v {
+      font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--t1);
+    }
+    .insp-risk-v.pos { color: var(--green); }
+    .insp-risk-v.neg { color: var(--red); }
+    .insp-risk-v.amber { color: var(--amber); }
     @media (max-width: 900px) and (min-width: 641px) {
       .app { grid-template-columns: var(--sb-w-collapsed) 1fr; }
       .nav-label, .sidebar-logo .logo-text { display: none; }
@@ -3159,6 +3251,50 @@
 
 </main><!-- /.main-content -->
 
+<!-- ═══════════════════════════════════════════════════════
+     PHASE 0 — Inspector drawer (visible at ≥1440px only)
+     Populated by renderInspector() from the trades array,
+     alertsCache, and the live exchange status.
+════════════════════════════════════════════════════════ -->
+<aside class="inspector" id="inspector" aria-label="Live snapshot">
+  <div class="insp-head">
+    <div class="insp-title">Live Snapshot</div>
+    <button class="topbar-toggle" onclick="renderInspector()" title="Refresh" style="font-size:14px;">↻</button>
+  </div>
+
+  <div class="insp-section">
+    <div class="insp-l">Open Positions <span class="count" id="inspOpenCount">0</span></div>
+    <div id="inspOpenBody"><div class="insp-empty">No open trades.</div></div>
+  </div>
+
+  <div class="insp-section">
+    <div class="insp-l">Active Alerts <span class="count" id="inspAlertCount">0</span></div>
+    <div id="inspAlertBody"><div class="insp-empty">No active alerts.</div></div>
+  </div>
+
+  <div class="insp-section">
+    <div class="insp-l">Risk Snapshot</div>
+    <div class="insp-risk-grid">
+      <div class="insp-risk-cell">
+        <div class="insp-risk-l">Today P&amp;L</div>
+        <div class="insp-risk-v" id="inspToday">—</div>
+      </div>
+      <div class="insp-risk-cell">
+        <div class="insp-risk-l">30d P&amp;L</div>
+        <div class="insp-risk-v" id="insp30d">—</div>
+      </div>
+      <div class="insp-risk-cell">
+        <div class="insp-risk-l">Open Risk</div>
+        <div class="insp-risk-v" id="inspOpenRisk">—</div>
+      </div>
+      <div class="insp-risk-cell">
+        <div class="insp-risk-l">Win Rate 30d</div>
+        <div class="insp-risk-v" id="inspWR">—</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
 <!-- Mobile bottom nav (Phase 0 — 5-slot iOS tabbar with center FAB) -->
 <nav class="bottom-nav" role="navigation" aria-label="Primary">
   <button class="bn-item active" data-tab="dashboard" onclick="nav('dashboard')">
@@ -4400,6 +4536,111 @@ function refreshTickerPrices() {
     buildTicker(); refreshTickerPrices();
   }
   setInterval(refreshTickerPrices, 5000);
+})();
+
+// Phase 0 — Inspector drawer (≥1440px). Reads from `trades`, `alertsCache`,
+// `_alertLivePrices` — all globals already maintained by other parts of the app.
+function _inspFmtMoney(v) {
+  if (v == null || isNaN(v)) return '—';
+  const sign = v >= 0 ? '+' : '−';
+  return sign + '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+function renderInspector() {
+  const insp = document.getElementById('inspector');
+  if (!insp) return;
+  const all = (typeof trades === 'object' && Array.isArray(trades)) ? trades : [];
+
+  // ── Open positions ───────────────────────────────
+  const open = all.filter(t => t && (t.status === 'open' || t.outcome === 'open'));
+  const openCount = document.getElementById('inspOpenCount');
+  const openBody  = document.getElementById('inspOpenBody');
+  if (openCount) openCount.textContent = open.length;
+  if (openBody) {
+    if (!open.length) {
+      openBody.innerHTML = '<div class="insp-empty">No open trades.</div>';
+    } else {
+      openBody.innerHTML = open.slice(0, 6).map(t => {
+        const venue = (t.venue === 'bitunix') ? 'bx' : 'mt5';
+        const vlabel = venue === 'bx' ? 'BX' : 'MT5';
+        const live = (typeof _alertLivePrices === 'object' && _alertLivePrices) ? _alertLivePrices[(t.pair||'').toUpperCase()] : null;
+        let pnlTxt = 'running', pnlCls = 'neu';
+        if (live != null && t.entry && t.size) {
+          const dir = (t.direction === 'long' || t.direction === 'buy') ? 1 : -1;
+          const diff = (live - t.entry) * dir;
+          if (diff > 0) { pnlTxt = '+' + diff.toFixed(4) + 'pt'; pnlCls = 'pos'; }
+          else if (diff < 0) { pnlTxt = diff.toFixed(4) + 'pt'; pnlCls = 'neg'; }
+        }
+        return '<div class="insp-trade">'
+             + '<div class="insp-trade-top">'
+             +   '<div class="insp-trade-pair">' + (t.pair || '?') + ' <span class="insp-vbadge ' + venue + '">' + vlabel + '</span></div>'
+             +   '<div class="insp-trade-pnl ' + pnlCls + '">' + pnlTxt + '</div>'
+             + '</div>'
+             + '<div class="insp-trade-meta">' + (t.direction || '').toUpperCase() + ' · ' + (t.setup || '—') + '</div>'
+             + '</div>';
+      }).join('');
+    }
+  }
+
+  // ── Active alerts ────────────────────────────────
+  const alerts = (typeof alertsCache === 'object' && Array.isArray(alertsCache)) ? alertsCache : [];
+  const active = alerts.filter(a => a && !a.triggered);
+  const aCount = document.getElementById('inspAlertCount');
+  const aBody  = document.getElementById('inspAlertBody');
+  if (aCount) aCount.textContent = active.length;
+  if (aBody) {
+    if (!active.length) {
+      aBody.innerHTML = '<div class="insp-empty">No active alerts.</div>';
+    } else {
+      aBody.innerHTML = active.slice(0, 6).map(a => {
+        const sym = (a.symbol || '').toUpperCase();
+        const live = (typeof _alertLivePrices === 'object' && _alertLivePrices) ? _alertLivePrices[sym] : null;
+        let dist = '—', distCls = '';
+        if (live != null && a.price) {
+          const pct = ((live - a.price) / a.price) * 100;
+          dist = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+          if (Math.abs(pct) < 1) distCls = 'close';
+        }
+        return '<div class="insp-alert">'
+             + '<div><div class="insp-alert-pair">' + sym + '</div>'
+             + '<div style="font-size:10px;color:var(--t3);margin-top:1px;">@ ' + (a.price != null ? a.price : '—') + '</div></div>'
+             + '<div class="insp-alert-dist ' + distCls + '">' + dist + '</div>'
+             + '</div>';
+      }).join('');
+    }
+  }
+
+  // ── Risk snapshot ────────────────────────────────
+  const today = new Date().toISOString().slice(0, 10);
+  const todayPnL = all.filter(t => t && t.status === 'closed' && (t.dateClose || '').slice(0,10) === today)
+                      .reduce((s, t) => s + (Number(t.actualPnL) || 0), 0);
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+  const last30 = all.filter(t => t && t.status === 'closed' && new Date(t.dateClose || 0) >= cutoff);
+  const pnl30 = last30.reduce((s, t) => s + (Number(t.actualPnL) || 0), 0);
+  const wins30 = last30.filter(t => t.outcome === 'win').length;
+  const wr30 = last30.length ? Math.round(wins30 / last30.length * 100) : null;
+  const openRisk = open.reduce((s, t) => s + (Number(t.risk) || 0), 0);
+
+  const setVal = (id, v, cls) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = v;
+    el.className = 'insp-risk-v' + (cls ? ' ' + cls : '');
+  };
+  setVal('inspToday', _inspFmtMoney(todayPnL), todayPnL > 0 ? 'pos' : todayPnL < 0 ? 'neg' : '');
+  setVal('insp30d',   _inspFmtMoney(pnl30),    pnl30    > 0 ? 'pos' : pnl30    < 0 ? 'neg' : '');
+  setVal('inspOpenRisk', openRisk ? openRisk.toFixed(2) + '%' : '0%', openRisk > 2 ? 'amber' : '');
+  setVal('inspWR',    wr30 == null ? '—' : wr30 + '%', wr30 != null && wr30 >= 60 ? 'pos' : wr30 != null && wr30 < 50 ? 'neg' : '');
+}
+(function initInspector() {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', renderInspector, { once: true });
+  } else {
+    renderInspector();
+  }
+  // Refresh every 30s; also re-render after the alerts cache or trades change
+  // (renderJournal/renderDashboard call refreshTickerPrices indirectly — we
+  // rely on the interval here rather than hooking every mutation site).
+  setInterval(renderInspector, 30000);
 })();
 
 // Phase 5 — sidebar collapse + persistence
