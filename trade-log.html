@@ -2,9 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Trade Journal</title>
   <meta name="build-id" content="phase7-2026-05-07">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="POIWatcher">
+  <meta name="theme-color" content="#0c0e10">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -34,6 +39,11 @@
       --grey-sc: #6b7280;
       --orange:  #f97316;
       --mono:    'JetBrains Mono', 'SF Mono', Menlo, monospace;
+      /* ── Phase 0 PWA — safe-area insets for iOS notch / home indicator ── */
+      --safe-top:    env(safe-area-inset-top, 0px);
+      --safe-bot:    env(safe-area-inset-bottom, 0px);
+      --safe-left:   env(safe-area-inset-left, 0px);
+      --safe-right:  env(safe-area-inset-right, 0px);
       /* ── Layout sizing tokens used by sidebar layout ── */
       --sb-w:           240px;
       --sb-w-collapsed: 58px;
@@ -124,7 +134,9 @@
     /* ── Topbar (lean) ── */
     .topbar {
       grid-column: 1 / -1; grid-row: 1;
-      display: flex; align-items: center; gap: 14px; padding: 0 18px;
+      display: flex; align-items: center; gap: 14px;
+      padding: 0 calc(18px + var(--safe-right)) 0 calc(18px + var(--safe-left));
+      padding-top: var(--safe-top);
       background: var(--s1); border-bottom: 1px solid var(--border);
       position: sticky; top: 0; z-index: 90;
     }
@@ -228,12 +240,17 @@
         grid-template-columns: 1fr;
       }
       .sidebar { display: none !important; }
-      .main-content { grid-column: 1; padding: 14px 14px 72px; }
+      .main-content {
+        grid-column: 1;
+        padding: 14px calc(14px + var(--safe-right)) calc(72px + var(--safe-bot)) calc(14px + var(--safe-left));
+      }
       .bottom-nav {
         display: flex; position: fixed; bottom: 0; left: 0; right: 0;
-        height: 60px; background: var(--s1); border-top: 1px solid var(--border);
+        height: calc(60px + var(--safe-bot)); padding-bottom: var(--safe-bot);
+        background: var(--s1); border-top: 1px solid var(--border);
         z-index: 100; justify-content: space-around; align-items: center;
-        padding: 0 4px;
+        padding-left: calc(4px + var(--safe-left));
+        padding-right: calc(4px + var(--safe-right));
       }
       .bn-item {
         display: flex; flex-direction: column; align-items: center; gap: 3px;
