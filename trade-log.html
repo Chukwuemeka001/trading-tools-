@@ -572,6 +572,34 @@
     .v0-cal-legend .swatch {
       width: 14px; height: 14px; border-radius: 3px;
     }
+
+    /* Setup performance bars (spec-styled) */
+    .v0-setup-row {
+      display: grid; grid-template-columns: 1fr auto;
+      gap: 14px; padding: 9px 0; align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .v0-setup-row:last-child { border-bottom: none; }
+    .v0-setup-name-wrap {
+      display: flex; flex-direction: column; gap: 5px; min-width: 0;
+    }
+    .v0-setup-name {
+      font-size: 12px; font-weight: 600; color: var(--t1);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .v0-setup-bar-bg {
+      height: 5px; background: var(--s3);
+      border-radius: 3px; display: flex; overflow: hidden;
+    }
+    .v0-setup-bar-w { background: var(--green); height: 100%; }
+    .v0-setup-bar-l { background: var(--red);   height: 100%; }
+    .v0-setup-stats {
+      display: flex; flex-direction: column; align-items: flex-end;
+      font-family: var(--mono); font-size: 11px;
+    }
+    .v0-setup-stats .wr  { font-weight: 700; color: var(--green); }
+    .v0-setup-stats .wr.neg { color: var(--red); }
+    .v0-setup-stats .rr  { color: var(--t3); margin-top: 2px; }
     @media (max-width: 900px) and (min-width: 641px) {
       .app { grid-template-columns: var(--sb-w-collapsed) 1fr; }
       .nav-label, .sidebar-logo .logo-text { display: none; }
@@ -2144,6 +2172,13 @@
         <div class="v0-card-sub" id="v0CalMonth">—</div>
       </div>
       <div id="v0CalendarBody"></div>
+    </div>
+    <div class="v0-card" id="v0SetupCard">
+      <div class="v0-card-h">
+        <div class="v0-card-t">Setup Performance</div>
+        <div class="v0-card-sub" id="v0SetupSub">—</div>
+      </div>
+      <div id="v0SetupBody"></div>
     </div>
   </div>
 </div>
@@ -8829,6 +8864,75 @@ function renderCalendarHeatmap(monthDate, allTrades) {
   body.innerHTML = html;
 }
 
+// Phase 0 — compact setup-performance bars (spec-styled).
+// Uses the same setup list as the f_setup form select so the rows
+// match the canonical names; trades whose setup doesn't match any
+// known entry are bucketed as "Other".
+function renderSetupBars(allTrades) {
+  const body = document.getElementById('v0SetupBody');
+  const sub  = document.getElementById('v0SetupSub');
+  if (!body) return;
+  const closed = (allTrades || []).filter(t => t && t.status === 'closed');
+  if (sub) sub.textContent = closed.length + (closed.length === 1 ? ' trade' : ' trades');
+  if (!closed.length) {
+    body.innerHTML = '<div style="color:var(--t3);font-size:12px;padding:6px 0;">No closed trades yet.</div>';
+    return;
+  }
+  const SETUPS = [
+    'Primary POI + SC entry',
+    'Secondary POI + SC entry',
+    'Trusted BOS entry',
+    'mbms confirmation entry',
+    'SC reaction only',
+    'HTF liquidity sweep entry',
+  ];
+  const map = {};
+  SETUPS.forEach(s => { map[s] = { w: 0, l: 0, rrSum: 0, rrN: 0 }; });
+  map.Other = { w: 0, l: 0, rrSum: 0, rrN: 0 };
+  closed.forEach(t => {
+    const setup = (t.setup || '').startsWith('Other') ? 'Other' : t.setup;
+    const bucket = map[setup] || map.Other;
+    if (t.outcome === 'win')  bucket.w++;
+    if (t.outcome === 'loss') bucket.l++;
+    const sr = (typeof signedRR === 'function') ? signedRR(t) : (t.actualRR || null);
+    if (sr != null) { bucket.rrSum += Number(sr); bucket.rrN++; }
+  });
+
+  // Sort: most trades first, hide rows with zero
+  const rows = Object.entries(map)
+    .map(([name, v]) => ({ name, ...v, total: v.w + v.l }))
+    .filter(r => r.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  if (!rows.length) {
+    body.innerHTML = '<div style="color:var(--t3);font-size:12px;padding:6px 0;">No setup data yet.</div>';
+    return;
+  }
+
+  body.innerHTML = rows.map(r => {
+    const wr = r.total ? Math.round((r.w / r.total) * 100) : 0;
+    const wPct = (r.w / r.total) * 100;
+    const lPct = (r.l / r.total) * 100;
+    const avgR = r.rrN ? (r.rrSum / r.rrN) : null;
+    const wrCls = wr >= 50 ? '' : 'neg';
+    const avgRTxt = avgR == null ? '—'
+      : (avgR >= 0 ? '+' : '') + avgR.toFixed(2) + 'R';
+    return '<div class="v0-setup-row">'
+         + '<div class="v0-setup-name-wrap">'
+         +   '<div class="v0-setup-name" title="' + r.name + '">' + r.name + '</div>'
+         +   '<div class="v0-setup-bar-bg">'
+         +     '<div class="v0-setup-bar-w" style="width:' + wPct.toFixed(1) + '%"></div>'
+         +     '<div class="v0-setup-bar-l" style="width:' + lPct.toFixed(1) + '%"></div>'
+         +   '</div>'
+         + '</div>'
+         + '<div class="v0-setup-stats">'
+         +   '<div class="wr ' + wrCls + '">' + wr + '% · ' + avgRTxt + '</div>'
+         +   '<div class="rr">' + r.w + 'W / ' + r.l + 'L · ' + r.total + 't</div>'
+         + '</div>'
+         + '</div>';
+  }).join('');
+}
+
 function renderComparison(allTrades) {
   const el = document.getElementById('comparisonContent');
   if (!el) return;
@@ -9276,6 +9380,8 @@ function renderDashboard() {
   renderCalendar(trades);
   // Phase 0 — spec-styled compact heatmap (additive, lives below)
   renderCalendarHeatmap(new Date(), trades);
+  // Phase 0 — setup-performance bars (compact W/L split + avg R)
+  renderSetupBars(trades);
 
   // Left on table summary (enhanced)
   const lotEl = document.getElementById('leftOnTableSummary');
