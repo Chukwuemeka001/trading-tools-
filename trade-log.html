@@ -242,29 +242,55 @@
       .sidebar { display: none !important; }
       .main-content {
         grid-column: 1;
-        padding: 14px calc(14px + var(--safe-right)) calc(72px + var(--safe-bot)) calc(14px + var(--safe-left));
+        padding: 14px calc(14px + var(--safe-right)) calc(96px + var(--safe-bot)) calc(14px + var(--safe-left));
       }
       .bottom-nav {
         display: flex; position: fixed; bottom: 0; left: 0; right: 0;
-        height: calc(60px + var(--safe-bot)); padding-bottom: var(--safe-bot);
-        background: var(--s1); border-top: 1px solid var(--border);
-        z-index: 100; justify-content: space-around; align-items: center;
+        height: calc(78px + var(--safe-bot)); padding-bottom: var(--safe-bot); padding-top: 8px;
+        background: rgba(17,20,24,0.92); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+        border-top: 1px solid var(--border);
+        z-index: 100; align-items: flex-start;
         padding-left: calc(4px + var(--safe-left));
         padding-right: calc(4px + var(--safe-right));
       }
       .bn-item {
+        position: relative;
         display: flex; flex-direction: column; align-items: center; gap: 3px;
-        padding: 6px 8px; cursor: pointer; border-radius: 8px;
-        color: var(--t3); font-size: 10px; font-weight: 500;
+        padding: 6px 4px; cursor: pointer; border-radius: 8px;
+        color: var(--t3); font-size: 10px; font-weight: 600;
         border: none; background: none; flex: 1; font-family: inherit;
+        min-height: 44px;
+        transition: color 0.2s ease;
       }
       .bn-item.active { color: var(--blue); }
-      .bn-icon { font-size: 20px; position: relative; }
+      .bn-indicator { display: none; }
+      .bn-item.active .bn-indicator {
+        display: block;
+        position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+        width: 24px; height: 3px; background: var(--blue); border-radius: 0 0 3px 3px;
+      }
+      .bn-icon { font-size: 20px; line-height: 1; position: relative; }
+      .bn-label { letter-spacing: 0.02em; }
       .bn-badge {
         position: absolute; top: -4px; right: -6px;
         background: var(--red); color: #fff; border-radius: 8px;
         padding: 1px 4px; font-size: 9px; font-weight: 700;
       }
+      /* Center FAB — sits in the same flex row, raised above the bar */
+      .bn-fab-wrap {
+        flex: 1; display: flex; justify-content: center; align-items: flex-start;
+      }
+      .bn-fab {
+        width: 54px; height: 54px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--blue), #1d4ed8);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 28px; color: #fff; font-weight: 300;
+        box-shadow: 0 6px 20px rgba(59,130,246,0.4), 0 0 0 4px var(--bg);
+        margin-top: -14px; cursor: pointer; border: none;
+        font-family: inherit; line-height: 1;
+        transition: transform 0.15s ease;
+      }
+      .bn-fab:active { transform: scale(0.95); }
     }
     @media (max-width: 900px) and (min-width: 641px) {
       .app { grid-template-columns: var(--sb-w-collapsed) 1fr; }
@@ -3032,13 +3058,31 @@
 
 </main><!-- /.main-content -->
 
-<!-- Mobile bottom nav -->
-<nav class="bottom-nav">
-  <button class="bn-item active" data-tab="dashboard" onclick="nav('dashboard')"><span class="bn-icon">📊</span><span>Dashboard</span></button>
-  <button class="bn-item" data-tab="log"     onclick="nav('log')"><span class="bn-icon">✏️</span><span>Log</span></button>
-  <button class="bn-item" data-tab="journal" onclick="nav('journal')"><span class="bn-icon">📋</span><span>Journal</span></button>
-  <button class="bn-item" data-tab="live"    onclick="nav('live')"><span class="bn-icon">📡</span><span>Live</span></button>
-  <button class="bn-item" data-tab="calculator" onclick="nav('calculator')"><span class="bn-icon">🧮</span><span>Calc</span></button>
+<!-- Mobile bottom nav (Phase 0 — 5-slot iOS tabbar with center FAB) -->
+<nav class="bottom-nav" role="navigation" aria-label="Primary">
+  <button class="bn-item active" data-tab="dashboard" onclick="nav('dashboard')">
+    <span class="bn-indicator"></span>
+    <span class="bn-icon">📊</span>
+    <span class="bn-label">Home</span>
+  </button>
+  <button class="bn-item" data-tab="journal" onclick="nav('journal')">
+    <span class="bn-indicator"></span>
+    <span class="bn-icon">📋</span>
+    <span class="bn-label">Journal</span>
+  </button>
+  <div class="bn-fab-wrap">
+    <button class="bn-fab" onclick="nav('log')" aria-label="Log new trade">+</button>
+  </div>
+  <button class="bn-item" data-tab="live" onclick="nav('live')">
+    <span class="bn-indicator"></span>
+    <span class="bn-icon">📡</span>
+    <span class="bn-label">Live</span>
+  </button>
+  <button class="bn-item" onclick="openSheet('more')" aria-label="More options">
+    <span class="bn-indicator"></span>
+    <span class="bn-icon">⋯</span>
+    <span class="bn-label">More</span>
+  </button>
 </nav>
 
 </div><!-- /.app -->
@@ -4139,6 +4183,24 @@ function nav(view) {
   const main = document.querySelector('.main-content');
   if (main) main.scrollTo({ top: 0, behavior: 'instant' });
   window.scrollTo(0, 0);
+}
+
+// Phase 0 — bottom sheet open/close (real DOM lands in next commit; stub
+// keeps the More button non-throwing in the meantime).
+function openSheet(name) {
+  const bg = document.getElementById('sheetBg');
+  const sh = document.getElementById('sheet-' + name);
+  if (!bg || !sh) return;
+  document.querySelectorAll('.sheet').forEach(s => s.classList.remove('open'));
+  bg.classList.add('open');
+  sh.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeSheet() {
+  const bg = document.getElementById('sheetBg');
+  if (bg) bg.classList.remove('open');
+  document.querySelectorAll('.sheet').forEach(s => s.classList.remove('open'));
+  document.body.style.overflow = '';
 }
 
 // Phase 5 — sidebar collapse + persistence
