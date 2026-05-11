@@ -292,6 +292,63 @@
       }
       .bn-fab:active { transform: scale(0.95); }
     }
+
+    /* ── Phase 0 — Bottom sheet (More menu, etc) ── */
+    .sheet-bg {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+      z-index: 150; opacity: 0; pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .sheet-bg.open { opacity: 1; pointer-events: auto; }
+    .sheet {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 160;
+      background: var(--s1);
+      border-top-left-radius: 20px; border-top-right-radius: 20px;
+      max-height: 88vh; display: flex; flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+      padding-bottom: var(--safe-bot);
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.4);
+    }
+    .sheet.open { transform: translateY(0); }
+    .sheet-handle {
+      width: 36px; height: 4px; background: var(--border2);
+      border-radius: 2px; margin: 8px auto 6px; flex-shrink: 0;
+    }
+    .sheet-head {
+      padding: 6px 18px 12px; display: flex; justify-content: space-between;
+      align-items: center; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .sheet-title { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; color: var(--t1); }
+    .sheet-close {
+      font-size: 14px; color: var(--blue); font-weight: 600;
+      background: none; border: none; cursor: pointer; font-family: inherit;
+      padding: 6px 10px; min-height: 44px;
+    }
+    .sheet-body { flex: 1; overflow-y: auto; padding: 18px; -webkit-overflow-scrolling: touch; }
+    /* iOS-style grouped settings list */
+    .setlist {
+      background: var(--s2); border: 1px solid var(--border);
+      border-radius: 14px; overflow: hidden; margin-bottom: 12px;
+    }
+    .setrow {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      min-height: 56px; cursor: pointer; background: none; border-left: none;
+      border-right: none; border-top: none; width: 100%; font-family: inherit;
+      color: var(--t1); text-align: left;
+      transition: background 0.15s ease;
+    }
+    .setrow:last-child { border-bottom: none; }
+    .setrow:active { background: var(--s3); }
+    .setrow-icon {
+      width: 30px; height: 30px; border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0; color: #fff;
+    }
+    .setrow-label { flex: 1; font-size: 14px; color: var(--t1); }
+    .setrow-val  { font-size: 13px; color: var(--t3); font-family: var(--mono); }
+    .setrow-chev { color: var(--t3); font-size: 18px; }
     @media (max-width: 900px) and (min-width: 641px) {
       .app { grid-template-columns: var(--sb-w-collapsed) 1fr; }
       .nav-label, .sidebar-logo .logo-text { display: none; }
@@ -3088,6 +3145,45 @@
 </div><!-- /.app -->
 
 <!-- ═══════════════════════════════════════════════════════
+     PHASE 0 — Mobile bottom sheets (More menu)
+     Wired by openSheet(name) / closeSheet(). Tap-outside
+     dismiss via .sheet-bg onclick.
+════════════════════════════════════════════════════════ -->
+<div class="sheet-bg" id="sheetBg" onclick="closeSheet()"></div>
+
+<div class="sheet" id="sheet-more" role="dialog" aria-modal="true" aria-labelledby="sheetMoreTitle">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div class="sheet-title" id="sheetMoreTitle">More</div>
+    <button class="sheet-close" onclick="closeSheet()">Done</button>
+  </div>
+  <div class="sheet-body">
+    <div class="setlist">
+      <button class="setrow" onclick="closeSheet(); nav('calculator')">
+        <div class="setrow-icon" style="background: var(--blue)">$</div>
+        <div class="setrow-label">Position Calculator</div>
+        <span class="setrow-chev">›</span>
+      </button>
+      <button class="setrow" onclick="closeSheet(); nav('alerts')">
+        <div class="setrow-icon" style="background: var(--orange)">🔔</div>
+        <div class="setrow-label">Price Alerts</div>
+        <span class="setrow-chev">›</span>
+      </button>
+    </div>
+    <div class="setlist">
+      <button class="setrow" onclick="closeSheet(); if (typeof openSettingsModal === 'function') openSettingsModal();">
+        <div class="setrow-icon" style="background: #374151">⚙</div>
+        <div class="setrow-label">Settings</div>
+        <span class="setrow-chev">›</span>
+      </button>
+    </div>
+    <div style="text-align: center; font-size: 11px; color: var(--t3); margin-top: 14px;">
+      POIWatcher · Phase 0 mobile chrome
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
      MODAL: Trade Detail
 ════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="modalOverlay" onclick="maybeCloseModal(event)">
@@ -4202,6 +4298,9 @@ function closeSheet() {
   document.querySelectorAll('.sheet').forEach(s => s.classList.remove('open'));
   document.body.style.overflow = '';
 }
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.querySelector('.sheet.open')) closeSheet();
+});
 
 // Phase 5 — sidebar collapse + persistence
 function toggleSidebar() {
