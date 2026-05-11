@@ -600,6 +600,30 @@
     .v0-setup-stats .wr  { font-weight: 700; color: var(--green); }
     .v0-setup-stats .wr.neg { color: var(--red); }
     .v0-setup-stats .rr  { color: var(--t3); margin-top: 2px; }
+
+    /* Confluence hit-rate widget (spec-styled) */
+    .v0-conf-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 8px; font-size: 11px;
+    }
+    .v0-conf-label {
+      min-width: 130px; color: var(--t2); font-size: 11px;
+    }
+    .v0-conf-bar {
+      flex: 1; height: 6px; background: var(--s3);
+      border-radius: 3px; overflow: hidden;
+    }
+    .v0-conf-fill {
+      height: 100%; border-radius: 3px;
+      background: var(--blue);
+      transition: width 0.3s ease;
+    }
+    .v0-conf-fill.high { background: var(--green); }
+    .v0-conf-fill.low  { background: var(--amber); }
+    .v0-conf-stat {
+      font-family: var(--mono); font-size: 11px;
+      color: var(--t3); min-width: 64px; text-align: right;
+    }
     @media (max-width: 900px) and (min-width: 641px) {
       .app { grid-template-columns: var(--sb-w-collapsed) 1fr; }
       .nav-label, .sidebar-logo .logo-text { display: none; }
@@ -2179,6 +2203,13 @@
         <div class="v0-card-sub" id="v0SetupSub">—</div>
       </div>
       <div id="v0SetupBody"></div>
+    </div>
+    <div class="v0-card" id="v0ConfCard" style="grid-column: 1 / -1;">
+      <div class="v0-card-h">
+        <div class="v0-card-t">Confluence Hit Rate (per system rule)</div>
+        <div class="v0-card-sub" id="v0ConfSub">—</div>
+      </div>
+      <div id="v0ConfBody"></div>
     </div>
   </div>
 </div>
@@ -8933,6 +8964,44 @@ function renderSetupBars(allTrades) {
   }).join('');
 }
 
+// Phase 0 — confluence hit-rate. Mirrors the 8 checks in calcSystemScore
+// (line ~7256), one row per rule, showing the % of closed trades where
+// each rule was satisfied. Keeping the logic local (vs reading
+// calcSystemScore output) lets us show per-rule hit rates rather than
+// just the aggregate score.
+function renderConfluenceHitRate(allTrades) {
+  const body = document.getElementById('v0ConfBody');
+  const sub  = document.getElementById('v0ConfSub');
+  if (!body) return;
+  const closed = (allTrades || []).filter(t => t && t.status === 'closed');
+  if (sub) sub.textContent = closed.length + ' closed';
+  if (!closed.length) {
+    body.innerHTML = '<div style="color:var(--t3);font-size:12px;padding:6px 0;">No closed trades yet.</div>';
+    return;
+  }
+  // Each check matches the corresponding entry in calcSystemScore exactly.
+  const RULES = [
+    { label: 'HTF Aligned',         check: t => ['Bullish','Bearish'].includes(t.htfBias) },
+    { label: '$$ Liquidity Taken',  check: t => t.liqTaken === 'Yes' },
+    { label: 'Entry Confirmation',  check: t => typeof t.entryConfirmation === 'string' && (t.entryConfirmation.startsWith('HH+HL') || t.entryConfirmation.startsWith('LL+LH')) },
+    { label: 'Distance & Momentum', check: t => ['Strong','Moderate'].includes(t.distMomentum) },
+    { label: 'Not Chasing',         check: t => ['Waiting for confirmation','Waiting'].includes(t.notChasing) },
+    { label: 'Mentor Check',        check: t => t.mentorCheck === 'Yes' },
+    { label: 'My System',           check: t => ['Yes','My system'].includes(t.mySystem) },
+    { label: 'DXY Confirms',        check: t => t.dxyConfirms === 'Yes aligned' },
+  ];
+  body.innerHTML = RULES.map(r => {
+    const hits = closed.filter(t => { try { return r.check(t); } catch { return false; } }).length;
+    const pct = closed.length ? (hits / closed.length) * 100 : 0;
+    const fillCls = pct >= 70 ? 'high' : pct >= 40 ? '' : 'low';
+    return '<div class="v0-conf-row">'
+         + '<div class="v0-conf-label">' + r.label + '</div>'
+         + '<div class="v0-conf-bar"><div class="v0-conf-fill ' + fillCls + '" style="width:' + pct.toFixed(1) + '%"></div></div>'
+         + '<div class="v0-conf-stat">' + Math.round(pct) + '% · ' + hits + '/' + closed.length + '</div>'
+         + '</div>';
+  }).join('');
+}
+
 function renderComparison(allTrades) {
   const el = document.getElementById('comparisonContent');
   if (!el) return;
@@ -9382,6 +9451,8 @@ function renderDashboard() {
   renderCalendarHeatmap(new Date(), trades);
   // Phase 0 — setup-performance bars (compact W/L split + avg R)
   renderSetupBars(trades);
+  // Phase 0 — confluence hit-rate (% of trades with each rule satisfied)
+  renderConfluenceHitRate(trades);
 
   // Left on table summary (enhanced)
   const lotEl = document.getElementById('leftOnTableSummary');
