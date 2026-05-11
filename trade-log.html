@@ -624,6 +624,12 @@
       font-family: var(--mono); font-size: 11px;
       color: var(--t3); min-width: 64px; text-align: right;
     }
+
+    /* KPI sparklines (spec-styled) */
+    .v0-spark {
+      display: block; width: 100%; height: 28px;
+      margin-top: 6px;
+    }
     @media (max-width: 900px) and (min-width: 641px) {
       .app { grid-template-columns: var(--sb-w-collapsed) 1fr; }
       .nav-label, .sidebar-logo .logo-text { display: none; }
@@ -9002,6 +9008,65 @@ function renderConfluenceHitRate(allTrades) {
   }).join('');
 }
 
+// Phase 0 — KPI sparklines. Reads the last 20 closed trades and paints
+// one of three series: cumulative P&L, rolling win-rate, or rolling
+// signed-R. SVG path is computed inline; if there are fewer than 2 data
+// points the sparkline is left empty rather than rendered as a flat line.
+function renderSparkline(svgEl, dataPoints, color) {
+  if (!svgEl) return;
+  const pts = (dataPoints || []).filter(v => typeof v === 'number' && !isNaN(v));
+  if (pts.length < 2) { svgEl.innerHTML = ''; return; }
+  const W = 100, H = 28, pad = 2;
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const range = (max - min) || 1;
+  const stepX = (W - 2 * pad) / (pts.length - 1);
+  const path = pts.map((v, i) => {
+    const x = pad + i * stepX;
+    const y = H - pad - ((v - min) / range) * (H - 2 * pad);
+    return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  const c = color || 'var(--blue)';
+  svgEl.innerHTML =
+      '<path d="' + path + '" fill="none" stroke="' + c + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>';
+}
+function attachKpiSparklines(closedTrades) {
+  const arr = (closedTrades || []).slice()
+    .sort((a, b) => new Date(a.dateClose || 0) - new Date(b.dateClose || 0))
+    .slice(-20);
+  if (!arr.length) return;
+  // Three pre-computed series — pick the right one per data-spark attr below.
+  let cum = 0;
+  const cumPnL = arr.map(t => { cum += Number(t.actualPnL) || 0; return cum; });
+  let wWindow = [];
+  const winRate = arr.map(t => {
+    wWindow.push(t.outcome === 'win' ? 1 : 0);
+    if (wWindow.length > 10) wWindow.shift();
+    return (wWindow.reduce((s, v) => s + v, 0) / wWindow.length) * 100;
+  });
+  let rWindow = [];
+  const avgR = arr.map(t => {
+    const sr = (typeof signedRR === 'function') ? signedRR(t) : t.actualRR;
+    if (sr != null) rWindow.push(Number(sr));
+    if (rWindow.length > 10) rWindow.shift();
+    return rWindow.length ? rWindow.reduce((s, v) => s + v, 0) / rWindow.length : 0;
+  });
+  document.querySelectorAll('#statsRow .v0-spark').forEach(svg => {
+    const kind = svg.dataset.spark;
+    let data = null, color = 'var(--blue)';
+    if (kind === 'cumPnL') {
+      data = cumPnL;
+      color = cumPnL[cumPnL.length - 1] >= 0 ? 'var(--green)' : 'var(--red)';
+    } else if (kind === 'winRate') {
+      data = winRate;
+      color = winRate[winRate.length - 1] >= 50 ? 'var(--green)' : 'var(--red)';
+    } else if (kind === 'avgR') {
+      data = avgR;
+      color = avgR[avgR.length - 1] >= 0 ? 'var(--purple)' : 'var(--red)';
+    }
+    renderSparkline(svg, data, color);
+  });
+}
+
 function renderComparison(allTrades) {
   const el = document.getElementById('comparisonContent');
   if (!el) return;
@@ -9421,19 +9486,25 @@ function renderDashboard() {
   const leftOnTable = calcLeftOnTable(closed.concat(partials));
 
   const stats = [
-    { label: 'Total P&L',     val: fmtPnL(allRealizedPnL), cls: allRealizedPnL>0?'green':allRealizedPnL<0?'red':'' },
-    { label: 'Win Rate',      val: closed.length ? fmt(winRate,1)+'%' : '—', cls: winRate>=50?'green':winRate>0?'red':'' },
+    { label: 'Total P&L',     val: fmtPnL(allRealizedPnL), cls: allRealizedPnL>0?'green':allRealizedPnL<0?'red':'',
+      spark: 'cumPnL' },
+    { label: 'Win Rate',      val: closed.length ? fmt(winRate,1)+'%' : '—', cls: winRate>=50?'green':winRate>0?'red':'',
+      spark: 'winRate' },
     { label: 'Total Trades',  val: filtered.length,  cls: 'blue' },
     { label: 'Open / Partial',val: openCount + (partialCount ? ' / ' + partialCount : ''), cls: partialCount ? 'blue' : '' },
     { label: 'Avg Actual R',  val: hasRRSamples ? fmtRR(avgRR) : '—',
-       cls: !hasRRSamples ? '' : avgRR > 0 ? 'green' : avgRR < 0 ? 'red' : 'amber' },
+       cls: !hasRRSamples ? '' : avgRR > 0 ? 'green' : avgRR < 0 ? 'red' : 'amber',
+       spark: 'avgR' },
     { label: 'Profit Factor', val: isFinite(pf) ? fmt(pf,2) : pf===Infinity ? '∞' : '—', cls: pf>=1.5?'green':pf>=1?'':pf>0?'red':'' },
   ];
 
   document.getElementById('statsRow').innerHTML = stats.map(s =>
     `<div class="stat-card"><div class="stat-label">${s.label}</div>
-     <div class="stat-value ${s.cls}">${s.val}</div></div>`
+     <div class="stat-value ${s.cls}">${s.val}</div>
+     ${s.spark ? `<svg class="v0-spark" data-spark="${s.spark}" viewBox="0 0 100 28" preserveAspectRatio="none"></svg>` : ''}</div>`
   ).join('');
+  // Phase 0 — paint sparklines into every .v0-spark we just emitted
+  attachKpiSparklines(closed);
 
   // Phase 4: per-venue breakdown + crypto-only metrics
   renderVenuePerformance(filtered);
