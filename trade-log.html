@@ -49,6 +49,8 @@
       --sb-w-collapsed: 58px;
       --top-h:          52px;
       --ses-h:          38px;
+      --ticker-h:       32px;
+      --insp-w:         340px;
       /* ── Legacy aliases — keep ~12k lines of existing rules resolving ── */
       --bg-base:       var(--bg);
       --bg-card:       var(--s2);
@@ -349,6 +351,39 @@
     .setrow-label { flex: 1; font-size: 14px; color: var(--t1); }
     .setrow-val  { font-size: 13px; color: var(--t3); font-family: var(--mono); }
     .setrow-chev { color: var(--t3); font-size: 18px; }
+
+    /* ── Phase 0 — Desktop pro chrome (≥1440px) ── */
+    .ticker-bar { display: none; }
+    @media (min-width: 1440px) {
+      .ticker-bar {
+        position: fixed; top: 0; left: 0; right: 0;
+        height: var(--ticker-h);
+        background: #000; border-bottom: 1px solid var(--border);
+        display: flex; align-items: center; overflow: hidden;
+        font-family: var(--mono); font-size: 11px;
+        z-index: 95;
+      }
+      .ticker-track {
+        display: flex; gap: 0; white-space: nowrap;
+        animation: ticker-scroll 120s linear infinite;
+      }
+      .ticker-bar:hover .ticker-track { animation-play-state: paused; }
+      .ticker-item {
+        padding: 0 18px; border-right: 1px solid var(--border);
+        display: flex; align-items: center; gap: 8px;
+        color: var(--t2); height: var(--ticker-h); flex-shrink: 0;
+      }
+      .ticker-item .sym { color: var(--t1); font-weight: 600; }
+      .ticker-item .up  { color: var(--green); }
+      .ticker-item .dn  { color: var(--red); }
+      @keyframes ticker-scroll {
+        0%   { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
+      }
+      /* Push the app down so the fixed ticker doesn't overlap the topbar */
+      .app { padding-top: var(--ticker-h); }
+      .app .topbar { top: var(--ticker-h); }
+    }
     @media (max-width: 900px) and (min-width: 641px) {
       .app { grid-template-columns: var(--sb-w-collapsed) 1fr; }
       .nav-label, .sidebar-logo .logo-text { display: none; }
@@ -1703,6 +1738,15 @@
   </style>
 </head>
 <body>
+
+<!-- ═══════════════════════════════════════════════════════
+     PHASE 0 — Desktop ticker bar (visible at ≥1440px only)
+     Hardcoded symbol list; live price values are written into
+     the .px spans by refreshTickerPrices() from _alertLivePrices.
+════════════════════════════════════════════════════════ -->
+<div class="ticker-bar" id="tickerBar" aria-hidden="true">
+  <div class="ticker-track" id="tickerTrack"></div>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════
      Phase 5 — App shell: topbar + sidebar + main-content
@@ -4301,6 +4345,62 @@ function closeSheet() {
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape' && document.querySelector('.sheet.open')) closeSheet();
 });
+
+// Phase 0 — Desktop ticker (≥1440px). Pulls live prices from the existing
+// _alertLivePrices cache that the Alerts tab already polls. Falls back to
+// "—" so the bar still renders before any backend response.
+const TICKER_SYMBOLS = [
+  { sym: 'BTC/USDT', key: 'BTCUSDT' },
+  { sym: 'ETH/USDT', key: 'ETHUSDT' },
+  { sym: 'EUR/USD',  key: 'EURUSD'  },
+  { sym: 'GBP/USD',  key: 'GBPUSD'  },
+  { sym: 'USD/JPY',  key: 'USDJPY'  },
+  { sym: 'AUD/USD',  key: 'AUDUSD'  },
+  { sym: 'USD/CAD',  key: 'USDCAD'  },
+  { sym: 'USD/CHF',  key: 'USDCHF'  },
+  { sym: 'GBP/JPY',  key: 'GBPJPY'  },
+  { sym: 'EUR/JPY',  key: 'EURJPY'  },
+  { sym: 'SOL/USDT', key: 'SOLUSDT' },
+  { sym: 'XAU/USD',  key: 'XAUUSD'  },
+];
+function _tickerItemHTML(s) {
+  return '<div class="ticker-item" data-key="' + s.key + '">'
+       + '<span class="sym">' + s.sym + '</span> '
+       + '<span class="px">—</span>'
+       + '</div>';
+}
+function buildTicker() {
+  const track = document.getElementById('tickerTrack');
+  if (!track) return;
+  // Duplicate the list inline so the -50% translateX produces a seamless loop.
+  track.innerHTML = TICKER_SYMBOLS.map(_tickerItemHTML).join('') +
+                    TICKER_SYMBOLS.map(_tickerItemHTML).join('');
+}
+function refreshTickerPrices() {
+  const track = document.getElementById('tickerTrack');
+  if (!track) return;
+  const live = (typeof _alertLivePrices === 'object' && _alertLivePrices) ? _alertLivePrices : {};
+  track.querySelectorAll('.ticker-item').forEach(it => {
+    const k = it.dataset.key;
+    const v = live[k];
+    const px = it.querySelector('.px');
+    if (!px) return;
+    if (v == null) { px.textContent = '—'; return; }
+    // Crypto/metals: 2dp; FX: 4dp (5dp for JPY pairs).
+    let dp = 4;
+    if (k.endsWith('USDT') || k === 'XAUUSD') dp = 2;
+    else if (k.endsWith('JPY')) dp = 3;
+    px.textContent = Number(v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+  });
+}
+(function initTicker() {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { buildTicker(); refreshTickerPrices(); }, { once: true });
+  } else {
+    buildTicker(); refreshTickerPrices();
+  }
+  setInterval(refreshTickerPrices, 5000);
+})();
 
 // Phase 5 — sidebar collapse + persistence
 function toggleSidebar() {
