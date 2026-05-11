@@ -476,6 +476,51 @@
     .insp-risk-v.pos { color: var(--green); }
     .insp-risk-v.neg { color: var(--red); }
     .insp-risk-v.amber { color: var(--amber); }
+
+    /* ── Phase 0 — Command palette (⌘K) ── */
+    .palette-bg {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+      z-index: 200; display: none;
+      align-items: flex-start; justify-content: center;
+      padding-top: 14vh;
+    }
+    .palette-bg.open { display: flex; }
+    .palette {
+      width: 560px; max-width: 92vw;
+      background: var(--s1); border: 1px solid var(--border2);
+      border-radius: 14px; box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
+    .palette-input {
+      width: 100%; background: none; border: none;
+      padding: 18px 22px; color: var(--t1); font-size: 16px;
+      outline: none; border-bottom: 1px solid var(--border);
+      font-family: inherit;
+    }
+    .palette-input::placeholder { color: var(--t3); }
+    .palette-list {
+      max-height: 380px; overflow-y: auto; padding: 8px;
+    }
+    .palette-cat {
+      font-size: 10px; color: var(--t3);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 8px 14px 4px; font-weight: 700;
+    }
+    .palette-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; border-radius: 8px; cursor: pointer;
+      background: none; border: none; width: 100%;
+      font-family: inherit; color: var(--t1); text-align: left;
+    }
+    .palette-row:hover, .palette-row.active { background: var(--s3); }
+    .palette-icon {
+      width: 28px; height: 28px; border-radius: 7px;
+      background: var(--s4); display: flex; align-items: center;
+      justify-content: center; font-size: 13px; flex-shrink: 0;
+    }
+    .palette-label { flex: 1; font-size: 13px; }
+    .palette-shortcut { font-family: var(--mono); font-size: 10px; color: var(--t3); }
+    .palette-empty { padding: 20px; text-align: center; color: var(--t3); font-size: 12px; }
     @media (max-width: 900px) and (min-width: 641px) {
       .app { grid-template-columns: var(--sb-w-collapsed) 1fr; }
       .nav-label, .sidebar-logo .logo-text { display: none; }
@@ -3364,6 +3409,18 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
+     PHASE 0 — Command palette (⌘K / Ctrl+K)
+     Lists every nav action + cloud sync. Keyboard nav: ↑↓ +
+     Enter; Escape closes.
+════════════════════════════════════════════════════════ -->
+<div class="palette-bg" id="paletteBg" onclick="if(event.target===this)closePalette()">
+  <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">
+    <input class="palette-input" id="paletteInput" type="text" placeholder="Type a command or search…" autocomplete="off">
+    <div class="palette-list" id="paletteList"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
      MODAL: Trade Detail
 ════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="modalOverlay" onclick="maybeCloseModal(event)">
@@ -4641,6 +4698,107 @@ function renderInspector() {
   // (renderJournal/renderDashboard call refreshTickerPrices indirectly — we
   // rely on the interval here rather than hooking every mutation site).
   setInterval(renderInspector, 30000);
+})();
+
+// Phase 0 — Command palette (⌘K / Ctrl+K). Routes through the existing
+// nav() / openSettingsModal() / gistPush() so the palette is a thin shim,
+// not a parallel control surface.
+const PALETTE_ACTIONS = [
+  { cat: 'Navigate', icon: '📊', label: 'Dashboard',         keywords: 'home dashboard overview kpi', run: () => nav('dashboard') },
+  { cat: 'Navigate', icon: '✏️', label: 'Log Trade',         keywords: 'new trade log entry add',      run: () => nav('log') },
+  { cat: 'Navigate', icon: '📋', label: 'Journal',           keywords: 'history trades list closed',   run: () => nav('journal') },
+  { cat: 'Navigate', icon: '📡', label: 'Live',              keywords: 'live mt5 bitunix positions',   run: () => nav('live') },
+  { cat: 'Navigate', icon: '🧮', label: 'Calculator',        keywords: 'calc position size risk',       run: () => nav('calculator') },
+  { cat: 'Navigate', icon: '🔔', label: 'Alerts',            keywords: 'price alerts notifications',   run: () => nav('alerts') },
+  { cat: 'Navigate', icon: '⚙️', label: 'Settings',          keywords: 'settings prefs config api',    run: () => { if (typeof openSettingsModal === 'function') openSettingsModal(); } },
+  { cat: 'Action',   icon: '☁️', label: 'Sync to Cloud',     keywords: 'sync gist push backup save',   run: () => { if (typeof gistPush === 'function') gistPush(); } },
+];
+let _paletteFiltered = [];
+let _paletteIdx = 0;
+function openPalette() {
+  const bg = document.getElementById('paletteBg');
+  if (!bg) return;
+  bg.classList.add('open');
+  const input = document.getElementById('paletteInput');
+  if (input) { input.value = ''; setTimeout(() => input.focus(), 30); }
+  _paletteIdx = 0;
+  renderPaletteList('');
+}
+function closePalette() {
+  const bg = document.getElementById('paletteBg');
+  if (bg) bg.classList.remove('open');
+}
+function renderPaletteList(q) {
+  const list = document.getElementById('paletteList');
+  if (!list) return;
+  const needle = (q || '').trim().toLowerCase();
+  _paletteFiltered = PALETTE_ACTIONS.filter(a => {
+    if (!needle) return true;
+    return (a.label + ' ' + a.keywords).toLowerCase().includes(needle);
+  });
+  if (!_paletteFiltered.length) {
+    list.innerHTML = '<div class="palette-empty">No matches.</div>';
+    return;
+  }
+  if (_paletteIdx >= _paletteFiltered.length) _paletteIdx = 0;
+  let html = '', lastCat = '';
+  _paletteFiltered.forEach((a, i) => {
+    if (a.cat !== lastCat) { html += '<div class="palette-cat">' + a.cat + '</div>'; lastCat = a.cat; }
+    html += '<button class="palette-row' + (i === _paletteIdx ? ' active' : '') + '" data-idx="' + i + '">'
+         +  '<div class="palette-icon">' + a.icon + '</div>'
+         +  '<div class="palette-label">' + a.label + '</div>'
+         +  '</button>';
+  });
+  list.innerHTML = html;
+  list.querySelectorAll('.palette-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const i = Number(row.dataset.idx);
+      const action = _paletteFiltered[i];
+      if (action) { closePalette(); action.run(); }
+    });
+  });
+}
+document.addEventListener('keydown', function(e) {
+  // ⌘K / Ctrl+K to open
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    const bg = document.getElementById('paletteBg');
+    if (bg && bg.classList.contains('open')) closePalette();
+    else openPalette();
+    return;
+  }
+  const bg = document.getElementById('paletteBg');
+  if (!bg || !bg.classList.contains('open')) return;
+  if (e.key === 'Escape') { e.preventDefault(); closePalette(); return; }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (_paletteFiltered.length) {
+      _paletteIdx = (_paletteIdx + 1) % _paletteFiltered.length;
+      renderPaletteList(document.getElementById('paletteInput').value);
+    }
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (_paletteFiltered.length) {
+      _paletteIdx = (_paletteIdx - 1 + _paletteFiltered.length) % _paletteFiltered.length;
+      renderPaletteList(document.getElementById('paletteInput').value);
+    }
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const action = _paletteFiltered[_paletteIdx];
+    if (action) { closePalette(); action.run(); }
+  }
+});
+(function initPalette() {
+  const wire = () => {
+    const input = document.getElementById('paletteInput');
+    if (!input) return;
+    input.addEventListener('input', () => { _paletteIdx = 0; renderPaletteList(input.value); });
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire, { once: true });
+  } else {
+    wire();
+  }
 })();
 
 // Phase 5 — sidebar collapse + persistence
