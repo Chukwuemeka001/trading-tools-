@@ -523,6 +523,46 @@
     .palette-shortcut { font-family: var(--mono); font-size: 10px; color: var(--t3); }
     .palette-empty { padding: 20px; text-align: center; color: var(--t3); font-size: 12px; }
 
+    /* ── Phase 7.6 — Cloud-sync toast (top-center, all viewports) ── */
+    .sync-toast {
+      position: fixed; top: calc(8px + var(--safe-top)); left: 50%;
+      transform: translate(-50%, -120%);
+      background: var(--s2); color: var(--t1);
+      border: 1px solid var(--border2); border-left: 3px solid var(--blue);
+      border-radius: 10px; padding: 9px 14px;
+      font-size: 13px; font-weight: 500;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      display: none; align-items: center; gap: 10px;
+      z-index: 250; max-width: 92vw;
+      transition: transform 0.25s cubic-bezier(0.32,0.72,0,1), opacity 0.2s;
+      opacity: 0;
+    }
+    .sync-toast.show { display: inline-flex; transform: translate(-50%, 0); opacity: 1; }
+    .sync-toast.ok    { border-left-color: var(--green); }
+    .sync-toast.error { border-left-color: var(--red); }
+    .sync-toast .sync-toast-msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sync-toast button {
+      background: var(--s3); color: var(--t1);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 4px 10px; font-size: 12px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+    }
+    .sync-toast button:hover { background: var(--s4); }
+    /* Topbar Cloud sync button (repurposed from #syncDot span) */
+    #syncDot {
+      font-size: 0.71rem; font-family: inherit;
+      color: var(--t2); white-space: nowrap;
+      padding: 4px 11px; border-radius: 20px;
+      background: var(--s2); border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      display: inline-flex; align-items: center; gap: 6px;
+      min-height: 28px;
+    }
+    #syncDot:hover:not(:disabled) { background: var(--s3); border-color: var(--border2); color: var(--t1); }
+    #syncDot:disabled { cursor: wait; opacity: 0.7; }
+    #syncDot.syncing { color: var(--blue); border-color: rgba(59,130,246,0.35); }
+
     /* ── Phase 0 — Dashboard mini visuals (spec-styled additions) ── */
     .v0-section {
       display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
@@ -2014,7 +2054,7 @@
     <span id="bitunixDotIcon" class="dot grey" style="width:6px;height:6px;border-radius:50%;background:#8b949e;display:inline-block;"></span>
     <span id="bitunixDotText">Bitunix</span>
   </span>
-  <span id="syncDot" style="font-size:0.71rem;color:#8b949e;white-space:nowrap;padding:0 4px;"></span>
+  <button id="syncDot" type="button" onclick="topbarSyncClick()" title="Sync trades with cloud (pull + push)" aria-label="Sync trades with cloud"></button>
   <button class="btn-log-trade" onclick="nav('log')">✏️ Log Trade</button>
 </header>
 
@@ -3557,6 +3597,13 @@
     <input class="palette-input" id="paletteInput" type="text" placeholder="Type a command or search…" autocomplete="off">
     <div class="palette-list" id="paletteList"></div>
   </div>
+</div>
+
+<!-- Phase 7.6 — Cloud sync toast. Top-center floating chip used by boot-pull,
+     manual pull, and the topbar Cloud button. -->
+<div class="sync-toast" id="syncToast" role="status" aria-live="polite">
+  <span class="sync-toast-msg" id="syncToastMsg"></span>
+  <button id="syncToastBtn" type="button" style="display:none;" onclick="topbarSyncClick()">Retry</button>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
@@ -9992,15 +10039,119 @@ function applySync() {
   } catch {}
 }
 
+// Phase 7.6 — repurposed: this chip now reflects GIST sync state, and the
+// element is a real <button> wired to topbarSyncClick(). Calculator-driven
+// capital sync is still surfaced via #syncBar on the journal page; the
+// previous "Synced from Calculator · 12:34" lived here only as a dot, which
+// new users were misreading as cloud-sync state.
 function updateSyncDot() {
   const el = document.getElementById('syncDot');
   if (!el) return;
-  const s = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null');
-  if (s && s.lastUpdated) {
-    const t = new Date(s.lastUpdated).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    el.innerHTML = `<span style="color:#3fb950;">⬤</span> Synced · ${t}`;
+  const cfg = getGistCfg();
+  if (!cfg.token || !cfg.gistId) {
+    el.innerHTML = '<span style="color:#6e7681;">☁</span> Set up sync';
+    el.title = 'Set up cloud sync in Settings';
+    return;
+  }
+  if (!cfg.lastSync) {
+    el.innerHTML = '<span style="color:#58a6ff;">☁</span> Cloud · pending';
+    el.title = 'Click to pull + push (no successful sync yet)';
+    return;
+  }
+  const t = new Date(cfg.lastSync).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  el.innerHTML = `<span style="color:#3fb950;">☁</span> Cloud · ${t}`;
+  el.title = 'Click to sync trades with cloud (pull + push)';
+}
+
+// Phase 7.6 — top-center cloud-sync toast (single-instance, replaces in-modal
+// status messages so users on Dashboard / Journal also see boot-pull state).
+let _syncToastTimer = null;
+function showSyncToast(msg, kind, opts) {
+  const el  = document.getElementById('syncToast');
+  const txt = document.getElementById('syncToastMsg');
+  const btn = document.getElementById('syncToastBtn');
+  if (!el || !txt || !btn) return;
+  clearTimeout(_syncToastTimer);
+  el.classList.remove('ok', 'error');
+  if (kind === 'ok')    el.classList.add('ok');
+  if (kind === 'error') el.classList.add('error');
+  txt.textContent = msg;
+  btn.style.display = (opts && opts.retry) ? 'inline-flex' : 'none';
+  // Force reflow before adding .show so the slide-in transition triggers.
+  el.style.display = 'inline-flex';
+  void el.offsetWidth;
+  el.classList.add('show');
+  if (opts && opts.autoMs) {
+    _syncToastTimer = setTimeout(hideSyncToast, opts.autoMs);
+  }
+}
+function hideSyncToast() {
+  clearTimeout(_syncToastTimer);
+  const el = document.getElementById('syncToast');
+  if (!el) return;
+  el.classList.remove('show');
+  // Wait for transition before display:none so the slide-out is visible.
+  setTimeout(() => { if (!el.classList.contains('show')) el.style.display = 'none'; }, 260);
+}
+
+// Phase 7.6 — bidirectional topbar sync. Pull first (newer-updatedAt wins,
+// Gist wins on missing timestamps), then push so other devices catch up.
+let _syncInFlight = false;
+async function topbarSyncClick() {
+  const btn = document.getElementById('syncDot');
+  const cfg = getGistCfg();
+  if (!cfg.token || !cfg.gistId) {
+    showSyncToast('Set up cloud sync in Settings', 'error');
+    if (typeof openSettingsModal === 'function') {
+      // Tiny delay so the toast is visible briefly before the modal jumps in.
+      setTimeout(() => { openSettingsModal(); if (typeof setSettingsTab === 'function') setSettingsTab('sync'); }, 150);
+    }
+    return;
+  }
+  if (_syncInFlight) return;
+  _syncInFlight = true;
+  if (btn) { btn.disabled = true; btn.classList.add('syncing'); }
+  showSyncToast('⟳ Syncing trades from cloud…', 'info');
+
+  let pull;
+  try {
+    pull = await gistPullRaw();
+  } catch (e) {
+    _syncInFlight = false;
+    if (btn) { btn.disabled = false; btn.classList.remove('syncing'); }
+    showSyncToast('Sync failed: ' + (e && e.message || 'unknown'), 'error', { retry: true });
+    return;
+  }
+  if (!pull.ok) {
+    _syncInFlight = false;
+    if (btn) { btn.disabled = false; btn.classList.remove('syncing'); }
+    showSyncToast('Sync failed: ' + pull.reason, 'error', { retry: true });
+    return;
+  }
+  if (pull.added > 0 || pull.updated > 0) { renderJournal(); renderDashboard(); }
+
+  let pushedId;
+  try {
+    pushedId = await gistPush(cfg.token, cfg.gistId);
+  } catch (e) {
+    _syncInFlight = false;
+    if (btn) { btn.disabled = false; btn.classList.remove('syncing'); }
+    showSyncToast('Push failed: ' + e.message, 'error', { retry: true });
+    return;
+  }
+  saveGistCfg({ ...cfg, gistId: pushedId, lastSync: new Date().toISOString() });
+  updateSyncDot();
+  refreshCloudStatus();
+  _syncInFlight = false;
+  if (btn) { btn.disabled = false; btn.classList.remove('syncing'); }
+
+  if (pull.added > 0 || pull.updated > 0) {
+    const parts = [];
+    if (pull.added)   parts.push(pull.added   + ' new');
+    if (pull.updated) parts.push(pull.updated + ' updated');
+    showSyncToast('✓ Synced — ' + parts.join(', '), 'ok', { autoMs: 5000 });
   } else {
-    el.innerHTML = `<span style="color:#6e7681;">⬤</span> Not synced`;
+    showSyncToast('✓ Already up to date', 'ok', { autoMs: 3000 });
   }
 }
 
@@ -10108,6 +10259,7 @@ async function gistConnect() {
     saveGistCfg({ gistId: newId, lastSync: new Date().toISOString() });
     document.getElementById('gistId').value = newId;
     refreshCloudStatus();
+    updateSyncDot();
     const addedNote = pullResult.ok && pullResult.added > 0 ? ` · ${pullResult.added} new from cloud` : '';
     bar.innerHTML = `<span style="color:#3fb950;">✓ Synced${addedNote}</span>`;
   } catch(err) {
@@ -10184,20 +10336,45 @@ async function gistPullRaw() {
     return { ok: false, added: 0, reason: 'gist content not valid JSON' };
   }
 
-  // ── Merge: Gist additions only; local trades preserved ──
+  // ── Merge: newer updatedAt wins (per-trade); Gist wins when either side
+  //          is missing the timestamp. Local-only trades that haven't been
+  //          pushed yet are preserved as-is. Returns { added, updated } so
+  //          the UI can distinguish "3 new from cloud" from "1 cloud edit
+  //          replaced your local copy".
   const incoming    = Array.isArray(data.trades) ? data.trades : [];
-  const existingIds = new Set(trades.map(t => t.id));
-  const newTrades   = incoming.filter(t => t && t.id && !existingIds.has(t.id));
-  if (newTrades.length) {
-    trades = [...trades, ...newTrades];
+  const incomingMap = new Map(incoming.filter(t => t && t.id).map(t => [t.id, t]));
+  let added = 0, updated = 0;
+  const merged = trades.map(local => {
+    const remote = incomingMap.get(local.id);
+    if (!remote) return local;                   // local-only — keep
+    const lu = local.updatedAt  ? Date.parse(local.updatedAt)  : NaN;
+    const ru = remote.updatedAt ? Date.parse(remote.updatedAt) : NaN;
+    // Gist wins when either timestamp is missing (covers legacy trades).
+    const gistWins = isNaN(lu) || isNaN(ru) || ru > lu;
+    if (gistWins && JSON.stringify(remote) !== JSON.stringify(local)) {
+      updated++;
+      return remote;
+    }
+    return local;
+  });
+  // Append cloud-only trades.
+  const localIds = new Set(trades.map(t => t.id));
+  incoming.forEach(t => {
+    if (t && t.id && !localIds.has(t.id)) { merged.push(t); added++; }
+  });
+  if (added > 0 || updated > 0) {
+    trades = merged;
     localStorage.setItem(STORE, JSON.stringify(trades));
   }
-  // Settings restore: only on a brand-new device (no local settings yet).
-  if (data.settings && !localStorage.getItem(SETTINGS_KEY)) {
+  // Settings: always overwrite local with Gist (Gist wins). Credentials
+  // (Bitunix API key/secret, execution key, Telegram token, Gist token) live
+  // in cookies + their own localStorage keys and are NOT in this object —
+  // see DEFAULT_SETTINGS at line ~12440. So this overwrite is credential-safe.
+  if (data.settings) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(data.settings));
     if (typeof applySettings === 'function') applySettings(data.settings);
   }
-  return { ok: true, added: newTrades.length, total: incoming.length };
+  return { ok: true, added, updated, total: incoming.length };
 }
 
 async function gistPullUI() {
@@ -10217,11 +10394,13 @@ async function gistPullUI() {
   const cfg = getGistCfg();
   saveGistCfg({ ...cfg, lastSync: new Date().toISOString() });
   refreshCloudStatus();
-  if (result.added > 0) {
+  updateSyncDot();
+  if (result.added > 0 || result.updated > 0) {
     renderJournal();
     renderDashboard();
   }
-  if (bar) bar.innerHTML = `<span style="color:#3fb950;">✓ Synced — ${result.added} new trade(s) added.</span>`;
+  const u = result.updated || 0;
+  if (bar) bar.innerHTML = `<span style="color:#3fb950;">✓ Synced — ${result.added} new${u ? ', ' + u + ' updated' : ''}.</span>`;
 }
 
 function gistDisconnect() {
@@ -10243,7 +10422,8 @@ function scheduleGistPush() {
       const newId = await gistPush(token, cfg.gistId);
       saveGistCfg({ ...cfg, gistId: newId, lastSync: new Date().toISOString() });
       refreshCloudStatus();
-    } catch { /* silent */ }
+      updateSyncDot();
+    } catch { /* silent — keep chip on prior lastSync time */ }
   }, 3000);
 }
 
@@ -12682,21 +12862,20 @@ migrateChartImages().catch(e => console.warn('Chart migration:', e));
 applySettings(getSettings());
 updateSyncDot();
 refreshCloudStatus();
-// Phase 7.5 — pull-first boot. If cloud is configured, wait up to 3s for
-// the pull to finish before the initial render so users land on a fully-
-// synced journal. Slow Gist API doesn't block forever — after 3s we render
-// with whatever we have and the pull continues in the background; on
-// completion we re-render to show the freshly pulled trades.
+// Phase 7.6 — pull-first boot. Wait up to 8 seconds for the pull (was 3s —
+// too tight on slow mobile connections, the main symptom of "phone trades
+// don't appear on laptop"). After 8s we paint with whatever's local and the
+// pull continues in the background; the toast surfaces the result.
 (async () => {
   const cfg = getGistCfg();
   const cloudConfigured = !!(cfg.token && cfg.gistId);
-  const bar = document.getElementById('cloudStatusBar');
+  // Initial chip state (whether cloud-configured or not).
+  if (typeof updateSyncDot === 'function') updateSyncDot();
   let pullPromise = null;
   if (cloudConfigured) {
-    if (bar) bar.innerHTML = '<span style="color:#58a6ff;">⟳ Syncing from cloud…</span>';
+    showSyncToast('⟳ Syncing trades from cloud…', 'info');
     pullPromise = gistPullRaw().catch(e => ({ ok: false, added: 0, reason: e?.message || 'unknown' }));
-    // Race the pull against a 3s timeout — first paint shouldn't hang.
-    await Promise.race([pullPromise, new Promise(r => setTimeout(r, 3000))]);
+    await Promise.race([pullPromise, new Promise(r => setTimeout(r, 8000))]);
   }
   // First paint — uses whatever's in `trades` right now (synced or local).
   renderDashboard();
@@ -12711,18 +12890,26 @@ refreshCloudStatus();
   if (pullPromise) {
     pullPromise.then(result => {
       if (!result || !result.ok) {
-        if (bar) bar.innerHTML = `<span style="color:#f85149;">✗ Sync failed: ${result?.reason || 'unknown'}</span> <button class="btn btn-ghost" onclick="gistPullUI()" style="padding:2px 8px;font-size:0.7rem;margin-left:6px;">Retry</button>`;
+        showSyncToast('Sync failed: ' + (result?.reason || 'unknown'), 'error', { retry: true });
         return;
       }
       saveGistCfg({ ...getGistCfg(), lastSync: new Date().toISOString() });
       refreshCloudStatus();
-      if (result.added > 0) {
-        // Re-render whichever views show trade data so newly pulled trades
-        // appear without a tab switch.
+      updateSyncDot();
+      if (result.added > 0 || result.updated > 0) {
         renderJournal();
         renderDashboard();
       }
-    }).catch(() => { /* swallow — refreshCloudStatus already gives status */ });
+      const a = result.added || 0, u = result.updated || 0;
+      if (a > 0 || u > 0) {
+        const parts = [];
+        if (a) parts.push(a + ' new');
+        if (u) parts.push(u + ' updated');
+        showSyncToast('✓ Synced — ' + parts.join(', '), 'ok', { autoMs: 5000 });
+      } else {
+        showSyncToast('✓ Already up to date', 'ok', { autoMs: 3000 });
+      }
+    }).catch(() => { /* swallow — toast handler above covers display */ });
   }
 })();
 window.addEventListener('resize', () => {
